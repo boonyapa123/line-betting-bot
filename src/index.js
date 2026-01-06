@@ -9,8 +9,7 @@ const { storeMessage, handleMessageDelete } = require('./handlers/deleteHandler'
 const app = express();
 
 // Middleware - ต้องอยู่ก่อน routes
-// LINE middleware ต้องรับ raw body
-// LINE webhook middleware - ต้องอยู่ก่อน route handler
+// LINE webhook middleware - ต้องรับ raw body และอยู่ก่อน express.json()
 app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   console.log('🔔 Webhook received');
   
@@ -65,7 +64,7 @@ app.post('/', express.raw({ type: 'application/json' }), (req, res) => {
   }
 });
 
-// JSON middleware สำหรับ routes อื่น
+// JSON middleware สำหรับ routes อื่น (ต้องอยู่หลัง webhook routes)
 app.use(express.json());
 
 // Serve static files (for LIFF)
