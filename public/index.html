@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ฟอร์มส่งข้อมูล</title>
+    <script>
+        // Redirect to the appropriate form based on the 'form' parameter
+        function redirectToForm() {
+            const params = new URLSearchParams(window.location.search);
+            const formType = params.get('form') || 'payment';
+            
+            console.log('📋 Form type:', formType);
+            console.log('📋 Current URL:', window.location.href);
+            
+            if (formType === 'open-betting') {
+                console.log('🎯 Redirecting to open betting form');
+                const newUrl = '/liff-open-betting.html' + window.location.search;
+                console.log('🎯 New URL:', newUrl);
+                window.location.replace(newUrl);
+            } else {
+                console.log('💳 Redirecting to payment form');
+                const newUrl = '/liff-payment-form.html' + window.location.search;
+                console.log('💳 New URL:', newUrl);
+                window.location.replace(newUrl);
+            }
+        }
+        
+        // Redirect immediately
+        redirectToForm();
+    </script>
+</head>
+<body>
+    <p>กำลังโหลด...</p>
+</body>
+</html>

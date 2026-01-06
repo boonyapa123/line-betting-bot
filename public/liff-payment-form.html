@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ฟอร์มส่งลิงค์โอนเงิน</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 ส่งลิงค์โอนเงิน</h1>
+            <p>กรุณากรอกข้อมูลการโอนเงิน</p>
+        </div>
+
+        <div class="error" id="errorMsg"></div>
+        <div class="success" id="successMsg"></div>
+
+        <div class="info-box">
+            ℹ️ ข้อมูลที่กรอกจะถูกส่งไปยังห้องแชทกลุ่มทันที
+        </div>
+
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="groupId">เลือกกลุ่มที่จะส่ง <span class="required">*</span></label>
+                <select id="groupId" required>
+                    <option value="">-- กำลังโหลด --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="bankName">ชื่อธนาคาร <span class="required">*</span></label>
+                <input 
+                    type="text" 
+                    id="bankName" 
+                    placeholder="เช่น ธนาคารกรุงไทย"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="accountNumber">เลขบัญชี <span class="required">*</span></label>
+                <input 
+                    type="text" 
+                    id="accountNumber" 
+                    placeholder="เช่น 123-456-789"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="accountName">ชื่อบัญชี <span class="required">*</span></label>
+                <input 
+                    type="text" 
+                    id="accountName" 
+                    placeholder="เช่น นาย ก. ใจดี"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="paymentLink">ลิงค์โอนเงิน (ถ้ามี)</label>
+                <textarea 
+                    id="paymentLink" 
+                    placeholder="เช่น https://promptpay.io/..."
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="note">หมายเหตุ (ถ้ามี)</label>
+                <textarea 
+                    id="note" 
+                    placeholder="เช่น โปรดโอนเงินภายใน 30 นาที"
+                ></textarea>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn-cancel" onclick="closeForm()">ยกเลิก</button>
+                <button type="submit" class="btn-submit">ส่งข้อมูล</button>
+            </div>
+
+            <div class="loading" id="loading">
+                <span class="spinner"></span>
+                <span>กำลังส่งข้อมูล...</span>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let liffId = null;
+        let groupId = null;
+        let userId = null;
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('📄 DOM loaded - Payment Form');
+            console.log('📍 Current URL:', window.location.href);
+            
+            // Get userId from LIFF context
+            try {
+                if (typeof liff !== 'undefined' && liff.isInClient()) {
+                    const context = liff.getContext();
+                    userId = context.userId;
+                    console.log('✅ Got userId from LIFF context:', userId);
+                } else {
+                    console.warn('⚠️ Not in LIFF client');
+                }
+            } catch (error) {
+                console.error('❌ Error getting userId from LIFF:', error);
+            }
+            
+            // Check if this is the correct form
+            // Handle liff.state parameter which contains the actual parameters
+            let formType = 'payment'; // default
+            
+            // First, check if liff.state exists
+            const params = new URLSearchParams(window.location.search);
+            const liffState = params.get('liff.state');
+            
+            console.log('📋 liff.state:', liffState);
+            
+            if (liffState) {
+                // Decode and parse liff.state
+                try {
+                    const decodedState = decodeURIComponent(liffState);
+                    console.log('📋 Decoded state:', decodedState);
+                    
+                    const stateParams = new URLSearchParams(decodedState);
+                    formType = stateParams.get('form') || 'payment';
+                    console.log('📋 Form type from state:', formType);
+                } catch (e) {
+                    console.error('❌ Error parsing liff.state:', e);
+                }
+            } else {
+                // Check direct form parameter
+                formType = params.get('form') || 'payment';
+                console.log('📋 Form type from params:', formType);
+            }
+            
+            console.log('📋 Final form type:', formType);
+            
+            if (formType === 'open-betting') {
+                console.log('🎯 Wrong form! Redirecting to open betting form');
+                window.location.replace('/liff-open-betting.html' + window.location.search);
+                return;
+            }
+            
+            setupFormListener();
+        });
+        
+        // Setup form listener
+        function setupFormListener() {
+            const form = document.getElementById('paymentForm');
+            if (!form) {
+                console.error('❌ paymentForm element not found');
+                return;
+            }
+            
+            console.log('✅ Setting up form listener');
+            
+            // Load groups
+            loadGroups();
+            
+            form.addEventListener('submit', handleFormSubmit);
+        }
+
+        // Load groups from API
+        async function loadGroups() {
+            try {
+                console.log('📥 Loading groups from API...');
+                const response = await fetch('/api/groups', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load groups');
+                }
+
+                const data = await response.json();
+                const select = document.getElementById('groupId');
+
+                // Clear existing options
+                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
+
+                // Add groups
+                if (data.groups && data.groups.length > 0) {
+                    console.log('✅ Groups loaded:', data.groups.length);
+                    data.groups.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.id;
+                        option.textContent = group.name;
+                        select.appendChild(option);
+                    });
+                } else {
+                    console.warn('⚠️ No groups found');
+                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
+                }
+            } catch (error) {
+                console.error('❌ Error loading groups:', error);
+                const select = document.getElementById('groupId');
+                select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+            }
+        }
+
+        // Handle form submission
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            console.log('📝 Form submitted');
+            console.log('🔍 Checking form data...');
+
+            const selectedGroupId = document.getElementById('groupId').value;
+            const bankName = document.getElementById('bankName').value.trim();
+            const accountNumber = document.getElementById('accountNumber').value.trim();
+            const accountName = document.getElementById('accountName').value.trim();
+            const paymentLink = document.getElementById('paymentLink').value.trim();
+            const note = document.getElementById('note').value.trim();
+
+            console.log('📋 Form data:', {
+                selectedGroupId,
+                bankName,
+                accountNumber,
+                accountName,
+                paymentLink,
+                note,
+            });
+
+            // Validate
+            if (!selectedGroupId || !bankName || !accountNumber || !accountName) {
+                console.error('❌ Validation failed');
+                showError('กรุณากรอกข้อมูลที่จำเป็นทั้งหมด');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('paymentForm').style.opacity = '0.5';
+            document.getElementById('paymentForm').style.pointerEvents = 'none';
+
+            try {
+                console.log('📤 Sending payment link...');
+                console.log('🌐 Fetch URL: /api/send-payment-link');
+                console.log('📦 Request body:', {
+                    groupId: selectedGroupId,
+                    bankName,
+                    accountNumber,
+                    accountName,
+                    paymentLink: paymentLink || undefined,
+                    note: note || undefined,
+                    userId,
+                    timestamp: new Date().toISOString(),
+                });
+                
+                // Send to backend
+                const response = await fetch('/api/send-payment-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        groupId: selectedGroupId,
+                        bankName,
+                        accountNumber,
+                        accountName,
+                        paymentLink: paymentLink || undefined,
+                        note: note || undefined,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                    })
+                });
+
+                console.log('📥 Response status:', response.status);
+                console.log('📥 Response received');
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('❌ Server error:', error);
+                    throw new Error(error.error || 'Failed to send payment link');
+                }
+
+                const result = await response.json();
+                console.log('✅ Payment link sent successfully:', result);
+
+                // Show success
+                showSuccess('✅ ส่งข้อมูลไปยังกลุ่มแล้ว');
+
+                // Close LIFF after 2 seconds
+                setTimeout(() => {
+                    if (liff.isInClient()) {
+                        liff.closeWindow();
+                    } else {
+                        window.close();
+                    }
+                }, 2000);
+            } catch (error) {
+                console.error('❌ Error sending payment link:', error);
+                showError('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('paymentForm').style.opacity = '1';
+                document.getElementById('paymentForm').style.pointerEvents = 'auto';
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successEl = document.getElementById('successMsg');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+        }
+
+        // Close form
+        function closeForm() {
+            window.close();
+        }
+
+        // Initialize on load
+        // (Form listener is set up in DOMContentLoaded)
+    </script>
+</body>
+</html>
