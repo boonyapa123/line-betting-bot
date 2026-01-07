@@ -230,49 +230,51 @@ router.get('/groups', async (req, res) => {
     
     console.log('📥 GET /api/groups requested');
     
-    // Get group ID from environment
-    const groupId = process.env.LINE_GROUP_ID;
+    // Get group IDs from environment (support multiple groups)
+    const groupIdsEnv = process.env.LINE_GROUP_IDS || process.env.LINE_GROUP_ID;
     
-    if (!groupId) {
-      console.warn('⚠️ LINE_GROUP_ID not set');
+    if (!groupIdsEnv) {
+      console.warn('⚠️ LINE_GROUP_IDS or LINE_GROUP_ID not set');
       return res.json({
         success: true,
         groups: [],
       });
     }
     
-    // Get group summary from LINE API
-    try {
-      const groupSummary = await client.getGroupSummary(groupId);
-      console.log('✅ Group summary:', groupSummary);
-      
-      const groups = [
-        {
+    // Parse group IDs (support comma-separated list)
+    const groupIds = groupIdsEnv.split(',').map(id => id.trim()).filter(id => id);
+    
+    console.log('📋 Group IDs to fetch:', groupIds);
+    
+    const groups = [];
+    
+    // Fetch each group
+    for (const groupId of groupIds) {
+      try {
+        const groupSummary = await client.getGroupSummary(groupId);
+        console.log(`✅ Group summary for ${groupId}:`, groupSummary);
+        
+        groups.push({
           id: groupId,
-          name: groupSummary.groupName || 'ห้องแทงหลัก',
-        },
-      ];
-      
-      res.json({
-        success: true,
-        groups,
-      });
-    } catch (error) {
-      console.error('❌ Error getting group summary:', error);
-      
-      // Fallback to hardcoded name
-      const groups = [
-        {
+          name: groupSummary.groupName || `ห้องแทง ${groups.length + 1}`,
+        });
+      } catch (error) {
+        console.error(`❌ Error getting group summary for ${groupId}:`, error.message);
+        
+        // Fallback to generic name
+        groups.push({
           id: groupId,
-          name: 'ห้องแทงหลัก',
-        },
-      ];
-      
-      res.json({
-        success: true,
-        groups,
-      });
+          name: `ห้องแทง ${groups.length + 1}`,
+        });
+      }
     }
+    
+    console.log('📊 Final groups list:', groups);
+    
+    res.json({
+      success: true,
+      groups,
+    });
   } catch (error) {
     console.error('❌ Error getting groups:', error);
     res.status(500).json({
