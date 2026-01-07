@@ -13,7 +13,7 @@ const app = express();
 app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   console.log('🔔 Webhook received');
   
-  // ตอบกลับ 200 ทันที
+  // ตอบกลับ 200 ทันที (ต้องทำก่อนประมวลผล)
   res.status(200).send('OK');
   
   // Parse body
@@ -26,10 +26,13 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
     console.log('📨 Full webhook body:', JSON.stringify(body, null, 2));
     console.log('📨 Events:', body.events?.length);
     
-    // ประมวลผล events
+    // ประมวลผล events แบบ async (ไม่รอให้เสร็จ)
     if (body.events && Array.isArray(body.events)) {
       body.events.forEach(event => {
-        handleEvent(event).catch(err => console.error('Error:', err));
+        // ใช้ setImmediate เพื่อให้ประมวลผลแบบ non-blocking
+        setImmediate(() => {
+          handleEvent(event).catch(err => console.error('Error handling event:', err));
+        });
       });
     }
   } catch (error) {
@@ -41,7 +44,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
 app.post('/', express.raw({ type: 'application/json' }), (req, res) => {
   console.log('🔔 Webhook received (root)');
   
-  // ตอบกลับ 200 ทันที
+  // ตอบกลับ 200 ทันที (ต้องทำก่อนประมวลผล)
   res.status(200).send('OK');
   
   // Parse body
@@ -53,10 +56,13 @@ app.post('/', express.raw({ type: 'application/json' }), (req, res) => {
     
     console.log('📨 Events:', body.events?.length);
     
-    // ประมวลผล events
+    // ประมวลผล events แบบ async (ไม่รอให้เสร็จ)
     if (body.events && Array.isArray(body.events)) {
       body.events.forEach(event => {
-        handleEvent(event).catch(err => console.error('Error:', err));
+        // ใช้ setImmediate เพื่อให้ประมวลผลแบบ non-blocking
+        setImmediate(() => {
+          handleEvent(event).catch(err => console.error('Error handling event:', err));
+        });
       });
     }
   } catch (error) {
