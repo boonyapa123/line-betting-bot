@@ -135,6 +135,62 @@ app.get('/api/groups', (req, res) => {
   }
 });
 
+// Debug endpoint - test webhook manually
+app.post('/api/test-webhook', express.json(), (req, res) => {
+  try {
+    console.log('🧪 Test webhook called');
+    console.log('📨 Body:', JSON.stringify(req.body, null, 2));
+    
+    const event = {
+      type: 'message',
+      message: {
+        type: 'text',
+        text: req.body.text || 'test message',
+        id: 'test-msg-id'
+      },
+      source: {
+        type: 'group',
+        groupId: req.body.groupId || 'test-group-id',
+        userId: req.body.userId || 'test-user-id'
+      },
+      replyToken: 'test-reply-token',
+      timestamp: Date.now()
+    };
+    
+    console.log('🧪 Processing test event:', JSON.stringify(event, null, 2));
+    
+    // Process event
+    handleEvent(event).then(() => {
+      res.status(200).json({ success: true, message: 'Test webhook processed' });
+    }).catch(err => {
+      console.error('❌ Error processing test webhook:', err);
+      res.status(500).json({ success: false, error: err.message });
+    });
+  } catch (error) {
+    console.error('❌ Error in test webhook:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Debug endpoint - check webhook configuration
+app.get('/api/debug/webhook', (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      webhook: {
+        url: 'https://line-betting-bot.onrender.com/webhook',
+        status: 'active',
+        lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ? '✓ set' : '✗ not set',
+        lineChannelSecret: process.env.LINE_CHANNEL_SECRET ? '✓ set' : '✗ not set',
+        googleSheetsId: process.env.GOOGLE_SHEETS_ID ? '✓ set' : '✗ not set',
+        googleCredentials: process.env.GOOGLE_CREDENTIALS_BASE64 ? '✓ set' : '✗ not set',
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get specific group details
 app.get('/api/groups/:groupId', (req, res) => {
   try {
