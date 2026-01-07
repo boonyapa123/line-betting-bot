@@ -107,6 +107,81 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Get all groups/rooms where bot is active
+app.get('/api/groups', (req, res) => {
+  try {
+    const groupManagementService = require('./services/groupManagementService');
+    const groups = groupManagementService.getAllGroups();
+    
+    res.status(200).json({
+      success: true,
+      count: groups.length,
+      groups: groups.map(g => ({
+        id: g.id,
+        name: g.name,
+        createdAt: g.createdAt,
+        lastActive: g.lastActive,
+      })),
+    });
+  } catch (error) {
+    console.error('❌ Error getting groups:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific group details
+app.get('/api/groups/:groupId', (req, res) => {
+  try {
+    const groupManagementService = require('./services/groupManagementService');
+    const group = groupManagementService.getGroup(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ success: false, error: 'Group not found' });
+    }
+    
+    res.status(200).json({
+      success: true,
+      group: {
+        id: group.id,
+        name: group.name,
+        createdAt: group.createdAt,
+        lastActive: group.lastActive,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error getting group:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update group name
+app.put('/api/groups/:groupId', express.json(), (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Group name is required' });
+    }
+    
+    const groupManagementService = require('./services/groupManagementService');
+    const success = groupManagementService.updateGroupName(req.params.groupId, name);
+    
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Group not found' });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Group name updated',
+    });
+  } catch (error) {
+    console.error('❌ Error updating group:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
 // Webhook event handler
 async function handleEvent(event) {
   console.log('📨 Received event:', JSON.stringify(event, null, 2));
@@ -166,7 +241,7 @@ async function handleEvent(event) {
       console.log('🎯 Open betting command detected');
       try {
         const openBettingService = require('./services/openBettingService');
-        const groupId = process.env.LINE_GROUP_ID;
+        const groupId = event.source.groupId || event.source.roomId;
         console.log('📝 Calling requestOpenBettingInput with:', { replyToken: event.replyToken, userId: event.source.userId, groupId });
         await openBettingService.requestOpenBettingInput(event.replyToken, event.source.userId, groupId);
         console.log('✅ requestOpenBettingInput completed');
@@ -197,7 +272,7 @@ async function handleEvent(event) {
       console.log('📊 Result summary command detected');
       try {
         const resultSummaryService = require('./services/resultSummaryService');
-        const groupId = process.env.LINE_GROUP_ID;
+        const groupId = event.source.groupId || event.source.roomId;
         console.log('📝 Calling requestResultSummaryInput with:', { replyToken: event.replyToken, userId: event.source.userId, groupId });
         await resultSummaryService.requestResultSummaryInput(event.replyToken, event.source.userId, groupId);
         console.log('✅ requestResultSummaryInput completed');
@@ -213,7 +288,7 @@ async function handleEvent(event) {
       try {
         const PaymentLinkService = require('./services/paymentLinkService');
         console.log('📝 PaymentLinkService loaded:', typeof PaymentLinkService);
-        const groupId = process.env.LINE_GROUP_ID;
+        const groupId = event.source.groupId || event.source.roomId;
         console.log('📝 Calling requestPaymentLinkInput with:', { replyToken: event.replyToken, userId: event.source.userId, groupId });
         await PaymentLinkService.requestPaymentLinkInput(event.replyToken, event.source.userId, groupId);
         console.log('✅ requestPaymentLinkInput completed');
