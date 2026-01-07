@@ -230,46 +230,39 @@ router.get('/groups', async (req, res) => {
     
     console.log('📥 GET /api/groups requested');
     
-    // Get group IDs from environment (support multiple groups)
-    const groupIdsEnv = process.env.LINE_GROUP_IDS || process.env.LINE_GROUP_ID;
+    const groupManagementService = require('../services/groupManagementService');
     
-    if (!groupIdsEnv) {
-      console.warn('⚠️ LINE_GROUP_IDS or LINE_GROUP_ID not set');
-      return res.json({
-        success: true,
-        groups: [],
-      });
-    }
+    // ดึงกลุ่มทั้งหมดจาก service
+    const groups = groupManagementService.getAllGroups();
     
-    // Parse group IDs (support comma-separated list)
-    const groupIds = groupIdsEnv.split(',').map(id => id.trim()).filter(id => id);
+    console.log('📊 Groups found:', groups.length);
     
-    console.log('📋 Group IDs to fetch:', groupIds);
-    
-    const groups = [];
-    
-    // Fetch each group
-    for (const groupId of groupIds) {
-      try {
-        const groupSummary = await client.getGroupSummary(groupId);
-        console.log(`✅ Group summary for ${groupId}:`, groupSummary);
+    // ถ้าไม่มีกลุ่มใน database ให้ใช้ environment variable เป็น fallback
+    if (groups.length === 0) {
+      const groupIdsEnv = process.env.LINE_GROUP_IDS || process.env.LINE_GROUP_ID;
+      
+      if (groupIdsEnv) {
+        console.log('⚠️ No groups in database, using environment variable as fallback');
         
-        groups.push({
-          id: groupId,
-          name: groupSummary.groupName || `ห้องแทง ${groups.length + 1}`,
-        });
-      } catch (error) {
-        console.error(`❌ Error getting group summary for ${groupId}:`, error.message);
+        const groupIds = groupIdsEnv.split(',').map(id => id.trim()).filter(id => id);
         
-        // Fallback to generic name
-        groups.push({
-          id: groupId,
-          name: `ห้องแทง ${groups.length + 1}`,
-        });
+        for (const groupId of groupIds) {
+          try {
+            const groupSummary = await client.getGroupSummary(groupId);
+            groups.push({
+              id: groupId,
+              name: groupSummary.groupName || `ห้องแทง ${groups.length + 1}`,
+            });
+          } catch (error) {
+            console.error(`❌ Error getting group summary for ${groupId}:`, error.message);
+            groups.push({
+              id: groupId,
+              name: `ห้องแทง ${groups.length + 1}`,
+            });
+          }
+        }
       }
     }
-    
-    console.log('📊 Final groups list:', groups);
     
     res.json({
       success: true,

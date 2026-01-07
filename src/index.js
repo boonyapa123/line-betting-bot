@@ -111,6 +111,18 @@ app.get('/health', async (req, res) => {
 async function handleEvent(event) {
   console.log('📨 Received event:', JSON.stringify(event, null, 2));
   
+  // Record group activity if from group
+  if (event.source.type === 'group' || event.source.type === 'room') {
+    const groupManagementService = require('./services/groupManagementService');
+    const { client } = require('./config/line');
+    const groupId = event.source.groupId || event.source.roomId;
+    
+    if (groupId) {
+      console.log(`📝 Recording group activity: ${groupId}`);
+      await groupManagementService.recordGroupActivity(groupId, null, client);
+    }
+  }
+  
   // Handle postback events (Rich Menu buttons)
   if (event.type === 'postback') {
     console.log('📤 Processing postback event:', event.postback.data);
