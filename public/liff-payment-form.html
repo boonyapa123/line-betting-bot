@@ -262,63 +262,62 @@
         let liffId = null;
         let groupId = null;
         let userId = null;
+        let liff;
 
         // Initialize on load
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('📄 DOM loaded - Payment Form');
             console.log('📍 Current URL:', window.location.href);
             
-            // Get userId from LIFF context
-            try {
-                if (typeof liff !== 'undefined' && liff.isInClient()) {
-                    const context = liff.getContext();
-                    userId = context.userId;
-                    console.log('✅ Got userId from LIFF context:', userId);
-                } else {
-                    console.warn('⚠️ Not in LIFF client');
-                }
-            } catch (error) {
-                console.error('❌ Error getting userId from LIFF:', error);
-            }
-            
-            // Check if this is the correct form
-            // Handle liff.state parameter which contains the actual parameters
-            let formType = 'payment'; // default
-            
-            // First, check if liff.state exists
-            const params = new URLSearchParams(window.location.search);
-            const liffState = params.get('liff.state');
-            
-            console.log('📋 liff.state:', liffState);
-            
-            if (liffState) {
-                // Decode and parse liff.state
-                try {
-                    const decodedState = decodeURIComponent(liffState);
-                    console.log('📋 Decoded state:', decodedState);
-                    
-                    const stateParams = new URLSearchParams(decodedState);
-                    formType = stateParams.get('form') || 'payment';
-                    console.log('📋 Form type from state:', formType);
-                } catch (e) {
-                    console.error('❌ Error parsing liff.state:', e);
-                }
-            } else {
-                // Check direct form parameter
-                formType = params.get('form') || 'payment';
-                console.log('📋 Form type from params:', formType);
-            }
-            
-            console.log('📋 Final form type:', formType);
-            
-            if (formType === 'open-betting') {
-                console.log('🎯 Wrong form! Redirecting to open betting form');
-                window.location.replace('/liff-open-betting.html' + window.location.search);
-                return;
-            }
-            
+            await initLiff();
             setupFormListener();
         });
+
+        // Initialize LIFF
+        async function initLiff() {
+            try {
+                console.log('🔄 Initializing LIFF...');
+                
+                // Wait for LIFF to be available
+                let attempts = 0;
+                while (!window.liff && attempts < 10) {
+                    console.log('⏳ Waiting for LIFF to load...');
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!window.liff) {
+                    throw new Error('LIFF SDK failed to load');
+                }
+                
+                liff = window.liff;
+                
+                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
+                
+                console.log('📝 LIFF ID:', liffId);
+                
+                await liff.init({ liffId });
+                console.log('✅ LIFF initialized');
+
+                if (!liff.isLoggedIn()) {
+                    console.log('🔐 User not logged in, redirecting to login...');
+                    liff.login();
+                    return;
+                }
+
+                // Get user context
+                const context = liff.getContext();
+                userId = context.userId;
+                groupId = context.groupId;
+
+                console.log('👤 User ID:', userId);
+                console.log('👥 Group ID from context:', groupId);
+                console.log('📍 Context:', context);
+            } catch (error) {
+                console.error('❌ LIFF init error:', error);
+                showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
+            }
+        }
         
         // Setup form listener
         function setupFormListener() {

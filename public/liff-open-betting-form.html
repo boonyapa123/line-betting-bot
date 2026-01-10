@@ -264,9 +264,21 @@
         async function initLiff() {
             try {
                 console.log('🔄 Initializing LIFF...');
+                
+                // Wait for LIFF to be available
+                let attempts = 0;
+                while (!window.liff && attempts < 10) {
+                    console.log('⏳ Waiting for LIFF to load...');
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!window.liff) {
+                    throw new Error('LIFF SDK failed to load');
+                }
+                
                 liff = window.liff;
                 
-                // Get LIFF ID from environment or use default
                 const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
                 
                 console.log('📝 LIFF ID:', liffId);

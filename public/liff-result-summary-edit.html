@@ -315,10 +315,15 @@
         }
 
         const baseUrl = getBaseUrl();
+        let liff;
+        let userId = null;
+        let groupId = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             console.log('📄 DOM loaded - Result Summary Edit Form');
             console.log('🌐 Base URL:', baseUrl);
+            
+            await initLiff();
             
             const params = new URLSearchParams(window.location.search);
             const liffState = params.get('liff.state');
@@ -348,6 +353,53 @@
                 window.location.replace('/liff-payment-form.html' + window.location.search);
                 return;
             }
+
+        });
+
+        // Initialize LIFF
+        async function initLiff() {
+            try {
+                console.log('🔄 Initializing LIFF...');
+                
+                // Wait for LIFF to be available
+                let attempts = 0;
+                while (!window.liff && attempts < 10) {
+                    console.log('⏳ Waiting for LIFF to load...');
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!window.liff) {
+                    throw new Error('LIFF SDK failed to load');
+                }
+                
+                liff = window.liff;
+                
+                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
+                
+                console.log('📝 LIFF ID:', liffId);
+                
+                await liff.init({ liffId });
+                console.log('✅ LIFF initialized');
+
+                if (!liff.isLoggedIn()) {
+                    console.log('🔐 User not logged in, redirecting to login...');
+                    liff.login();
+                    return;
+                }
+
+                // Get user context
+                const context = liff.getContext();
+                userId = context.userId;
+                groupId = context.groupId;
+
+                console.log('👤 User ID:', userId);
+                console.log('👥 Group ID from context:', groupId);
+            } catch (error) {
+                console.error('❌ LIFF init error:', error);
+                showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
+            }
+        }
             
             if (groupIdFromUrl) {
                 selectedGroupId = groupIdFromUrl;
