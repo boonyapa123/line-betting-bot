@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ฟอร์มส่งลิงค์โอนเงิน</title>
-    <script src="https://cdn.jsdelivr.net/npm/@line/liff/dist/liff.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@line/liff/dist/liff.js" onload="onLiffLoad()"></script>
     <style>
         * {
             margin: 0;
@@ -263,14 +263,23 @@
         let groupId = null;
         let userId = null;
         let liff;
+        let liffReady = false;
+
+        // Called when LIFF SDK loads
+        function onLiffLoad() {
+            console.log('✅ LIFF SDK loaded');
+            liffReady = true;
+            initLiff();
+        }
 
         // Initialize on load
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('📄 DOM loaded - Payment Form');
             console.log('📍 Current URL:', window.location.href);
             
-            await initLiff();
-            setupFormListener();
+            if (liffReady) {
+                setupFormListener();
+            }
         });
 
         // Initialize LIFF
@@ -278,19 +287,11 @@
             try {
                 console.log('🔄 Initializing LIFF...');
                 
-                // Wait for LIFF to be available
-                let attempts = 0;
-                while (!window.liff && attempts < 10) {
-                    console.log('⏳ Waiting for LIFF to load...');
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-                
-                if (!window.liff) {
-                    throw new Error('LIFF SDK failed to load');
-                }
-                
                 liff = window.liff;
+                
+                if (!liff) {
+                    throw new Error('LIFF SDK not available');
+                }
                 
                 const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
                 
@@ -313,6 +314,8 @@
                 console.log('👤 User ID:', userId);
                 console.log('👥 Group ID from context:', groupId);
                 console.log('📍 Context:', context);
+                
+                setupFormListener();
             } catch (error) {
                 console.error('❌ LIFF init error:', error);
                 showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
