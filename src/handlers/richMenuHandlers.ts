@@ -21,8 +21,8 @@ export class RichMenuHandlers {
     try {
       console.log('🎯 Handling open betting request');
 
-      // Get LIFF URL
-      const liffUrl = this.getLiffUrl('open-betting');
+      // Get LIFF URL with groupId
+      const liffUrl = this.getLiffUrl('open-betting', groupId);
 
       // Create Flex Message with LIFF button
       const message: any = {
@@ -222,15 +222,15 @@ export class RichMenuHandlers {
   /**
    * Get LIFF URL
    */
-  private static getLiffUrl(formType: string = 'payment'): string {
+  private static getLiffUrl(formType: string = 'payment', groupId?: string): string {
     const baseUrl = process.env.LIFF_URL || 'https://liff.line.me';
     const liffId = process.env.LIFF_ID || '';
     
     if (formType === 'open-betting') {
-      return `${baseUrl}/${liffId}?form=open-betting`;
+      return `${baseUrl}/${liffId}?form=open-betting${groupId ? `&groupId=${groupId}` : ''}`;
     }
     
-    return `${baseUrl}/${liffId}?form=payment`;
+    return `${baseUrl}/${liffId}?form=payment${groupId ? `&groupId=${groupId}` : ''}`;
   }
 
   /**

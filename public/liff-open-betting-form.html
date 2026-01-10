@@ -266,8 +266,10 @@
                 console.log('🔄 Initializing LIFF...');
                 liff = window.liff;
                 
-                const liffId = new URLSearchParams(window.location.search).get('liffId') || 
-                               '2008804502-EXS0MfDI'; // Default LIFF ID
+                // Get LIFF ID from environment or use default
+                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
+                
+                console.log('📝 LIFF ID:', liffId);
                 
                 await liff.init({ liffId });
                 console.log('✅ LIFF initialized');
@@ -281,13 +283,11 @@
                 // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                
-                // Get groupId from URL parameter or context
-                const urlParams = new URLSearchParams(window.location.search);
-                groupId = urlParams.get('groupId') || context.groupId;
+                groupId = context.groupId;
 
                 console.log('👤 User ID:', userId);
-                console.log('👥 Group ID:', groupId);
+                console.log('👥 Group ID from context:', groupId);
+                console.log('📍 Context:', context);
 
                 // Pre-select group if available
                 if (groupId) {
@@ -295,12 +295,13 @@
                         const select = document.getElementById('groupId');
                         if (select) {
                             select.value = groupId;
+                            console.log('✅ Pre-selected group:', groupId);
                         }
                     }, 500);
                 }
             } catch (error) {
                 console.error('❌ LIFF init error:', error);
-                showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้');
+                showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
             }
         }
         
