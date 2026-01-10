@@ -6,7 +6,8 @@
 const fs = require('fs');
 const path = require('path');
 
-// ใช้ file เก็บ group IDs (ในการ production ควรใช้ database)
+// ใช้ environment variable เก็บ group IDs (JSON format)
+// ถ้าไม่มี ให้ใช้ file เป็น fallback
 const GROUPS_FILE = path.join(__dirname, '../../data/groups.json');
 
 // สร้าง directory ถ้ายังไม่มี
@@ -17,11 +18,20 @@ function ensureDataDir() {
   }
 }
 
-// อ่าน groups จาก file
+// อ่าน groups จาก environment variable หรือ file
 function loadGroups() {
-  ensureDataDir();
-  
   try {
+    // ลองอ่านจาก environment variable ก่อน
+    if (process.env.GROUPS_DATA) {
+      try {
+        return JSON.parse(process.env.GROUPS_DATA);
+      } catch (e) {
+        console.warn('⚠️ Could not parse GROUPS_DATA from env:', e.message);
+      }
+    }
+    
+    // Fallback ไปที่ file
+    ensureDataDir();
     if (fs.existsSync(GROUPS_FILE)) {
       const data = fs.readFileSync(GROUPS_FILE, 'utf-8');
       return JSON.parse(data);
@@ -33,13 +43,18 @@ function loadGroups() {
   return {};
 }
 
-// บันทึก groups ลง file
+// บันทึก groups ลง file และ environment variable
 function saveGroups(groups) {
   ensureDataDir();
   
   try {
+    // บันทึกลง file
     fs.writeFileSync(GROUPS_FILE, JSON.stringify(groups, null, 2));
-    console.log('✅ Groups saved');
+    console.log('✅ Groups saved to file');
+    
+    // บันทึกลง environment variable (สำหรับ production)
+    process.env.GROUPS_DATA = JSON.stringify(groups);
+    console.log('✅ Groups saved to memory');
   } catch (error) {
     console.error('❌ Error saving groups:', error);
   }
