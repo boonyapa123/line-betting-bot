@@ -6,8 +6,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// ใช้ environment variable เก็บ group IDs (JSON format)
-// ถ้าไม่มี ให้ใช้ file เป็น fallback
+// ใช้ global variable เก็บ group IDs (persist ตราบเท่าที่ process ยังทำงาน)
+let groupsInMemory = {};
+
+// ใช้ file เก็บ group IDs (ในการ production ควรใช้ database)
 const GROUPS_FILE = path.join(__dirname, '../../data/groups.json');
 
 // สร้าง directory ถ้ายังไม่มี
@@ -18,23 +20,23 @@ function ensureDataDir() {
   }
 }
 
-// อ่าน groups จาก environment variable หรือ file
+// อ่าน groups จาก memory ก่อน แล้วจึง file
 function loadGroups() {
   try {
-    // ลองอ่านจาก environment variable ก่อน
-    if (process.env.GROUPS_DATA) {
-      try {
-        return JSON.parse(process.env.GROUPS_DATA);
-      } catch (e) {
-        console.warn('⚠️ Could not parse GROUPS_DATA from env:', e.message);
-      }
+    // ถ้ามีใน memory ให้ใช้ memory ก่อน
+    if (Object.keys(groupsInMemory).length > 0) {
+      console.log('✅ Groups loaded from memory:', Object.keys(groupsInMemory).length);
+      return groupsInMemory;
     }
     
     // Fallback ไปที่ file
     ensureDataDir();
     if (fs.existsSync(GROUPS_FILE)) {
       const data = fs.readFileSync(GROUPS_FILE, 'utf-8');
-      return JSON.parse(data);
+      const groups = JSON.parse(data);
+      groupsInMemory = groups; // Cache ไว้ใน memory
+      console.log('✅ Groups loaded from file:', Object.keys(groups).length);
+      return groups;
     }
   } catch (error) {
     console.error('❌ Error loading groups:', error);
@@ -43,18 +45,18 @@ function loadGroups() {
   return {};
 }
 
-// บันทึก groups ลง file และ environment variable
+// บันทึก groups ลง file และ memory
 function saveGroups(groups) {
   ensureDataDir();
   
   try {
+    // บันทึกลง memory ก่อน
+    groupsInMemory = groups;
+    console.log('✅ Groups saved to memory');
+    
     // บันทึกลง file
     fs.writeFileSync(GROUPS_FILE, JSON.stringify(groups, null, 2));
     console.log('✅ Groups saved to file');
-    
-    // บันทึกลง environment variable (สำหรับ production)
-    process.env.GROUPS_DATA = JSON.stringify(groups);
-    console.log('✅ Groups saved to memory');
   } catch (error) {
     console.error('❌ Error saving groups:', error);
   }
