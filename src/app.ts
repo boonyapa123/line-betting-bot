@@ -12,6 +12,7 @@ import { PostbackHandler } from './handlers/postbackHandler';
 import { TextMessageHandler } from './handlers/textMessageHandler';
 import { ErrorHandler } from './utils/errorHandler';
 import { ChatTypeService } from './services/chatTypeService';
+import { GroupAutoDetectService } from './services/groupAutoDetectService';
 import paymentRoutes from './routes/paymentRoutes';
 
 const app: Express = express();
@@ -138,6 +139,27 @@ app.use(express.static('public'));
 // Payment routes
 app.use('/api', paymentRoutes);
 
+// Get auto-detected groups
+app.get('/api/groups', (_req: Request, res: Response) => {
+  try {
+    const groups = GroupAutoDetectService.getAllGroups();
+    const primaryGroupId = GroupAutoDetectService.getPrimaryGroupId();
+
+    res.json({
+      success: true,
+      count: groups.length,
+      primaryGroupId,
+      groups,
+      envGroupId: process.env.LINE_GROUP_ID || 'not set',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Status endpoint
 app.get('/status', async (_req: Request, res: Response) => {
   try {
@@ -200,6 +222,20 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
  */
 async function handleLineEvent(event: any): Promise<void> {
   try {
+    // Handle join event - when OA is added to a group
+    if (event.type === 'join') {
+      console.log('🎉 Join event detected');
+      await GroupAutoDetectService.handleJoinEvent(event);
+      return;
+    }
+
+    // Handle leave event - when OA is removed from a group
+    if (event.type === 'leave') {
+      console.log('👋 Leave event detected');
+      await GroupAutoDetectService.handleLeaveEvent(event);
+      return;
+    }
+
     // Handle postback events (Rich Menu buttons)
     if (event.type === 'postback') {
       console.log('📤 Processing postback event:', event.postbackData);

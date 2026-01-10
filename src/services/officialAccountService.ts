@@ -6,6 +6,7 @@
 
 import { lineClient } from '../config/line';
 import { config } from '../config/environment';
+import { GroupAutoDetectService } from './groupAutoDetectService';
 
 export class OfficialAccountService {
   /**
@@ -29,19 +30,26 @@ export class OfficialAccountService {
       // Parse command
       const command = text.trim();
 
-      // Get group ID from environment or config
-      const groupId = process.env.LINE_GROUP_ID;
+      // Get group ID from environment or auto-detected groups
+      let groupId = process.env.LINE_GROUP_ID;
+
+      // If not set in env, try to get from auto-detected groups
+      if (!groupId) {
+        groupId = GroupAutoDetectService.getPrimaryGroupId() || undefined;
+      }
 
       if (!groupId) {
-        console.error('❌ LINE_GROUP_ID not set');
+        console.error('❌ LINE_GROUP_ID not set and no groups detected');
         if (replyToken) {
           await lineClient.replyMessage(replyToken, {
             type: 'text',
-            text: '❌ ไม่สามารถเชื่อมต่อกับกลุ่มได้',
+            text: '❌ ไม่สามารถเชื่อมต่อกับกลุ่มได้\n\nวิธีแก้:\n1. เพิ่ม OA เข้ากลุ่ม LINE\n2. ระบบจะตรวจจับ Group ID อัตโนมัติ\n3. ลองใช้คำสั่งอีกครั้ง',
           });
         }
         return;
       }
+
+      console.log('📍 Using group ID:', groupId);
 
       // Handle different commands - ไม่ตรวจสอบ admin
       switch (true) {

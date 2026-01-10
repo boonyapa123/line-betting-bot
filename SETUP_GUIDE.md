@@ -13,7 +13,7 @@ node scripts/add-columns-to-sheets.js
 1. เปิด Google Sheets
 2. ไปที่ sheet "Bets"
 3. ใส่ "ยอดเงิน" ใน cell G1
-4. ใส่ "สถานะอัปเดต" ใน cell H1
+4. ใส่ " ✅ ชนะ:" ใน cell H1
 
 ดูรายละเอียดใน: `ADD_COLUMNS_INSTRUCTION.md`
 
