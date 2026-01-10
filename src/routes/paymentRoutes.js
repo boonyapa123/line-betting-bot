@@ -310,6 +310,28 @@ router.post('/send-betting-message', async (req, res) => {
       });
     }
 
+    // Get group name and user profile
+    let groupName = 'ห้องแชท';
+    let userName = 'ผู้ใช้';
+    
+    try {
+      const groupSummary = await client.getGroupSummary(groupId);
+      groupName = groupSummary.groupName || groupName;
+      console.log('✅ Group name:', groupName);
+    } catch (error) {
+      console.warn('⚠️ Could not get group name:', error.message);
+    }
+
+    try {
+      if (userId) {
+        const userProfile = await client.getProfile(userId);
+        userName = userProfile.displayName || userName;
+        console.log('✅ User name:', userName);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not get user profile:', error.message);
+    }
+
     // Create Flex Message
     const flexMessage = {
       type: 'flex',
@@ -327,6 +349,50 @@ router.post('/send-betting-message', async (req, res) => {
               size: 'xl',
               weight: 'bold',
               color: '#667eea',
+            },
+            // Group name
+            {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'xs',
+              contents: [
+                {
+                  type: 'text',
+                  text: '👥 กลุ่ม',
+                  size: 'sm',
+                  color: '#999999',
+                  weight: 'bold',
+                },
+                {
+                  type: 'text',
+                  text: groupName,
+                  size: 'md',
+                  weight: 'bold',
+                  color: '#333333',
+                },
+              ],
+            },
+            // Admin name
+            {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'xs',
+              contents: [
+                {
+                  type: 'text',
+                  text: '👤 ผู้เปิดแทง',
+                  size: 'sm',
+                  color: '#999999',
+                  weight: 'bold',
+                },
+                {
+                  type: 'text',
+                  text: userName,
+                  size: 'md',
+                  weight: 'bold',
+                  color: '#333333',
+                },
+              ],
             },
             // Venue
             {
