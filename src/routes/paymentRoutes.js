@@ -233,9 +233,10 @@ router.get('/groups', async (req, res) => {
     const groupManagementService = require('../services/groupManagementService');
     
     // ดึงกลุ่มทั้งหมดจาก service
-    const groups = groupManagementService.getAllGroups();
+    let groups = groupManagementService.getAllGroups();
     
-    console.log('📊 Groups found:', groups.length);
+    console.log('📊 Groups found from service:', groups.length);
+    console.log('📊 Groups data:', JSON.stringify(groups, null, 2));
     
     // ถ้าไม่มีกลุ่มใน database ให้ใช้ environment variable เป็น fallback
     if (groups.length === 0) {
@@ -263,6 +264,8 @@ router.get('/groups', async (req, res) => {
         }
       }
     }
+    
+    console.log('📊 Final groups to send:', JSON.stringify(groups, null, 2));
     
     res.json({
       success: true,

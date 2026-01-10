@@ -309,6 +309,10 @@ async function handleEvent(event) {
         console.log('✅ requestOpenBettingInput completed');
       } catch (error) {
         console.error('❌ Error in open betting command:', error);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาด: ' + error.message,
+        });
       }
       return Promise.resolve(null);
     }
@@ -316,16 +320,32 @@ async function handleEvent(event) {
     // Check for สรุปยอดแทง command
     if (messageText === 'สรุปยอดแทง') {
       console.log('📊 Summary command detected');
-      const { handleSummaryCommand } = require('./handlers/summaryHandler');
-      await handleSummaryCommand(event);
+      try {
+        const { handleSummaryCommand } = require('./handlers/summaryHandler');
+        await handleSummaryCommand(event);
+      } catch (error) {
+        console.error('❌ Error in summary command:', error);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาด: ' + error.message,
+        });
+      }
       return Promise.resolve(null);
     }
 
     // Check for สรุปยอดโอนเงิน command
     if (messageText === 'สรุปยอดโอนเงิน') {
       console.log('💰 Payout summary command detected');
-      const { handlePayoutSummaryCommand } = require('./handlers/summaryHandler');
-      await handlePayoutSummaryCommand(event);
+      try {
+        const { handlePayoutSummaryCommand } = require('./handlers/summaryHandler');
+        await handlePayoutSummaryCommand(event);
+      } catch (error) {
+        console.error('❌ Error in payout summary command:', error);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาด: ' + error.message,
+        });
+      }
       return Promise.resolve(null);
     }
 
@@ -340,6 +360,10 @@ async function handleEvent(event) {
         console.log('✅ requestResultSummaryInput completed');
       } catch (error) {
         console.error('❌ Error in result summary command:', error);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาด: ' + error.message,
+        });
       }
       return Promise.resolve(null);
     }
