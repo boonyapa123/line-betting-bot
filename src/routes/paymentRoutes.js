@@ -315,11 +315,13 @@ router.post('/send-betting-message', async (req, res) => {
     let userName = 'ผู้ใช้';
     
     try {
-      const groupSummary = await client.getGroupSummary(groupId);
-      groupName = groupSummary.groupName || groupName;
-      console.log('✅ Group name:', groupName);
+      if (groupId) {
+        const groupSummary = await client.getGroupSummary(groupId);
+        groupName = groupSummary.groupName || groupName;
+        console.log('✅ Group name:', groupName);
+      }
     } catch (error) {
-      console.warn('⚠️ Could not get group name:', error.message);
+      console.warn('⚠️ Could not get group name:', error.message || error);
     }
 
     try {
@@ -329,7 +331,7 @@ router.post('/send-betting-message', async (req, res) => {
         console.log('✅ User name:', userName);
       }
     } catch (error) {
-      console.warn('⚠️ Could not get user profile:', error.message);
+      console.warn('⚠️ Could not get user profile:', error.message || error);
     }
 
     // Create Flex Message
