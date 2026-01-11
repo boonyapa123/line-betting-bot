@@ -9,12 +9,28 @@ const path = require('path');
 /**
  * Get Google Credentials
  * ลำดับการค้นหา:
- * 1. GOOGLE_CREDENTIALS_PATH (สำหรับ Render secret files)
- * 2. GOOGLE_CREDENTIALS_JSON (สำหรับ environment variable)
- * 3. Default credentials files
+ * 1. GOOGLE_CREDENTIALS_BASE64 (สำหรับ Render/Railway environment variable)
+ * 2. GOOGLE_CREDENTIALS_PATH (สำหรับ Render secret files)
+ * 3. GOOGLE_CREDENTIALS_JSON (สำหรับ environment variable)
+ * 4. Default credentials files
  */
 function getGoogleCredentials() {
-  // ตัวเลือก 1: File path from environment (Render secret files)
+  // ตัวเลือก 1: Base64 encoded credentials (Render/Railway)
+  if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+    try {
+      console.log('📝 Loading Google credentials from GOOGLE_CREDENTIALS_BASE64');
+      const credentialsJson = Buffer.from(
+        process.env.GOOGLE_CREDENTIALS_BASE64,
+        'base64'
+      ).toString('utf-8');
+      return JSON.parse(credentialsJson);
+    } catch (error) {
+      console.error('❌ Failed to parse GOOGLE_CREDENTIALS_BASE64:', error.message);
+      // Don't throw, try other options
+    }
+  }
+
+  // ตัวเลือก 2: File path from environment (Render secret files)
   if (process.env.GOOGLE_CREDENTIALS_PATH) {
     const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH;
     if (fs.existsSync(credentialsPath)) {
@@ -30,7 +46,7 @@ function getGoogleCredentials() {
     }
   }
 
-  // ตัวเลือก 2: JSON string credentials (Railway/Render environment variable)
+  // ตัวเลือก 3: JSON string credentials (Railway/Render environment variable)
   if (process.env.GOOGLE_CREDENTIALS_JSON) {
     try {
       console.log('📝 Loading Google credentials from GOOGLE_CREDENTIALS_JSON');
@@ -41,7 +57,7 @@ function getGoogleCredentials() {
     }
   }
 
-  // ตัวเลือก 3: Default credentials files
+  // ตัวเลือก 4: Default credentials files
   const defaultPaths = [
     '/etc/secrets/google-credentials.json', // Render secret files
     './linebot-482513-5e72ad3d3232.json',
@@ -63,7 +79,7 @@ function getGoogleCredentials() {
 
   // ไม่พบ credentials
   throw new Error(
-    'Google credentials not found. Please set GOOGLE_CREDENTIALS_PATH or place credentials file'
+    'Google credentials not found. Please set GOOGLE_CREDENTIALS_BASE64, GOOGLE_CREDENTIALS_PATH, or place credentials file'
   );
 }
 
