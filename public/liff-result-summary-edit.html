@@ -304,6 +304,9 @@
         let selectedGroupId = null;
         let venues = [];
         let groups = [];
+        let liff;
+        let groupId = null;
+        let liffReady = false;
 
         function getBaseUrl() {
             if (typeof liff !== 'undefined') {
@@ -315,10 +318,6 @@
         }
 
         const baseUrl = getBaseUrl();
-        let liff;
-        let userId = null;
-        let groupId = null;
-        let liffReady = false;
 
         // Called when LIFF SDK loads
         function onLiffLoad() {
@@ -363,10 +362,17 @@
                 // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                // Don't use groupId from context - load all groups instead
-                groupId = null;
+                
+                console.log('📍 LIFF Context:', context);
+                console.log('📍 Context type:', context.type);
+                console.log('📍 Context groupId:', context.groupId);
+                console.log('📍 Context roomId:', context.roomId);
+                
+                // Try to get groupId from LIFF context first
+                groupId = context.groupId || context.roomId;
 
                 console.log('👤 User ID:', userId);
+                console.log('📍 Group ID (from context):', groupId);
                 
                 checkFormType();
             } catch (error) {
@@ -404,14 +410,13 @@
                 window.location.replace('/liff-payment-form.html' + window.location.search);
                 return;
             }
-        }
             
             if (groupIdFromUrl) {
                 selectedGroupId = groupIdFromUrl;
             }
             
             loadData();
-        });
+        }
 
         async function loadData() {
             try {
@@ -419,16 +424,14 @@
                 
                 // Load groups list
                 console.log('📥 Loading groups list...');
-                const groupsUrl = `${baseUrl}/api/groups`;
-                console.log('🔗 Fetching groups from:', groupsUrl);
                 
                 try {
                     // Create abort controller for timeout
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
                     
-                    // Use absolute URL instead of relative
-                    const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                    // Use relative URL
+                    const apiUrl = '/api/groups';
                     console.log('🔗 API URL:', apiUrl);
                     
                     const groupsResponse = await fetch(apiUrl, {
@@ -465,7 +468,7 @@
                     }
                 }
                 
-                const url = `${baseUrl}/api/result-summary-venues`;
+                const url = `/api/result-summary-venues`;
                 console.log('🔗 Fetching from:', url);
                 
                 const response = await fetch(url, {
@@ -612,7 +615,7 @@
 
             try {
                 console.log('📤 Sending result summary...');
-                const url = `${baseUrl}/api/send-result-summary-batch`;
+                const url = `/api/send-result-summary-batch`;
                 console.log('🔗 Posting to:', url);
                 
                 const response = await fetch(url, {

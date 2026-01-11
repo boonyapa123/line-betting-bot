@@ -316,11 +316,21 @@
                 const context = liff.getContext();
                 userId = context.userId;
                 
-                // Read groupId from URL parameter
-                groupId = getGroupIdFromUrl();
+                console.log('📍 LIFF Context:', context);
+                console.log('📍 Context type:', context.type);
+                console.log('📍 Context groupId:', context.groupId);
+                console.log('📍 Context roomId:', context.roomId);
+                
+                // Try to get groupId from LIFF context first
+                groupId = context.groupId || context.roomId;
+                
+                // If not in LIFF context, try URL parameter
+                if (!groupId) {
+                    groupId = getGroupIdFromUrl();
+                }
 
                 console.log('👤 User ID:', userId);
-                console.log('📍 Group ID from URL:', groupId);
+                console.log('📍 Group ID (from context or URL):', groupId);
                 
                 setupFormListener();
             } catch (error) {
@@ -354,8 +364,8 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
                 
-                // Use absolute URL instead of relative
-                const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                // Use relative URL
+                const apiUrl = '/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {

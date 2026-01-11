@@ -261,10 +261,12 @@ router.get('/groups', async (req, res) => {
           
           console.log(`📝 Row ${index}:`, row);
           
-          if (row[1] && row[2]) { // groupId and groupName
+          // Column structure: [timestamp, groupId, groupName, status]
+          if (row[1] && row[2]) { // groupId (column 1) and groupName (column 2)
             groups.push({
               id: row[1],
               name: row[2],
+              status: row[3] || 'Active',
             });
             console.log(`✅ Added group: ${row[2]} (${row[1]})`);
           }

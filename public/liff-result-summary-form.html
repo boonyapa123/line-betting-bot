@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>สรุปผลแข่ง</title>
-  <script src="https://cdn.jsdelivr.net/npm/@line/liff/dist/liff.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@line/liff/dist/liff.js" onload="onLiffLoad()"></script>
   <style>
     * {
       margin: 0;
@@ -315,23 +315,44 @@
     let liff;
     let bettingEvents = [];
     let selectedResults = {};
+    let liffReady = false;
+
+    // Called when LIFF SDK loads
+    function onLiffLoad() {
+      console.log('✅ LIFF SDK loaded');
+      liffReady = true;
+      initLiff();
+    }
 
     async function initLiff() {
       try {
-        const liffId = new URLSearchParams(window.location.search).get('liffId') || 
-                       '2008804502-EXS0MfDI'; // Default LIFF ID
+        console.log('🔄 Initializing LIFF...');
+        
+        liff = window.liff;
+        
+        if (!liff) {
+          throw new Error('LIFF SDK not available');
+        }
+        
+        const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
+        
+        console.log('📝 LIFF ID:', liffId);
         
         await liff.init({ liffId });
-        
+        console.log('✅ LIFF initialized');
+
         if (!liff.isLoggedIn()) {
+          console.log('🔐 User not logged in, redirecting to login...');
           liff.login();
           return;
         }
 
+        console.log('📍 LIFF Context:', liff.getContext());
+        
         loadBettingEvents();
       } catch (error) {
-        console.error('LIFF init error:', error);
-        showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้');
+        console.error('❌ LIFF init error:', error);
+        showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
       }
     }
 
@@ -507,9 +528,9 @@
       console.log('❌ Cancel button clicked');
       
       // Get the selected results to cancel
-      const selectedResults = Object.keys(selectedResults || {});
+      const selectedResultsKeys = Object.keys(selectedResults || {});
       
-      if (selectedResults.length === 0) {
+      if (selectedResultsKeys.length === 0) {
         console.log('ℹ️ No results selected, just closing window');
         if (liff.isInClient()) {
           liff.closeWindow();
@@ -526,7 +547,7 @@
       // Cancel each selected betting
       (async () => {
         try {
-          for (const index of selectedResults) {
+          for (const index of selectedResultsKeys) {
             const event = bettingEvents[index];
             if (!event || !event.records) continue;
 
@@ -591,9 +612,11 @@
     }
 
     // Initialize when page loads
-    window.addEventListener('load', () => {
-      liff = window.liff;
-      initLiff();
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('📄 DOM loaded - Result Summary Form');
+      if (liffReady) {
+        loadBettingEvents();
+      }
     });
   </script>
 </body>

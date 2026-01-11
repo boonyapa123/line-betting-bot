@@ -23,6 +23,7 @@ class OpenBettingService {
       const liffId = process.env.LIFF_ID;
       const liffUrl = process.env.LIFF_URL || 'https://liff.line.me';
 
+      console.log('🔍 DEBUG - requestOpenBettingInput called with:', { userId, groupId, liffId });
       console.log('🔍 DEBUG - LIFF_ID from env:', liffId);
 
       if (!liffId || liffId === 'YOUR_LIFF_ID_HERE') {
@@ -42,9 +43,11 @@ class OpenBettingService {
         return;
       }
 
-      // Send LIFF form
-      const liffAppUrl = `https://liff.line.me/${liffId}?groupId=${groupId}&form=open-betting`;
+      // Send LIFF form - groupId will be available from LIFF context
+      // Don't pass groupId in URL because LIFF will encode it incorrectly
+      const liffAppUrl = `https://liff.line.me/${liffId}`;
       console.log('📝 Generated LIFF URL:', liffAppUrl);
+      console.log('🔍 DEBUG - groupId will come from LIFF context:', groupId);
       
       const flexMessage = {
         type: 'flex',

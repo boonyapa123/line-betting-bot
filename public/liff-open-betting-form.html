@@ -195,8 +195,8 @@
         <form id="bettingForm">
             <div class="form-group">
                 <label for="groupId">เลือกกลุ่มที่จะส่ง <span class="required">*</span></label>
-                <div id="groupDisplay" style="padding: 12px; background: #f0f7ff; border: 2px solid #667eea; border-radius: 8px; color: #333;">
-                    <span id="groupName">กำลังโหลด...</span>
+                <div id="groupDisplay">
+                    <div id="groupName" style="padding: 12px; background: #f0f7ff; border-radius: 8px; color: #333; font-weight: 600;">กำลังโหลด...</div>
                 </div>
                 <input type="hidden" id="groupId" required>
             </div>
@@ -304,11 +304,22 @@
                 const context = liff.getContext();
                 userId = context.userId;
                 
-                // Read groupId from URL parameter (this is set by the backend)
-                groupId = getGroupIdFromUrl();
+                console.log('📍 LIFF Context:', context);
+                console.log('📍 Context type:', context.type);
+                console.log('📍 Context groupId:', context.groupId);
+                console.log('📍 Context roomId:', context.roomId);
+                
+                // Try to get groupId from LIFF context first
+                groupId = context.groupId || context.roomId;
+                
+                // If not in LIFF context, try URL parameter
+                if (!groupId) {
+                    groupId = getGroupIdFromUrl();
+                }
 
                 console.log('👤 User ID:', userId);
-                console.log('📍 Group ID from URL:', groupId);
+                console.log('📍 Group ID (from context or URL):', groupId);
+                console.log('🔍 DEBUG - groupId is:', groupId, 'type:', typeof groupId, 'empty?', !groupId);
                 
                 setupFormListener();
             } catch (error) {
@@ -337,44 +348,55 @@
         async function loadGroups() {
             try {
                 console.log('📥 Loading group info...');
+                console.log('🔍 Current groupId:', groupId, 'type:', typeof groupId, 'empty?', !groupId);
                 
-                // If groupId is already set from URL, use it directly
-                if (groupId) {
+                // If groupId is provided and not empty, use it directly
+                if (groupId && groupId.trim()) {
                     console.log('✅ Using groupId from URL:', groupId);
                     document.getElementById('groupId').value = groupId;
                     
                     // Try to get group name from API
                     try {
-                        const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                        const apiUrl = '/api/groups';
+                        console.log('🔗 Fetching groups from:', apiUrl);
+                        
                         const response = await fetch(apiUrl, {
                             method: 'GET',
                             headers: { 'Content-Type': 'application/json' }
                         });
                         
+                        console.log('📥 API response status:', response.status);
+                        
                         if (response.ok) {
                             const data = await response.json();
+                            console.log('📊 Groups from API:', data);
+                            
                             const group = data.groups?.find(g => g.id === groupId);
                             if (group) {
                                 document.getElementById('groupName').textContent = `✅ ${group.name}`;
-                                console.log('✅ Group name:', group.name);
+                                console.log('✅ Group name found:', group.name);
                             } else {
+                                console.warn('⚠️ Group not found in list, using ID');
                                 document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
                             }
+                        } else {
+                            console.warn('⚠️ API returned status:', response.status);
+                            document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
                         }
                     } catch (error) {
-                        console.warn('⚠️ Could not get group name:', error);
+                        console.warn('⚠️ Could not get group name from API:', error.message);
                         document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
                     }
                     return;
                 }
                 
-                // Fallback: Try to load all groups
-                console.log('📥 Loading all groups from API...');
+                // No groupId provided - load all groups
+                console.log('📥 No groupId from URL, loading all groups from API...');
                 
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                const apiUrl = '/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
