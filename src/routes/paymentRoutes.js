@@ -239,12 +239,19 @@ router.get('/groups', async (req, res) => {
       console.log('📊 Fetching groups from Google Sheets...');
       console.log('📊 GOOGLE_SHEETS_ID:', process.env.GOOGLE_SHEETS_ID);
       console.log('📊 GOOGLE_CREDENTIALS_BASE64:', process.env.GOOGLE_CREDENTIALS_BASE64 ? '✓ set' : '✗ not set');
+      console.log('📊 GOOGLE_CREDENTIALS_FILE:', process.env.GOOGLE_CREDENTIALS_FILE ? '✓ set' : '✗ not set');
       
       // Initialize Google Sheets first
+      console.log('🔄 Initializing Google Sheets...');
       const initResult = await googleSheetsService.initializeGoogleSheets();
       console.log('📊 Google Sheets init result:', initResult);
       
+      if (!initResult) {
+        throw new Error('Failed to initialize Google Sheets');
+      }
+      
       // Get all rows from "Groups" sheet
+      console.log('📥 Getting data from Groups sheet...');
       const result = await googleSheetsService.getSheetData('Groups');
       
       console.log('📊 Google Sheets result:', JSON.stringify(result, null, 2));
@@ -262,7 +269,7 @@ router.get('/groups', async (req, res) => {
           console.log(`📝 Row ${index}:`, row);
           
           // Column structure: [timestamp, groupId, groupName, status]
-          if (row[1] && row[2]) { // groupId (column 1) and groupName (column 2)
+          if (row && row.length >= 3 && row[1] && row[2]) { // groupId (column 1) and groupName (column 2)
             groups.push({
               id: row[1],
               name: row[2],
@@ -285,15 +292,19 @@ router.get('/groups', async (req, res) => {
     // Fallback to local service if Sheets fails
     if (groups.length === 0) {
       console.log('📥 Falling back to local group management service');
-      const groupManagementService = require('../services/groupManagementService');
-      const localGroups = groupManagementService.getAllGroups();
-      console.log('📊 Groups found from local service:', localGroups.length);
-      
-      if (localGroups && localGroups.length > 0) {
-        groups = localGroups.map(g => ({
-          id: g.id,
-          name: g.name,
-        }));
+      try {
+        const groupManagementService = require('../services/groupManagementService');
+        const localGroups = groupManagementService.getAllGroups();
+        console.log('📊 Groups found from local service:', localGroups.length);
+        
+        if (localGroups && localGroups.length > 0) {
+          groups = localGroups.map(g => ({
+            id: g.id,
+            name: g.name,
+          }));
+        }
+      } catch (localError) {
+        console.warn('⚠️ Could not get groups from local service:', localError.message);
       }
     }
     
