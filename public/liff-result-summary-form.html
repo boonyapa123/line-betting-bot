@@ -400,8 +400,9 @@
         const day = String(today.getDate()).padStart(2, '0');
         const dateStr = `${year}-${month}-${day}`;
 
-        // Fetch betting events from API
-        const response = await fetch(`https://line-betting-bot.onrender.com/api/betting/records?date=${dateStr}`);
+        // Fetch betting summary from API (reads from Bets sheet)
+        console.log('📥 Loading betting summary from API...');
+        const response = await fetch(`https://line-betting-bot.onrender.com/api/betting/summary?date=${dateStr}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -414,27 +415,20 @@
           return;
         }
 
-        if (!data.records || data.records.length === 0) {
+        if (!data.summary || !data.summary.venues || data.summary.venues.length === 0) {
           document.getElementById('resultsContainer').innerHTML = 
             '<p style="text-align: center; color: #999; padding: 20px;">ไม่มีข้อมูลการแทง</p>';
           return;
         }
 
-        // Group records by stadium and fireworks
-        const events = {};
-        data.records.forEach(record => {
-          const key = `${record.venue}-${record.message}`;
-          if (!events[key]) {
-            events[key] = {
-              stadium: record.venue,
-              fireworks: record.message,
-              records: []
-            };
-          }
-          events[key].records.push(record);
-        });
+        // Convert venues to bettingEvents format
+        bettingEvents = data.summary.venues.map(venue => ({
+          stadium: venue.venue,
+          fireworks: venue.message,
+          records: venue.bets || [],
+        }));
 
-        bettingEvents = Object.values(events);
+        console.log('✅ Betting events loaded:', bettingEvents.length);
         renderResults();
       } catch (error) {
         console.error('Error loading betting events:', error);
@@ -662,9 +656,7 @@
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', () => {
       console.log('📄 DOM loaded - Result Summary Form');
-      if (liffReady) {
-        loadBettingEvents();
-      }
+      // loadBettingEvents is already called in initLiff
     });
   </script>
 </body>

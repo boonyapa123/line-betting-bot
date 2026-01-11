@@ -386,6 +386,14 @@
                     console.warn('⚠️ Could not load groups:', groupError);
                 }
                 
+                // Get today's date
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+
+                // Fetch venues from result summary venues endpoint
                 const url = `https://line-betting-bot.onrender.com/api/result-summary-venues`;
                 console.log('🔗 Fetching from:', url);
                 

@@ -218,6 +218,158 @@ router.post('/send-payment-link', async (req, res) => {
 });
 
 /**
+ * GET /api/betting/summary
+ * ดึงสรุปยอดแทงของวันนี้ (อ่านจากชีท Bets)
+ */
+router.get('/betting/summary', async (req, res) => {
+  try {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+
+    console.log('📊 GET /api/betting/summary requested');
+
+    const { date } = req.query;
+    
+    // Initialize Google Sheets
+    console.log('🔄 Initializing Google Sheets...');
+    const googleSheetsService = require('../services/googleSheetsService');
+    const initResult = await googleSheetsService.initializeGoogleSheets();
+    console.log('✅ Google Sheets initialized:', initResult);
+    
+    // Get all bets from Bets sheet
+    const betsResult = await googleSheetsService.getAllBets();
+    
+    if (!betsResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: betsResult.error,
+      });
+    }
+
+    const bets = betsResult.bets || [];
+    
+    // Group by venue and message (สนาม บั้งไฟ)
+    const venueMap = new Map();
+    bets.forEach((bet) => {
+      const key = `${bet.venue}-${bet.message}`;
+      if (!venueMap.has(key)) {
+        venueMap.set(key, {
+          venue: bet.venue,
+          message: bet.message,
+          count: 0,
+          totalAmount: 0,
+          bets: [],
+        });
+      }
+      const venue = venueMap.get(key);
+      venue.count++;
+      venue.totalAmount += bet.amount || 0;
+      venue.bets.push(bet);
+    });
+
+    const summary = {
+      date: new Date().toISOString().split('T')[0],
+      totalBets: bets.length,
+      totalAmount: bets.reduce((sum, b) => sum + (b.amount || 0), 0),
+      venues: Array.from(venueMap.values()),
+    };
+
+    console.log('✅ Betting summary generated:', {
+      totalBets: summary.totalBets,
+      venues: summary.venues.length,
+    });
+
+    res.json({
+      success: true,
+      summary,
+    });
+  } catch (error) {
+    console.error('❌ Error getting betting summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get betting summary',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * OPTIONS /api/betting/summary
+ */
+router.options('/betting/summary', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+/**
+ * GET /api/debug/groups
+ * Debug endpoint - ตรวจสอบสถานะการโหลดกลุ่ม
+ */
+router.get('/debug/groups', async (req, res) => {
+  try {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    console.log('🔍 DEBUG: GET /api/debug/groups requested');
+    
+    const debug = {
+      timestamp: new Date().toISOString(),
+      environment: {
+        GOOGLE_SHEETS_ID: process.env.GOOGLE_SHEETS_ID ? '✓ set' : '✗ not set',
+        GOOGLE_CREDENTIALS_BASE64: process.env.GOOGLE_CREDENTIALS_BASE64 ? '✓ set' : '✗ not set',
+        GOOGLE_CREDENTIALS_PATH: process.env.GOOGLE_CREDENTIALS_PATH ? '✓ set' : '✗ not set',
+        GOOGLE_CREDENTIALS_JSON: process.env.GOOGLE_CREDENTIALS_JSON ? '✓ set' : '✗ not set',
+        LINE_GROUP_ID: process.env.LINE_GROUP_ID ? '✓ set' : '✗ not set',
+        LINE_GROUP_IDS: process.env.LINE_GROUP_IDS ? '✓ set' : '✗ not set',
+      },
+      googleSheets: {},
+      groups: [],
+    };
+    
+    // Try to initialize Google Sheets
+    try {
+      const googleSheetsService = require('../services/googleSheetsService');
+      const initResult = await googleSheetsService.initializeGoogleSheets();
+      debug.googleSheets.initialized = initResult;
+      
+      if (initResult) {
+        // Try to get Groups sheet data
+        const result = await googleSheetsService.getSheetData('Groups');
+        debug.googleSheets.getSheetDataResult = result;
+        
+        if (result.success && result.data) {
+          debug.groups = result.data.slice(0, 5); // First 5 rows
+        }
+      }
+    } catch (error) {
+      debug.googleSheets.error = error.message;
+    }
+    
+    res.json(debug);
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
+/**
+ * OPTIONS /api/debug/groups
+ */
+router.options('/debug/groups', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+/**
  * GET /api/groups
  * ได้รับรายการกลุ่มทั้งหมด
  */
@@ -638,6 +790,88 @@ router.options('/groups', (req, res) => {
 });
 
 /**
+ * GET /api/open-betting-summary
+ * ดึงสรุปการเปิดรับแทงของวันนี้ (อ่านจากชีท วันที่ปัจจุบัน)
+ */
+router.get('/open-betting-summary', async (req, res) => {
+  try {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+
+    console.log('📊 GET /api/open-betting-summary requested');
+
+    // Initialize open betting record service
+    console.log('🔄 Initializing open betting record service...');
+    const initResult = await openBettingRecordService.initialize();
+    console.log('✅ Open betting record service initialized:', initResult);
+
+    // Get today's records
+    const result = await openBettingRecordService.getTodayRecords();
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+      });
+    }
+
+    // Generate summary from records
+    const records = result.records || [];
+    
+    // Group by venue and fire number
+    const venueMap = new Map();
+    records.forEach((record) => {
+      const key = `${record.venue}-${record.fireNumber}`;
+      if (!venueMap.has(key)) {
+        venueMap.set(key, {
+          venue: record.venue,
+          fireNumber: record.fireNumber,
+          count: 0,
+          records: [],
+        });
+      }
+      const venue = venueMap.get(key);
+      venue.count++;
+      venue.records.push(record);
+    });
+
+    const summary = {
+      date: openBettingRecordService.getTodaySheetName(),
+      totalRecords: records.length,
+      venues: Array.from(venueMap.values()),
+    };
+
+    console.log('✅ Open betting summary generated:', {
+      totalRecords: summary.totalRecords,
+      venues: summary.venues.length,
+    });
+
+    res.json({
+      success: true,
+      summary,
+    });
+  } catch (error) {
+    console.error('❌ Error getting open betting summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get open betting summary',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * OPTIONS /api/open-betting-summary
+ */
+router.options('/open-betting-summary', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+/**
  * GET /api/open-betting-report
  * ดึงรายงานการเปิดรับแทง
  */
@@ -650,6 +884,11 @@ router.get('/open-betting-report', async (req, res) => {
     console.log('📊 GET /api/open-betting-report requested');
 
     const { date } = req.query;
+
+    // Initialize open betting record service
+    console.log('🔄 Initializing open betting record service...');
+    const initResult = await openBettingRecordService.initialize();
+    console.log('✅ Open betting record service initialized:', initResult);
 
     let result;
     if (date) {

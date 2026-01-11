@@ -313,29 +313,20 @@
             form.addEventListener('submit', handleFormSubmit);
         }
 
-        // Load groups from API with timeout
+        // Load groups from API
         async function loadGroups() {
             try {
                 console.log('📥 Loading groups from API...');
                 
-                // Create abort controller for timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-                
-                // Use absolute URL
                 const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    signal: controller.signal
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
-                clearTimeout(timeoutId);
-                console.log('📥 Groups response status:', response.status);
+                console.log('📥 Response status:', response.status);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -345,11 +336,8 @@
                 console.log('✅ Groups data:', data);
                 
                 const select = document.getElementById('groupId');
-
-                // Clear existing options
                 select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
 
-                // Add groups
                 if (data.groups && data.groups.length > 0) {
                     console.log('✅ Groups loaded:', data.groups.length);
                     data.groups.forEach(group => {
@@ -357,23 +345,17 @@
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
+                        console.log('✅ Added group:', group.name);
                     });
                 } else {
                     console.warn('⚠️ No groups found');
-                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ - กรุณาเพิ่ม OA เข้ากลุ่มก่อน</option>';
+                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
                 const select = document.getElementById('groupId');
-                
-                if (error.name === 'AbortError') {
-                    console.error('❌ Request timeout - server took too long to respond');
-                    select.innerHTML = '<option value="">หมดเวลารอ - ลองใหม่อีกครั้ง</option>';
-                    showError('หมดเวลารอการตอบสนองจากเซิร์ฟเวอร์');
-                } else {
-                    select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
-                    showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
-                }
+                select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
         }
 
