@@ -195,9 +195,10 @@
         <form id="bettingForm">
             <div class="form-group">
                 <label for="groupId">เลือกกลุ่มที่จะส่ง <span class="required">*</span></label>
-                <select id="groupId" required>
-                    <option value="">-- กำลังโหลด --</option>
-                </select>
+                <div id="groupDisplay" style="padding: 12px; background: #f0f7ff; border: 2px solid #667eea; border-radius: 8px; color: #333;">
+                    <span id="groupName">กำลังโหลด...</span>
+                </div>
+                <input type="hidden" id="groupId" required>
             </div>
 
             <div class="form-group">
@@ -254,6 +255,12 @@
         let liff;
         let liffReady = false;
 
+        // Read groupId from URL parameters
+        function getGroupIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('groupId');
+        }
+
         // Called when LIFF SDK loads
         function onLiffLoad() {
             console.log('✅ LIFF SDK loaded');
@@ -296,11 +303,12 @@
                 // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                // Don't use groupId from context - load all groups instead
-                groupId = null;
+                
+                // Read groupId from URL parameter (this is set by the backend)
+                groupId = getGroupIdFromUrl();
 
                 console.log('👤 User ID:', userId);
-                console.log('📍 Context:', context);
+                console.log('📍 Group ID from URL:', groupId);
                 
                 setupFormListener();
             } catch (error) {
@@ -328,21 +336,50 @@
         // Load groups from API with timeout
         async function loadGroups() {
             try {
-                console.log('📥 Loading groups from API...');
+                console.log('📥 Loading group info...');
                 
-                // Create abort controller for timeout
+                // If groupId is already set from URL, use it directly
+                if (groupId) {
+                    console.log('✅ Using groupId from URL:', groupId);
+                    document.getElementById('groupId').value = groupId;
+                    
+                    // Try to get group name from API
+                    try {
+                        const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                        const response = await fetch(apiUrl, {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            const group = data.groups?.find(g => g.id === groupId);
+                            if (group) {
+                                document.getElementById('groupName').textContent = `✅ ${group.name}`;
+                                console.log('✅ Group name:', group.name);
+                            } else {
+                                document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Could not get group name:', error);
+                        document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
+                    }
+                    return;
+                }
+                
+                // Fallback: Try to load all groups
+                console.log('📥 Loading all groups from API...');
+                
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                // Use absolute URL instead of relative
                 const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     signal: controller.signal
                 });
 
@@ -356,40 +393,46 @@
                 const data = await response.json();
                 console.log('✅ Groups data:', data);
                 
-                const select = document.getElementById('groupId');
-
-                // Clear existing options
-                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
-
-                // Add groups
                 if (data.groups && data.groups.length > 0) {
                     console.log('✅ Groups loaded:', data.groups.length);
+                    // If we have groups, show them as a dropdown
+                    const groupDisplay = document.getElementById('groupDisplay');
+                    const select = document.createElement('select');
+                    select.id = 'groupSelect';
+                    select.style.width = '100%';
+                    select.style.padding = '12px';
+                    select.style.border = '2px solid #667eea';
+                    select.style.borderRadius = '8px';
+                    select.style.fontSize = '14px';
+                    
+                    select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
                     data.groups.forEach(group => {
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
                     });
-
-                    // Pre-select if groupId is available
-                    if (groupId) {
-                        select.value = groupId;
-                        console.log('✅ Pre-selected group:', groupId);
-                    }
+                    
+                    select.addEventListener('change', (e) => {
+                        document.getElementById('groupId').value = e.target.value;
+                        document.getElementById('groupName').textContent = e.target.options[e.target.selectedIndex].text;
+                    });
+                    
+                    groupDisplay.innerHTML = '';
+                    groupDisplay.appendChild(select);
                 } else {
                     console.warn('⚠️ No groups found');
-                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ - กรุณาเพิ่ม OA เข้ากลุ่มก่อน</option>';
+                    document.getElementById('groupName').textContent = '❌ ไม่พบกลุ่มใดๆ - กรุณาเพิ่ม OA เข้ากลุ่มก่อน';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
-                const select = document.getElementById('groupId');
                 
                 if (error.name === 'AbortError') {
-                    console.error('❌ Request timeout - server took too long to respond');
-                    select.innerHTML = '<option value="">หมดเวลารอ - ลองใหม่อีกครั้ง</option>';
+                    console.error('❌ Request timeout');
+                    document.getElementById('groupName').textContent = '❌ หมดเวลารอ - ลองใหม่อีกครั้ง';
                     showError('หมดเวลารอการตอบสนองจากเซิร์ฟเวอร์');
                 } else {
-                    select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                    document.getElementById('groupName').textContent = '❌ ไม่สามารถโหลดกลุ่มได้';
                     showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
                 }
             }

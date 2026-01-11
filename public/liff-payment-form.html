@@ -265,6 +265,12 @@
         let liff;
         let liffReady = false;
 
+        // Read groupId from URL parameters
+        function getGroupIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('groupId');
+        }
+
         // Called when LIFF SDK loads
         function onLiffLoad() {
             console.log('✅ LIFF SDK loaded');
@@ -309,11 +315,12 @@
                 // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                // Don't use groupId from context - load all groups instead
-                groupId = null;
+                
+                // Read groupId from URL parameter
+                groupId = getGroupIdFromUrl();
 
                 console.log('👤 User ID:', userId);
-                console.log('📍 Context:', context);
+                console.log('📍 Group ID from URL:', groupId);
                 
                 setupFormListener();
             } catch (error) {
