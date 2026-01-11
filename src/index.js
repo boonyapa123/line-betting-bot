@@ -361,10 +361,10 @@ async function handleEvent(event) {
             if (index === 0) return; // Skip header
             
             if (row && row.length >= 3 && row[1] && row[2]) {
-              const timestamp = row[0] || '-';
-              const groupId = row[1];
-              const groupName = row[2];
-              const status = row[3] || 'Active';
+              const timestamp = (row[0] || '-').trim();
+              const groupId = (row[1] || '').trim();
+              const groupName = (row[2] || '').trim();
+              const status = (row[3] || 'Active').trim();
               
               responseText += `${index}. ${groupName}\n`;
               responseText += `   ID: ${groupId}\n`;

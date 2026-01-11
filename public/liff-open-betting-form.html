@@ -299,44 +299,63 @@
         async function loadGroups() {
             try {
                 console.log('📥 Loading groups from API...');
+                console.log('👤 Current userId:', userId);
                 
                 const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
                 });
 
                 console.log('📥 Response status:', response.status);
+                console.log('📥 Response headers:', response.headers);
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Response error:', errorText);
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const data = await response.json();
-                console.log('✅ Groups data:', data);
+                console.log('✅ Groups data:', JSON.stringify(data, null, 2));
                 
                 const select = document.getElementById('groupId');
+                if (!select) {
+                    console.error('❌ groupId select element not found');
+                    return;
+                }
+                
                 select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
 
-                if (data.groups && data.groups.length > 0) {
+                if (data.success && data.groups && data.groups.length > 0) {
                     console.log('✅ Groups loaded:', data.groups.length);
-                    data.groups.forEach(group => {
+                    data.groups.forEach((group, index) => {
+                        console.log(`📝 Adding group ${index}:`, group);
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
                         console.log('✅ Added group:', group.name);
                     });
+                    console.log('✅ Total groups added:', select.options.length - 1);
                 } else {
-                    console.warn('⚠️ No groups found');
+                    console.warn('⚠️ No groups found or success is false');
+                    console.warn('⚠️ data.success:', data.success);
+                    console.warn('⚠️ data.groups:', data.groups);
                     select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
+                console.error('❌ Error stack:', error.stack);
                 const select = document.getElementById('groupId');
-                select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                if (select) {
+                    select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                }
                 showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
         }

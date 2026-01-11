@@ -343,8 +343,18 @@ router.get('/debug/groups', async (req, res) => {
         debug.googleSheets.getSheetDataResult = result;
         
         if (result.success && result.data) {
-          debug.groups = result.data.slice(0, 5); // First 5 rows
-          debug.allGroups = result.data; // All rows
+          debug.groups = result.data.slice(0, 5).map(row => ({
+            timestamp: (row[0] || '').trim(),
+            groupId: (row[1] || '').trim(),
+            groupName: (row[2] || '').trim(),
+            status: (row[3] || 'Active').trim(),
+          })); // First 5 rows
+          debug.allGroups = result.data.map(row => ({
+            timestamp: (row[0] || '').trim(),
+            groupId: (row[1] || '').trim(),
+            groupName: (row[2] || '').trim(),
+            status: (row[3] || 'Active').trim(),
+          })); // All rows
           console.log('✅ Groups sheet data:', result.data.length, 'rows');
         }
       }
@@ -425,10 +435,10 @@ router.get('/debug/all-groups', async (req, res) => {
             
             if (row && row.length >= 3 && row[1] && row[2]) {
               debug.groupsFromSheets.push({
-                timestamp: row[0],
-                groupId: row[1],
-                groupName: row[2],
-                status: row[3] || 'Active',
+                timestamp: (row[0] || '').trim(),
+                groupId: (row[1] || '').trim(),
+                groupName: (row[2] || '').trim(),
+                status: (row[3] || 'Active').trim(),
               });
             }
           });
@@ -569,12 +579,17 @@ router.get('/groups', async (req, res) => {
           
           // Column structure: [timestamp, groupId, groupName, status]
           if (row && row.length >= 3 && row[1] && row[2]) { // groupId (column 1) and groupName (column 2)
-            groups.push({
-              id: row[1],
-              name: row[2],
-              status: row[3] || 'Active',
-            });
-            console.log(`✅ Added group: ${row[2]} (${row[1]})`);
+            const groupId = (row[1] || '').trim();
+            const groupName = (row[2] || '').trim();
+            
+            if (groupId && groupName) {
+              groups.push({
+                id: groupId,
+                name: groupName,
+                status: (row[3] || 'Active').trim(),
+              });
+              console.log(`✅ Added group: ${groupName} (${groupId})`);
+            }
           }
         });
         
