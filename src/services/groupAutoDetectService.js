@@ -212,7 +212,7 @@ class GroupAutoDetectService {
       
       console.log('📊 Recording group to Google Sheets:', { groupId, groupName });
       
-      // Add group to "Groups" sheet
+      // Add group to "Groups" sheet (appendRow will initialize if needed)
       const result = await googleSheetsService.appendRow('Groups', [
         timestamp,
         groupId,

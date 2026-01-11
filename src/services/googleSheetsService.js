@@ -398,10 +398,28 @@ const getSheetData = async (sheetName) => {
  */
 const appendRow = async (sheetName, values) => {
   try {
+    // Initialize if not already initialized
     if (!sheets || !spreadsheetId) {
-      logger.warn('Google Sheets not initialized');
+      console.log('📊 Sheets not initialized, initializing now...');
+      try {
+        const credentials = getGoogleCredentials();
+        console.log('✅ Credentials loaded');
+        
+        authClient = getGoogleAuthClient(credentials);
+        sheets = google.sheets({ version: 'v4', auth: authClient });
+        console.log('✅ Google Sheets API initialized');
+      } catch (error) {
+        console.error('❌ Failed to initialize Google Sheets:', error.message);
+        return { success: false, error: 'Failed to initialize Google Sheets: ' + error.message };
+      }
+    }
+
+    if (!sheets || !spreadsheetId) {
+      console.error('❌ Google Sheets still not initialized after init attempt');
       return { success: false, error: 'Google Sheets not initialized' };
     }
+
+    console.log(`📝 Appending row to ${sheetName}:`, values);
 
     const request = {
       spreadsheetId,
@@ -420,6 +438,7 @@ const appendRow = async (sheetName, values) => {
       updatedRange: response.data.updates.updatedRange,
     };
   } catch (error) {
+    console.error(`❌ Error appending row to ${sheetName} sheet:`, error.message);
     logger.error(`Error appending row to ${sheetName} sheet`, error);
     return { success: false, error: error.message };
   }
