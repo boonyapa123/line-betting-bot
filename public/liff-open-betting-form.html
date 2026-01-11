@@ -314,6 +314,7 @@
                 select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
                 
                 // Call backend to get groups from Google Sheets
+                console.log('🔗 Fetching from /api/debug/groups-from-sheets');
                 const response = await fetch('/api/debug/groups-from-sheets', {
                     method: 'GET',
                     headers: { 
@@ -329,21 +330,25 @@
                 }
 
                 const result = await response.json();
-                console.log('✅ Raw result:', JSON.stringify(result, null, 2));
+                console.log('✅ Full result:', JSON.stringify(result, null, 2));
                 
                 const rawData = result.rawResult.data || [];
-                console.log('📊 Raw data rows:', rawData.length);
+                console.log('📊 Raw data rows count:', rawData.length);
+                console.log('📊 Raw data:', JSON.stringify(rawData, null, 2));
                 
                 let groups = [];
                 
                 // Parse rows (skip header row at index 0)
                 for (let i = 1; i < rawData.length; i++) {
                     const row = rawData[i];
-                    console.log(`📝 Row ${i}:`, row);
+                    console.log(`📝 Processing row ${i}:`, JSON.stringify(row));
                     
                     if (row && row.length >= 3) {
                         const groupId = (row[1] || '').trim();
                         const groupName = (row[2] || '').trim();
+                        
+                        console.log(`   - groupId: "${groupId}"`);
+                        console.log(`   - groupName: "${groupName}"`);
                         
                         if (groupId && groupName) {
                             groups.push({
@@ -351,24 +356,31 @@
                                 name: groupName
                             });
                             console.log(`✅ Added group: ${groupName} (${groupId})`);
+                        } else {
+                            console.warn(`⚠️ Skipped row - missing groupId or groupName`);
                         }
+                    } else {
+                        console.warn(`⚠️ Row ${i} has less than 3 columns`);
                     }
                 }
                 
                 console.log('✅ Total groups parsed:', groups.length);
+                console.log('📋 Groups array:', JSON.stringify(groups, null, 2));
                 
                 // Populate select
                 select.innerHTML = '<option value="">-- เลือกห้องแชท --</option>';
                 
                 if (groups.length > 0) {
-                    groups.forEach(group => {
+                    console.log('✅ Adding', groups.length, 'groups to dropdown');
+                    groups.forEach((group, index) => {
+                        console.log(`📝 Creating option ${index}: ${group.name} (${group.id})`);
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
-                        console.log(`✅ Added option: ${group.name}`);
+                        console.log(`✅ Option added`);
                     });
-                    console.log('✅ Dropdown populated with', groups.length, 'groups');
+                    console.log('✅ Dropdown now has', select.options.length, 'options');
                 } else {
                     console.warn('⚠️ No groups found');
                     select.innerHTML = '<option value="">ไม่พบห้องแชทใดๆ</option>';
