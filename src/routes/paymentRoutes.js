@@ -238,6 +238,10 @@ router.get('/groups', async (req, res) => {
       
       console.log('📊 Fetching groups from Google Sheets...');
       
+      // Initialize Google Sheets first
+      const initResult = await googleSheetsService.initializeGoogleSheets();
+      console.log('📊 Google Sheets init result:', initResult);
+      
       // Get all rows from "Groups" sheet
       const result = await googleSheetsService.getSheetData('Groups');
       

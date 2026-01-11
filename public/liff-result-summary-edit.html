@@ -423,13 +423,19 @@
                 console.log('🔗 Fetching groups from:', groupsUrl);
                 
                 try {
+                    // Create abort controller for timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                    
                     const groupsResponse = await fetch(groupsUrl, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json',
-                        }
+                        },
+                        signal: controller.signal
                     });
 
+                    clearTimeout(timeoutId);
                     console.log('📥 Groups response status:', groupsResponse.status);
 
                     if (groupsResponse.ok) {
@@ -448,7 +454,11 @@
                         console.warn('⚠️ Failed to load groups:', groupsResponse.status);
                     }
                 } catch (groupError) {
-                    console.warn('⚠️ Could not load groups:', groupError);
+                    if (groupError.name === 'AbortError') {
+                        console.warn('⚠️ Groups request timeout');
+                    } else {
+                        console.warn('⚠️ Could not load groups:', groupError);
+                    }
                 }
                 
                 const url = `${baseUrl}/api/result-summary-venues`;
