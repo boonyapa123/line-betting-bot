@@ -363,10 +363,10 @@
                 // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                groupId = context.groupId;
+                // Don't use groupId from context - load all groups instead
+                groupId = null;
 
                 console.log('👤 User ID:', userId);
-                console.log('👥 Group ID from context:', groupId);
                 
                 checkFormType();
             } catch (error) {
