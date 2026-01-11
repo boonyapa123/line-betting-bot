@@ -230,15 +230,47 @@ router.get('/groups', async (req, res) => {
     
     console.log('📥 GET /api/groups requested');
     
-    const groupManagementService = require('../services/groupManagementService');
+    let groups = [];
     
-    // ดึงกลุ่มทั้งหมดจาก service
-    let groups = groupManagementService.getAllGroups();
+    try {
+      // Try to get groups from Google Sheets first
+      const googleSheetsService = require('../services/googleSheetsService');
+      
+      console.log('📊 Fetching groups from Google Sheets...');
+      
+      // Get all rows from "Groups" sheet
+      const result = await googleSheetsService.getSheetData('Groups');
+      
+      if (result.success && result.data && result.data.length > 0) {
+        console.log('📊 Groups from Sheets:', result.data.length);
+        
+        // Skip header row and map data
+        result.data.forEach((row, index) => {
+          if (index === 0) return; // Skip header
+          
+          if (row[1] && row[2]) { // groupId and groupName
+            groups.push({
+              id: row[1],
+              name: row[2],
+            });
+          }
+        });
+        
+        console.log('✅ Groups loaded from Google Sheets:', groups.length);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not get groups from Google Sheets:', error.message);
+    }
     
-    console.log('📊 Groups found from service:', groups.length);
-    console.log('📊 Groups data:', JSON.stringify(groups, null, 2));
+    // Fallback to local service if Sheets fails
+    if (groups.length === 0) {
+      console.log('📥 Falling back to local group management service');
+      const groupManagementService = require('../services/groupManagementService');
+      groups = groupManagementService.getAllGroups();
+      console.log('📊 Groups found from local service:', groups.length);
+    }
     
-    // ถ้าไม่มีกลุ่มใน database ให้ใช้ environment variable เป็น fallback
+    // Final fallback to environment variable
     if (groups.length === 0) {
       const groupIdsEnv = process.env.LINE_GROUP_IDS || process.env.LINE_GROUP_ID;
       

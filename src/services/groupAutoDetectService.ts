@@ -223,18 +223,16 @@ export class GroupAutoDetectService {
       
       console.log('📊 Recording group to Google Sheets:', { groupId, groupName });
       
-      // Add group to "Bets" sheet with special marker
-      const result = await googleSheetsService.appendRow('Bets', [
+      // Add group to "Groups" sheet (create if not exists)
+      const result = await googleSheetsService.appendRow('Groups', [
         timestamp,
-        `[GROUP] ${groupName}`,
-        'กลุ่ม',
         groupId,
+        groupName,
         'Active',
-        '',
       ]);
       
       if (result.success) {
-        console.log('✅ Group recorded to Google Sheets (Bets sheet)');
+        console.log('✅ Group recorded to Groups sheet');
       } else {
         console.warn('⚠️ Failed to record group to Google Sheets:', result.error);
       }
