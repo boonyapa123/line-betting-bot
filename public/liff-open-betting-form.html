@@ -192,6 +192,10 @@
             ℹ️ ข้อมูลที่กรอกจะถูกส่งไปยังห้องแชทกลุ่มทันที
         </div>
 
+        <div class="info-box" id="debugInfo" style="display: none; background: #fff3cd; border-left-color: #ffc107;">
+            🔍 <strong>Debug Info:</strong> <span id="debugText"></span>
+        </div>
+
         <form id="bettingForm">
             <div class="form-group">
                 <label for="groupId">เลือกกลุ่มที่จะส่ง <span class="required">*</span></label>
@@ -296,34 +300,10 @@
             }
         }
 
-        // Load groups from API
+        // Load groups from LIFF context
         async function loadGroups() {
             try {
-                console.log('📥 Loading groups from API...');
-                
-                const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
-                console.log('🔗 API URL:', apiUrl);
-                
-                showLoadingState(true);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
-
-                console.log('📥 Response status:', response.status);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ Response error:', errorText);
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log('✅ Groups data:', JSON.stringify(data, null, 2));
+                console.log('📥 Loading groups from LIFF context...');
                 
                 const select = document.getElementById('groupId');
                 if (!select) {
@@ -331,33 +311,102 @@
                     return;
                 }
                 
-                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
+                select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
+                
+                // Get context from LIFF
+                const context = liff.getContext();
+                console.log('📋 LIFF Context:', context);
+                
+                let groups = [];
+                
+                // If in group context, add current group
+                if (context && context.groupId) {
+                    console.log('✅ Current group ID:', context.groupId);
+                    
+                    try {
+                        const groupSummary = await liff.getGroupIdBasedOpenIDToken();
+                        console.log('📝 Group summary:', groupSummary);
+                    } catch (e) {
+                        console.warn('⚠️ Could not get group summary:', e);
+                    }
+                    
+                    groups.push({
+                        id: context.groupId,
+                        name: context.groupName || 'กลุ่มแชทปัจจุบัน'
+                    });
+                }
+                
+                // Try to get groups from API as fallback
+                try {
+                    console.log('📥 Trying to load additional groups from API...');
+                    const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    });
 
-                if (data.success && data.groups && data.groups.length > 0) {
-                    console.log('✅ Groups loaded:', data.groups.length);
-                    data.groups.forEach((group, index) => {
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('✅ API Groups data:', data);
+                        
+                        if (data.groups && data.groups.length > 0) {
+                            // Merge with existing groups, avoiding duplicates
+                            const existingIds = new Set(groups.map(g => g.id));
+                            data.groups.forEach(group => {
+                                if (!existingIds.has(group.id)) {
+                                    groups.push({
+                                        id: group.id,
+                                        name: group.name
+                                    });
+                                }
+                            });
+                            console.log('✅ Merged groups from API');
+                        }
+                    }
+                } catch (apiError) {
+                    console.warn('⚠️ API fallback failed:', apiError);
+                }
+                
+                // Populate select
+                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
+                
+                if (groups.length > 0) {
+                    console.log('✅ Total groups loaded:', groups.length);
+                    showDebugInfo(`พบกลุ่มทั้งหมด ${groups.length} กลุ่ม`);
+                    
+                    groups.forEach((group, index) => {
                         console.log(`📝 Adding group ${index}:`, group);
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
-                        console.log('✅ Added group:', group.name);
                     });
-                    console.log('✅ Total groups added:', select.options.length - 1);
+                    
+                    // Pre-select current group if available
+                    if (context && context.groupId) {
+                        select.value = context.groupId;
+                        console.log('✅ Pre-selected current group');
+                    }
+                    
+                    setTimeout(hideDebugInfo, 3000);
                 } else {
-                    console.warn('⚠️ No groups found or success is false');
+                    console.warn('⚠️ No groups found');
                     select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
+                    showDebugInfo('ไม่พบกลุ่มใดๆ - ตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
+                    showError('ไม่พบกลุ่มใดๆ กรุณาตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
                 }
-                
-                showLoadingState(false);
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
                 const select = document.getElementById('groupId');
                 if (select) {
                     select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
                 }
-                showLoadingState(false);
-                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message + ' - กรุณาลองใหม่อีกครั้ง');
+                showDebugInfo('❌ ' + error.message);
+                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
         }
 
@@ -456,6 +505,24 @@
                 loading.style.display = 'none';
                 form.style.opacity = '1';
                 form.style.pointerEvents = 'auto';
+            }
+        }
+
+        // Show debug info
+        function showDebugInfo(message) {
+            const debugBox = document.getElementById('debugInfo');
+            const debugText = document.getElementById('debugText');
+            if (debugBox && debugText) {
+                debugText.textContent = message;
+                debugBox.style.display = 'block';
+            }
+        }
+
+        // Hide debug info
+        function hideDebugInfo() {
+            const debugBox = document.getElementById('debugInfo');
+            if (debugBox) {
+                debugBox.style.display = 'none';
             }
         }
 
