@@ -303,7 +303,7 @@
         // Load groups directly from Google Sheets
         async function loadGroups() {
             try {
-                console.log('📥 Loading groups directly from Google Sheets...');
+                console.log('📥 Loading groups from /api/groups...');
                 
                 const select = document.getElementById('groupId');
                 if (!select) {
@@ -313,9 +313,9 @@
                 
                 select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
                 
-                // Call backend to get groups from Google Sheets
-                console.log('🔗 Fetching from /api/debug/groups-from-sheets');
-                const response = await fetch('/api/debug/groups-from-sheets', {
+                // Call backend to get groups
+                console.log('🔗 Fetching from /api/groups');
+                const response = await fetch('/api/groups', {
                     method: 'GET',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -329,43 +329,12 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const result = await response.json();
-                console.log('✅ Full result:', JSON.stringify(result, null, 2));
+                const data = await response.json();
+                console.log('✅ API response:', JSON.stringify(data, null, 2));
                 
-                const rawData = result.rawResult.data || [];
-                console.log('📊 Raw data rows count:', rawData.length);
-                console.log('📊 Raw data:', JSON.stringify(rawData, null, 2));
-                
-                let groups = [];
-                
-                // Parse rows (skip header row at index 0)
-                for (let i = 1; i < rawData.length; i++) {
-                    const row = rawData[i];
-                    console.log(`📝 Processing row ${i}:`, JSON.stringify(row));
-                    
-                    if (row && row.length >= 3) {
-                        const groupId = (row[1] || '').trim();
-                        const groupName = (row[2] || '').trim();
-                        
-                        console.log(`   - groupId: "${groupId}"`);
-                        console.log(`   - groupName: "${groupName}"`);
-                        
-                        if (groupId && groupName) {
-                            groups.push({
-                                id: groupId,
-                                name: groupName
-                            });
-                            console.log(`✅ Added group: ${groupName} (${groupId})`);
-                        } else {
-                            console.warn(`⚠️ Skipped row - missing groupId or groupName`);
-                        }
-                    } else {
-                        console.warn(`⚠️ Row ${i} has less than 3 columns`);
-                    }
-                }
-                
-                console.log('✅ Total groups parsed:', groups.length);
-                console.log('📋 Groups array:', JSON.stringify(groups, null, 2));
+                const groups = data.groups || [];
+                console.log('📊 Groups count:', groups.length);
+                console.log('📋 Groups:', JSON.stringify(groups, null, 2));
                 
                 // Populate select
                 select.innerHTML = '<option value="">-- เลือกห้องแชท --</option>';
