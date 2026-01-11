@@ -248,6 +248,30 @@ app.put('/api/groups/:groupId', express.json(), (req, res) => {
 async function handleEvent(event) {
   console.log('📨 Received event:', JSON.stringify(event, null, 2));
   
+  // Handle join event - when OA is added to a group
+  if (event.type === 'join') {
+    console.log('🎉 Join event detected');
+    try {
+      const { GroupAutoDetectService } = require('./services/groupAutoDetectService');
+      await GroupAutoDetectService.handleJoinEvent(event);
+    } catch (error) {
+      console.error('❌ Error handling join event:', error);
+    }
+    return Promise.resolve(null);
+  }
+  
+  // Handle leave event - when OA is removed from a group
+  if (event.type === 'leave') {
+    console.log('👋 Leave event detected');
+    try {
+      const { GroupAutoDetectService } = require('./services/groupAutoDetectService');
+      await GroupAutoDetectService.handleLeaveEvent(event);
+    } catch (error) {
+      console.error('❌ Error handling leave event:', error);
+    }
+    return Promise.resolve(null);
+  }
+  
   // Record group activity if from group
   if (event.source.type === 'group' || event.source.type === 'room') {
     const groupManagementService = require('./services/groupManagementService');

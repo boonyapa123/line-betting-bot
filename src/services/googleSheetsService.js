@@ -362,6 +362,69 @@ const updateBetStatus = async (identifier, status) => {
   }
 };
 
+/**
+ * Get all data from a specific sheet
+ */
+const getSheetData = async (sheetName) => {
+  try {
+    if (!sheets || !spreadsheetId) {
+      logger.warn('Google Sheets not initialized');
+      return { success: false, error: 'Google Sheets not initialized' };
+    }
+
+    const request = {
+      spreadsheetId,
+      range: `${sheetName}!A:Z`,
+    };
+
+    const response = await sheets.spreadsheets.values.get(request);
+    const rows = response.data.values || [];
+
+    console.log(`📊 Data from ${sheetName} sheet:`, rows.length, 'rows');
+
+    return {
+      success: true,
+      data: rows,
+      count: rows.length,
+    };
+  } catch (error) {
+    logger.error(`Error getting data from ${sheetName} sheet`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Append a row to a specific sheet
+ */
+const appendRow = async (sheetName, values) => {
+  try {
+    if (!sheets || !spreadsheetId) {
+      logger.warn('Google Sheets not initialized');
+      return { success: false, error: 'Google Sheets not initialized' };
+    }
+
+    const request = {
+      spreadsheetId,
+      range: `${sheetName}!A:Z`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [values],
+      },
+    };
+
+    const response = await sheets.spreadsheets.values.append(request);
+    console.log(`✅ Row appended to ${sheetName} sheet:`, values);
+
+    return {
+      success: true,
+      updatedRange: response.data.updates.updatedRange,
+    };
+  } catch (error) {
+    logger.error(`Error appending row to ${sheetName} sheet`, error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   initializeGoogleSheets,
   appendBet,
@@ -371,4 +434,6 @@ module.exports = {
   updateBetStatus,
   createSheet,
   clearSheet,
+  getSheetData,
+  appendRow,
 };
