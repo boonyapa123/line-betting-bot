@@ -237,6 +237,8 @@ router.get('/groups', async (req, res) => {
       const googleSheetsService = require('../services/googleSheetsService');
       
       console.log('📊 Fetching groups from Google Sheets...');
+      console.log('📊 GOOGLE_SHEETS_ID:', process.env.GOOGLE_SHEETS_ID);
+      console.log('📊 GOOGLE_CREDENTIALS_BASE64:', process.env.GOOGLE_CREDENTIALS_BASE64 ? '✓ set' : '✗ not set');
       
       // Initialize Google Sheets first
       const initResult = await googleSheetsService.initializeGoogleSheets();
@@ -245,7 +247,7 @@ router.get('/groups', async (req, res) => {
       // Get all rows from "Groups" sheet
       const result = await googleSheetsService.getSheetData('Groups');
       
-      console.log('📊 Google Sheets result:', result);
+      console.log('📊 Google Sheets result:', JSON.stringify(result, null, 2));
       
       if (result.success && result.data && result.data.length > 1) {
         console.log('📊 Groups from Sheets:', result.data.length, 'rows');
@@ -271,9 +273,11 @@ router.get('/groups', async (req, res) => {
         console.log('✅ Groups loaded from Google Sheets:', groups.length);
       } else {
         console.warn('⚠️ No data in Groups sheet or sheet not found');
+        console.warn('⚠️ Result:', result);
       }
     } catch (error) {
       console.warn('⚠️ Could not get groups from Google Sheets:', error.message);
+      console.warn('⚠️ Error stack:', error.stack);
     }
     
     // Fallback to local service if Sheets fails
