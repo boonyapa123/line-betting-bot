@@ -43,11 +43,15 @@ class OpenBettingService {
         return;
       }
 
-      // Send LIFF form - groupId will be available from LIFF context
-      // Don't pass groupId in URL because LIFF will encode it incorrectly
-      const liffAppUrl = `https://liff.line.me/${liffId}`;
-      console.log('📝 Generated LIFF URL:', liffAppUrl);
-      console.log('🔍 DEBUG - groupId will come from LIFF context:', groupId);
+      // Send LIFF form with groupId as URL parameter
+      let liffAppUrl = `https://liff.line.me/${liffId}`;
+      if (groupId) {
+        liffAppUrl += `?groupId=${encodeURIComponent(groupId)}`;
+        console.log('📝 Generated LIFF URL with groupId:', liffAppUrl);
+      } else {
+        console.log('📝 Generated LIFF URL (no groupId):', liffAppUrl);
+      }
+      console.log('🔍 DEBUG - groupId passed via URL:', groupId);
       
       const flexMessage = {
         type: 'flex',

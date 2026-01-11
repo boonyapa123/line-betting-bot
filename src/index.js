@@ -117,47 +117,76 @@ app.get('/health', async (req, res) => {
 // Get all groups/rooms where bot is active
 app.get('/api/groups', async (req, res) => {
   try {
-    const googleSheetsService = require('./services/googleSheetsService');
-    
-    // Initialize Google Sheets
-    await googleSheetsService.initializeGoogleSheets();
-    
-    // Try to get groups from Google Sheets first
-    const sheetsResult = await googleSheetsService.getSheetData('Groups');
+    console.log('📥 GET /api/groups requested');
     
     let groups = [];
-    let source = 'local';
+    let source = 'unknown';
     
-    if (sheetsResult.success && sheetsResult.data && sheetsResult.data.length > 1) {
-      // Parse data from Google Sheets (skip header row)
-      groups = sheetsResult.data.slice(1).map((row) => ({
-        timestamp: row[0] || '',
-        id: row[1] || '',
-        name: row[2] || '',
-        status: row[3] || 'Active',
-      })).filter((g) => g.id); // Filter out empty rows
+    // Try Google Sheets first
+    try {
+      const googleSheetsService = require('./services/googleSheetsService');
+      await googleSheetsService.initializeGoogleSheets();
       
-      console.log('✅ Groups loaded from Google Sheets:', groups.length);
-      source = 'google-sheets';
-    } else {
-      // Fallback to local groups
-      console.log('⚠️ Could not load from Google Sheets, using local groups');
-      const groupManagementService = require('./services/groupManagementService');
-      const localGroups = groupManagementService.getAllGroups();
-      groups = localGroups.map(g => ({
-        id: g.id,
-        name: g.name,
-        createdAt: g.createdAt,
-        lastActive: g.lastActive,
-      }));
-      source = 'local';
+      const sheetsResult = await googleSheetsService.getSheetData('Groups');
+      
+      if (sheetsResult.success && sheetsResult.data && sheetsResult.data.length > 1) {
+        // Parse data from Google Sheets (skip header row)
+        groups = sheetsResult.data.slice(1).map((row) => ({
+          timestamp: row[0] || '',
+          id: row[1] || '',
+          name: row[2] || '',
+          status: row[3] || 'Active',
+        })).filter((g) => g.id && g.name); // Filter out empty rows
+        
+        console.log('✅ Groups loaded from Google Sheets:', groups.length);
+        source = 'google-sheets';
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load from Google Sheets:', error.message);
     }
+    
+    // If no groups from Sheets, try local file
+    if (groups.length === 0) {
+      try {
+        const groupManagementService = require('./services/groupManagementService');
+        const localGroups = groupManagementService.getAllGroups();
+        
+        if (localGroups && localGroups.length > 0) {
+          groups = localGroups.map(g => ({
+            id: g.id,
+            name: g.name,
+            createdAt: g.createdAt,
+            lastActive: g.lastActive,
+          }));
+          
+          console.log('✅ Groups loaded from local file:', groups.length);
+          source = 'local-file';
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load from local file:', error.message);
+      }
+    }
+    
+    console.log(`📊 Total groups found: ${groups.length} (source: ${source})`);
     
     res.status(200).json({
       success: true,
       count: groups.length,
-      groups,
+      groups: groups.map(g => ({
+        id: g.id,
+        name: g.name,
+      })),
       source,
+    });
+  } catch (error) {
+    console.error('❌ Error in GET /api/groups:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      groups: [],
+    });
+  }
+});
     });
   } catch (error) {
     console.error('❌ Error getting groups:', error);

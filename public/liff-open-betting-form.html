@@ -300,10 +300,10 @@
             }
         }
 
-        // Load groups from LIFF context
+        // Load groups from Google Sheets via API
         async function loadGroups() {
             try {
-                console.log('📥 Loading groups from LIFF context...');
+                console.log('📥 Loading groups from API...');
                 
                 const select = document.getElementById('groupId');
                 if (!select) {
@@ -313,33 +313,18 @@
                 
                 select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
                 
-                // Get context from LIFF
-                const context = liff.getContext();
-                console.log('📋 LIFF Context:', context);
+                // Get groupId from URL parameter (if passed from webhook)
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlGroupId = urlParams.get('groupId');
+                console.log('📋 URL groupId:', urlGroupId);
                 
                 let groups = [];
                 
-                // If in group context, add current group
-                if (context && context.groupId) {
-                    console.log('✅ Current group ID:', context.groupId);
-                    
-                    try {
-                        const groupSummary = await liff.getGroupIdBasedOpenIDToken();
-                        console.log('📝 Group summary:', groupSummary);
-                    } catch (e) {
-                        console.warn('⚠️ Could not get group summary:', e);
-                    }
-                    
-                    groups.push({
-                        id: context.groupId,
-                        name: context.groupName || 'กลุ่มแชทปัจจุบัน'
-                    });
-                }
-                
-                // Try to get groups from API as fallback
+                // Try to get groups from API
                 try {
-                    console.log('📥 Trying to load additional groups from API...');
+                    console.log('📥 Fetching groups from API...');
                     const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                    console.log('🔗 API URL:', apiUrl);
                     
                     const response = await fetch(apiUrl, {
                         method: 'GET',
@@ -349,26 +334,31 @@
                         }
                     });
 
+                    console.log('📥 API Response status:', response.status);
+
                     if (response.ok) {
                         const data = await response.json();
-                        console.log('✅ API Groups data:', data);
+                        console.log('✅ API response:', JSON.stringify(data, null, 2));
                         
                         if (data.groups && data.groups.length > 0) {
-                            // Merge with existing groups, avoiding duplicates
-                            const existingIds = new Set(groups.map(g => g.id));
-                            data.groups.forEach(group => {
-                                if (!existingIds.has(group.id)) {
-                                    groups.push({
-                                        id: group.id,
-                                        name: group.name
-                                    });
-                                }
-                            });
-                            console.log('✅ Merged groups from API');
+                            groups = data.groups.map(group => ({
+                                id: group.id,
+                                name: group.name
+                            }));
+                            console.log('✅ Groups from API:', groups.length);
+                            showDebugInfo(`✅ พบกลุ่มจาก ${data.source}: ${groups.length} กลุ่ม`);
+                        } else {
+                            console.warn('⚠️ API returned no groups');
+                            showDebugInfo(`⚠️ API ไม่พบกลุ่ม (source: ${data.source})`);
                         }
+                    } else {
+                        const errorText = await response.text();
+                        console.warn('⚠️ API returned status:', response.status, errorText);
+                        showDebugInfo(`⚠️ API error: ${response.status}`);
                     }
                 } catch (apiError) {
-                    console.warn('⚠️ API fallback failed:', apiError);
+                    console.warn('⚠️ API fetch failed:', apiError);
+                    showDebugInfo(`❌ API fetch error: ${apiError.message}`);
                 }
                 
                 // Populate select
@@ -376,7 +366,6 @@
                 
                 if (groups.length > 0) {
                     console.log('✅ Total groups loaded:', groups.length);
-                    showDebugInfo(`พบกลุ่มทั้งหมด ${groups.length} กลุ่ม`);
                     
                     groups.forEach((group, index) => {
                         console.log(`📝 Adding group ${index}:`, group);
@@ -386,18 +375,18 @@
                         select.appendChild(option);
                     });
                     
-                    // Pre-select current group if available
-                    if (context && context.groupId) {
-                        select.value = context.groupId;
-                        console.log('✅ Pre-selected current group');
+                    // Pre-select group from URL if available
+                    if (urlGroupId) {
+                        select.value = urlGroupId;
+                        console.log('✅ Pre-selected group from URL:', urlGroupId);
                     }
                     
-                    setTimeout(hideDebugInfo, 3000);
+                    setTimeout(hideDebugInfo, 5000);
                 } else {
                     console.warn('⚠️ No groups found');
                     select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
-                    showDebugInfo('ไม่พบกลุ่มใดๆ - ตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
-                    showError('ไม่พบกลุ่มใดๆ กรุณาตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
+                    showDebugInfo('❌ ไม่พบกลุ่มใดๆ - ตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
+                    showError('ไม่พบกลุ่มใดๆ กรุณาตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว และข้อมูลถูกบันทึกใน Google Sheets หรือ local file');
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);

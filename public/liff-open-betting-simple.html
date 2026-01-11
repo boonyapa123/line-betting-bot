@@ -250,24 +250,31 @@
         async function loadGroups() {
             try {
                 console.log('📥 Loading groups from API...');
-                const response = await fetch('/api/groups', {
+                const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                console.log('🔗 API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
                 });
 
+                console.log('📥 Response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error('Failed to load groups');
+                    const errorText = await response.text();
+                    console.error('❌ Response error:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const data = await response.json();
+                console.log('✅ API response:', JSON.stringify(data, null, 2));
+                
                 const select = document.getElementById('groupId');
-
-                // Clear existing options
                 select.innerHTML = '<option value="">-- เลือกห้องแชท --</option>';
 
-                // Add groups
                 if (data.groups && data.groups.length > 0) {
                     console.log('✅ Groups loaded:', data.groups.length);
                     data.groups.forEach(group => {

@@ -294,18 +294,28 @@
         async function loadVenues() {
             try {
                 console.log('📥 Loading venues from API...');
-                const response = await fetch('/api/result-summary-venues', {
+                const apiUrl = 'https://line-betting-bot.onrender.com/api/result-summary-venues';
+                console.log('🔗 API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
                 });
 
+                console.log('📥 Response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error('Failed to load venues');
+                    const errorText = await response.text();
+                    console.error('❌ Response error:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const data = await response.json();
+                console.log('✅ API response:', JSON.stringify(data, null, 2));
+                
                 venues = data.venues || [];
 
                 console.log('✅ Venues loaded:', venues.length);
