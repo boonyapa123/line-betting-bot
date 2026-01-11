@@ -430,8 +430,8 @@
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
                     
-                    // Use relative URL
-                    const apiUrl = '/api/groups';
+                    // Use absolute URL
+                    const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                     console.log('🔗 API URL:', apiUrl);
                     
                     const groupsResponse = await fetch(apiUrl, {
@@ -468,7 +468,7 @@
                     }
                 }
                 
-                const url = `/api/result-summary-venues`;
+                const url = `https://line-betting-bot.onrender.com/api/result-summary-venues`;
                 console.log('🔗 Fetching from:', url);
                 
                 const response = await fetch(url, {
@@ -615,7 +615,7 @@
 
             try {
                 console.log('📤 Sending result summary...');
-                const url = `/api/send-result-summary-batch`;
+                const url = `https://line-betting-bot.onrender.com/api/send-result-summary-batch`;
                 console.log('🔗 Posting to:', url);
                 
                 const response = await fetch(url, {
