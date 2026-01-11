@@ -9,24 +9,12 @@ const path = require('path');
 /**
  * Get Google Credentials
  * ลำดับการค้นหา:
- * 1. GOOGLE_CREDENTIALS_JSON (สำหรับ Railway - JSON string)
- * 2. GOOGLE_CREDENTIALS_PATH (สำหรับ local)
- * 3. ./linebot-482513-5e72ad3d3232.json (default credentials file)
- * 4. ./credentials.json (fallback)
+ * 1. GOOGLE_CREDENTIALS_PATH (สำหรับ Render secret files)
+ * 2. GOOGLE_CREDENTIALS_JSON (สำหรับ environment variable)
+ * 3. Default credentials files
  */
 function getGoogleCredentials() {
-  // ตัวเลือก 1: JSON string credentials (Railway)
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    try {
-      console.log('📝 Loading Google credentials from GOOGLE_CREDENTIALS_JSON');
-      return JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-    } catch (error) {
-      console.error('❌ Failed to parse GOOGLE_CREDENTIALS_JSON:', error.message);
-      throw new Error('Invalid GOOGLE_CREDENTIALS_JSON format');
-    }
-  }
-
-  // ตัวเลือก 2: File path from environment
+  // ตัวเลือก 1: File path from environment (Render secret files)
   if (process.env.GOOGLE_CREDENTIALS_PATH) {
     const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH;
     if (fs.existsSync(credentialsPath)) {
@@ -37,11 +25,25 @@ function getGoogleCredentials() {
         console.error(`❌ Failed to read credentials from ${credentialsPath}:`, error.message);
         throw new Error(`Invalid credentials file: ${credentialsPath}`);
       }
+    } else {
+      console.warn(`⚠️ Credentials file not found at ${credentialsPath}`);
     }
   }
 
-  // ตัวเลือก 3: Default credentials file
+  // ตัวเลือก 2: JSON string credentials (Railway/Render environment variable)
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      console.log('📝 Loading Google credentials from GOOGLE_CREDENTIALS_JSON');
+      return JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    } catch (error) {
+      console.error('❌ Failed to parse GOOGLE_CREDENTIALS_JSON:', error.message);
+      // Don't throw, try other options
+    }
+  }
+
+  // ตัวเลือก 3: Default credentials files
   const defaultPaths = [
+    '/etc/secrets/google-credentials.json', // Render secret files
     './linebot-482513-5e72ad3d3232.json',
     './credentials.json',
     path.join(__dirname, '../../linebot-482513-5e72ad3d3232.json'),
@@ -61,7 +63,7 @@ function getGoogleCredentials() {
 
   // ไม่พบ credentials
   throw new Error(
-    'Google credentials not found. Please set GOOGLE_CREDENTIALS_JSON environment variable or place credentials file'
+    'Google credentials not found. Please set GOOGLE_CREDENTIALS_PATH or place credentials file'
   );
 }
 
