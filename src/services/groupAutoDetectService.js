@@ -179,25 +179,9 @@ class GroupAutoDetectService {
    */
   static async sendWelcomeMessage(groupId, groupName) {
     try {
-      const message = `👋 สวัสดีค่ะ! ยินดีต้อนรับเข้ากลุ่ม ${groupName}
-
-🤖 ฉันคือบอทแทงบั้งไฟ พร้อมช่วยเหลือคุณ
-
-📝 คำสั่งที่ใช้ได้:
-• เปิดรับแทง
-• ส่งลิ้งค์ห้องแข่ง
-• ส่งลิ้งค์การโอนเงิน
-• สรุปยอดแทง
-• สรุปผลแข่ง
-
-✅ Group ID ได้ถูกบันทึกแล้ว`;
-
-      await client.pushMessage(groupId, {
-        type: 'text',
-        text: message,
-      });
-
-      console.log('✅ Welcome message sent to group:', groupId);
+      // Disabled - don't send welcome message when OA joins
+      console.log('ℹ️ Welcome message disabled for join event');
+      return;
     } catch (error) {
       console.error('❌ Error sending welcome message:', error);
     }
