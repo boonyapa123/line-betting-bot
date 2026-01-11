@@ -5,6 +5,7 @@ const { handleBettingMessage } = require('./handlers/messageHandler');
 const { handleVenueSelection } = require('./handlers/venueHandler');
 const { handleBetHistorySearch } = require('./handlers/searchHandler');
 const { storeMessage, handleMessageDelete } = require('./handlers/deleteHandler');
+const { client } = require('./config/line');
 
 const app = express();
 
@@ -275,7 +276,6 @@ async function handleEvent(event) {
   // Record group activity if from group
   if (event.source.type === 'group' || event.source.type === 'room') {
     const groupManagementService = require('./services/groupManagementService');
-    const { client } = require('./config/line');
     const groupId = event.source.groupId || event.source.roomId;
     
     if (groupId) {
@@ -333,6 +333,58 @@ async function handleEvent(event) {
         console.log('✅ requestOpenBettingInput completed');
       } catch (error) {
         console.error('❌ Error in open betting command:', error);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาด: ' + error.message,
+        });
+      }
+      return Promise.resolve(null);
+    }
+
+    // Check for เช็คห้องแชท command
+    if (messageText === 'เช็คห้องแชท') {
+      console.log('🔍 Check groups command detected');
+      try {
+        const googleSheetsService = require('./services/googleSheetsService');
+        
+        // Initialize Google Sheets
+        await googleSheetsService.initializeGoogleSheets();
+        
+        // Get groups from Groups sheet
+        const result = await googleSheetsService.getSheetData('Groups');
+        
+        let responseText = '📊 ห้องแชทที่มีในระบบ:\n\n';
+        
+        if (result.success && result.data && result.data.length > 1) {
+          // Skip header row
+          result.data.forEach((row, index) => {
+            if (index === 0) return; // Skip header
+            
+            if (row && row.length >= 3 && row[1] && row[2]) {
+              const timestamp = row[0] || '-';
+              const groupId = row[1];
+              const groupName = row[2];
+              const status = row[3] || 'Active';
+              
+              responseText += `${index}. ${groupName}\n`;
+              responseText += `   ID: ${groupId}\n`;
+              responseText += `   สถานะ: ${status}\n`;
+              responseText += `   เข้าร่วม: ${timestamp}\n\n`;
+            }
+          });
+          
+          responseText += `✅ รวมทั้งหมด ${result.data.length - 1} ห้องแชท`;
+        } else {
+          responseText = '⚠️ ไม่พบห้องแชทในระบบ';
+        }
+        
+        console.log('📤 Sending groups list:', responseText);
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: responseText,
+        });
+      } catch (error) {
+        console.error('❌ Error in check groups command:', error);
         await client.replyMessage(event.replyToken, {
           type: 'text',
           text: '❌ เกิดข้อผิดพลาด: ' + error.message,

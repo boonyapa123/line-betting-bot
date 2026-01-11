@@ -328,6 +328,7 @@ router.get('/debug/groups', async (req, res) => {
       },
       googleSheets: {},
       groups: [],
+      allGroups: [],
     };
     
     // Try to initialize Google Sheets
@@ -343,10 +344,30 @@ router.get('/debug/groups', async (req, res) => {
         
         if (result.success && result.data) {
           debug.groups = result.data.slice(0, 5); // First 5 rows
+          debug.allGroups = result.data; // All rows
+          console.log('✅ Groups sheet data:', result.data.length, 'rows');
         }
       }
     } catch (error) {
       debug.googleSheets.error = error.message;
+      console.error('❌ Error getting Groups sheet:', error.message);
+    }
+    
+    // Try to get all groups from LINE API
+    try {
+      console.log('🔍 Checking LINE groups via API...');
+      
+      // Get bot info
+      const botInfo = await client.getBotInfo();
+      debug.botInfo = {
+        userId: botInfo.userId,
+        displayName: botInfo.displayName,
+        iconUrl: botInfo.iconUrl,
+      };
+      console.log('✅ Bot info:', botInfo.displayName);
+    } catch (error) {
+      debug.botInfo = { error: error.message };
+      console.error('❌ Error getting bot info:', error.message);
     }
     
     res.json(debug);
@@ -363,6 +384,132 @@ router.get('/debug/groups', async (req, res) => {
  * OPTIONS /api/debug/groups
  */
 router.options('/debug/groups', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+/**
+ * GET /api/debug/all-groups
+ * Debug endpoint - ตรวจสอบห้องแชททั้งหมดที่ OA เข้าร่วม
+ */
+router.get('/debug/all-groups', async (req, res) => {
+  try {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    console.log('🔍 DEBUG: GET /api/debug/all-groups requested');
+    
+    const debug = {
+      timestamp: new Date().toISOString(),
+      groupsFromSheets: [],
+      groupsFromLocalService: [],
+      groupsFromEnv: [],
+    };
+    
+    // 1. Get groups from Google Sheets
+    try {
+      console.log('📊 Fetching groups from Google Sheets...');
+      const googleSheetsService = require('../services/googleSheetsService');
+      const initResult = await googleSheetsService.initializeGoogleSheets();
+      
+      if (initResult) {
+        const result = await googleSheetsService.getSheetData('Groups');
+        
+        if (result.success && result.data && result.data.length > 1) {
+          // Skip header row
+          result.data.forEach((row, index) => {
+            if (index === 0) return; // Skip header
+            
+            if (row && row.length >= 3 && row[1] && row[2]) {
+              debug.groupsFromSheets.push({
+                timestamp: row[0],
+                groupId: row[1],
+                groupName: row[2],
+                status: row[3] || 'Active',
+              });
+            }
+          });
+          console.log('✅ Groups from Sheets:', debug.groupsFromSheets.length);
+        }
+      }
+    } catch (error) {
+      debug.sheetsError = error.message;
+      console.warn('⚠️ Error getting groups from Sheets:', error.message);
+    }
+    
+    // 2. Get groups from local service
+    try {
+      console.log('📥 Fetching groups from local service...');
+      const groupManagementService = require('../services/groupManagementService');
+      const localGroups = groupManagementService.getAllGroups();
+      
+      if (localGroups && localGroups.length > 0) {
+        debug.groupsFromLocalService = localGroups;
+        console.log('✅ Groups from local service:', localGroups.length);
+      }
+    } catch (error) {
+      debug.localServiceError = error.message;
+      console.warn('⚠️ Error getting groups from local service:', error.message);
+    }
+    
+    // 3. Get groups from environment variable
+    try {
+      console.log('🔧 Checking environment variables...');
+      const groupIdsEnv = process.env.LINE_GROUP_IDS || process.env.LINE_GROUP_ID;
+      
+      if (groupIdsEnv) {
+        const groupIds = groupIdsEnv.split(',').map(id => id.trim()).filter(id => id);
+        
+        for (const groupId of groupIds) {
+          try {
+            const groupSummary = await client.getGroupSummary(groupId);
+            debug.groupsFromEnv.push({
+              groupId,
+              groupName: groupSummary.groupName || 'Unknown',
+              iconUrl: groupSummary.iconUrl,
+            });
+          } catch (error) {
+            debug.groupsFromEnv.push({
+              groupId,
+              error: error.message,
+            });
+          }
+        }
+        console.log('✅ Groups from env:', debug.groupsFromEnv.length);
+      } else {
+        debug.envNote = 'No LINE_GROUP_IDS or LINE_GROUP_ID set';
+      }
+    } catch (error) {
+      debug.envError = error.message;
+      console.warn('⚠️ Error getting groups from env:', error.message);
+    }
+    
+    // Summary
+    debug.summary = {
+      totalFromSheets: debug.groupsFromSheets.length,
+      totalFromLocalService: debug.groupsFromLocalService.length,
+      totalFromEnv: debug.groupsFromEnv.length,
+    };
+    
+    console.log('📊 Summary:', debug.summary);
+    
+    res.json(debug);
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
+/**
+ * OPTIONS /api/debug/all-groups
+ */
+router.options('/debug/all-groups', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
