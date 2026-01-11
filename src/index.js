@@ -187,12 +187,6 @@ app.get('/api/groups', async (req, res) => {
     });
   }
 });
-    });
-  } catch (error) {
-    console.error('❌ Error getting groups:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // Debug endpoint - test webhook manually
 app.post('/api/test-webhook', express.json(), (req, res) => {
