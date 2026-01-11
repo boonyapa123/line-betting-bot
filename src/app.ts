@@ -140,10 +140,32 @@ app.use(express.static('public'));
 app.use('/api', paymentRoutes);
 
 // Get auto-detected groups
-app.get('/api/groups', (_req: Request, res: Response) => {
+app.get('/api/groups', async (_req: Request, res: Response) => {
   try {
-    const groups = GroupAutoDetectService.getAllGroups();
-    const primaryGroupId = GroupAutoDetectService.getPrimaryGroupId();
+    const googleSheetsService = require('./services/googleSheetsService');
+    
+    // Try to get groups from Google Sheets first
+    const sheetsResult = await googleSheetsService.getSheetData('Groups');
+    
+    let groups: any[] = [];
+    
+    if (sheetsResult.success && sheetsResult.data && sheetsResult.data.length > 1) {
+      // Parse data from Google Sheets (skip header row)
+      groups = sheetsResult.data.slice(1).map((row: any[]) => ({
+        timestamp: row[0] || '',
+        id: row[1] || '',
+        name: row[2] || '',
+        status: row[3] || 'Active',
+      })).filter((g: any) => g.id); // Filter out empty rows
+      
+      console.log('✅ Groups loaded from Google Sheets:', groups.length);
+    } else {
+      // Fallback to local groups.json
+      console.log('⚠️ Could not load from Google Sheets, using local groups');
+      groups = GroupAutoDetectService.getAllGroups();
+    }
+    
+    const primaryGroupId = groups.length > 0 ? groups[0].id : null;
 
     res.json({
       success: true,
@@ -151,8 +173,10 @@ app.get('/api/groups', (_req: Request, res: Response) => {
       primaryGroupId,
       groups,
       envGroupId: process.env.LINE_GROUP_ID || 'not set',
+      source: sheetsResult.success ? 'google-sheets' : 'local',
     });
   } catch (error) {
+    console.error('❌ Error getting groups:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
