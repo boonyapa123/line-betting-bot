@@ -195,10 +195,9 @@
         <form id="bettingForm">
             <div class="form-group">
                 <label for="groupId">เลือกกลุ่มที่จะส่ง <span class="required">*</span></label>
-                <div id="groupDisplay">
-                    <div id="groupName" style="padding: 12px; background: #f0f7ff; border-radius: 8px; color: #333; font-weight: 600;">กำลังโหลด...</div>
-                </div>
-                <input type="hidden" id="groupId" required>
+                <select id="groupId" required>
+                    <option value="">-- กำลังโหลด --</option>
+                </select>
             </div>
 
             <div class="form-group">
@@ -250,16 +249,9 @@
     </div>
 
     <script>
-        let groupId = null;
         let userId = null;
         let liff;
         let liffReady = false;
-
-        // Read groupId from URL parameters
-        function getGroupIdFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('groupId');
-        }
 
         // Called when LIFF SDK loads
         function onLiffLoad() {
@@ -267,14 +259,6 @@
             liffReady = true;
             initLiff();
         }
-
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('📄 DOM loaded');
-            if (liffReady) {
-                setupFormListener();
-            }
-        });
 
         // Initialize LIFF
         async function initLiff() {
@@ -287,8 +271,7 @@
                     throw new Error('LIFF SDK not available');
                 }
                 
-                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
-                
+                const liffId = '2008804502-EXS0MfDI';
                 console.log('📝 LIFF ID:', liffId);
                 
                 await liff.init({ liffId });
@@ -300,113 +283,32 @@
                     return;
                 }
 
-                // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                
-                console.log('📍 LIFF Context:', context);
-                console.log('📍 Context type:', context.type);
-                console.log('📍 Context groupId:', context.groupId);
-                console.log('📍 Context roomId:', context.roomId);
-                
-                // Try to get groupId from LIFF context first
-                groupId = context.groupId || context.roomId;
-                
-                // If not in LIFF context, try URL parameter
-                if (!groupId) {
-                    groupId = getGroupIdFromUrl();
-                }
-
                 console.log('👤 User ID:', userId);
-                console.log('📍 Group ID (from context or URL):', groupId);
-                console.log('🔍 DEBUG - groupId is:', groupId, 'type:', typeof groupId, 'empty?', !groupId);
                 
+                loadGroups();
                 setupFormListener();
             } catch (error) {
                 console.error('❌ LIFF init error:', error);
                 showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
             }
         }
-        
-        // Setup form listener
-        function setupFormListener() {
-            const form = document.getElementById('bettingForm');
-            if (!form) {
-                console.error('❌ bettingForm element not found');
-                return;
-            }
-            
-            console.log('✅ Setting up form listener');
-            
-            // Load groups
-            loadGroups();
-            
-            form.addEventListener('submit', handleFormSubmit);
-        }
 
-        // Load groups from API with timeout
+        // Load groups from API
         async function loadGroups() {
             try {
-                console.log('📥 Loading group info...');
-                console.log('🔍 Current groupId:', groupId, 'type:', typeof groupId, 'empty?', !groupId);
-                
-                // If groupId is provided and not empty, use it directly
-                if (groupId && groupId.trim()) {
-                    console.log('✅ Using groupId from URL:', groupId);
-                    document.getElementById('groupId').value = groupId;
-                    
-                    // Try to get group name from API
-                    try {
-                        const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
-                        console.log('🔗 Fetching groups from:', apiUrl);
-                        
-                        const response = await fetch(apiUrl, {
-                            method: 'GET',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        console.log('📥 API response status:', response.status);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            console.log('📊 Groups from API:', data);
-                            
-                            const group = data.groups?.find(g => g.id === groupId);
-                            if (group) {
-                                document.getElementById('groupName').textContent = `✅ ${group.name}`;
-                                console.log('✅ Group name found:', group.name);
-                            } else {
-                                console.warn('⚠️ Group not found in list, using ID');
-                                document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
-                            }
-                        } else {
-                            console.warn('⚠️ API returned status:', response.status);
-                            document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
-                        }
-                    } catch (error) {
-                        console.warn('⚠️ Could not get group name from API:', error.message);
-                        document.getElementById('groupName').textContent = `✅ กลุ่ม: ${groupId}`;
-                    }
-                    return;
-                }
-                
-                // No groupId provided - load all groups
-                console.log('📥 No groupId from URL, loading all groups from API...');
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                console.log('📥 Loading groups from API...');
                 
                 const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                 console.log('🔗 API URL:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: controller.signal
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
-                clearTimeout(timeoutId);
-                console.log('📥 Groups response status:', response.status);
+                console.log('📥 Response status:', response.status);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -415,82 +317,53 @@
                 const data = await response.json();
                 console.log('✅ Groups data:', data);
                 
+                const select = document.getElementById('groupId');
+                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
+
                 if (data.groups && data.groups.length > 0) {
                     console.log('✅ Groups loaded:', data.groups.length);
-                    // If we have groups, show them as a dropdown
-                    const groupDisplay = document.getElementById('groupDisplay');
-                    const select = document.createElement('select');
-                    select.id = 'groupSelect';
-                    select.style.width = '100%';
-                    select.style.padding = '12px';
-                    select.style.border = '2px solid #667eea';
-                    select.style.borderRadius = '8px';
-                    select.style.fontSize = '14px';
-                    
-                    select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
                     data.groups.forEach(group => {
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
+                        console.log('✅ Added group:', group.name);
                     });
-                    
-                    select.addEventListener('change', (e) => {
-                        document.getElementById('groupId').value = e.target.value;
-                        document.getElementById('groupName').textContent = e.target.options[e.target.selectedIndex].text;
-                    });
-                    
-                    groupDisplay.innerHTML = '';
-                    groupDisplay.appendChild(select);
                 } else {
                     console.warn('⚠️ No groups found');
-                    document.getElementById('groupName').textContent = '❌ ไม่พบกลุ่มใดๆ - กรุณาเพิ่ม OA เข้ากลุ่มก่อน';
+                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
-                
-                if (error.name === 'AbortError') {
-                    console.error('❌ Request timeout');
-                    document.getElementById('groupName').textContent = '❌ หมดเวลารอ - ลองใหม่อีกครั้ง';
-                    showError('หมดเวลารอการตอบสนองจากเซิร์ฟเวอร์');
-                } else {
-                    document.getElementById('groupName').textContent = '❌ ไม่สามารถโหลดกลุ่มได้';
-                    showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
-                }
+                const select = document.getElementById('groupId');
+                select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
+        }
+
+        // Setup form listener
+        function setupFormListener() {
+            const form = document.getElementById('bettingForm');
+            form.addEventListener('submit', handleFormSubmit);
         }
 
         // Handle form submission
         async function handleFormSubmit(e) {
             e.preventDefault();
             console.log('📝 Form submitted');
-            console.log('🔍 Checking form data...');
 
-            const selectedGroupId = document.getElementById('groupId').value;
+            const groupId = document.getElementById('groupId').value;
             const venue = document.getElementById('venue').value.trim();
             const fireNumber = document.getElementById('fireNumber').value.trim();
             const roomLink = document.getElementById('roomLink').value.trim();
             const note = document.getElementById('note').value.trim();
 
-            console.log('📋 Form data:', {
-                selectedGroupId,
-                venue,
-                fireNumber,
-                roomLink,
-                note,
-                userId,
-            });
+            console.log('📋 Form data:', { groupId, venue, fireNumber, roomLink, note });
 
             // Validate
-            if (!selectedGroupId || !venue || !fireNumber) {
+            if (!groupId || !venue || !fireNumber) {
                 console.error('❌ Validation failed');
                 showError('กรุณากรอกข้อมูลที่จำเป็นทั้งหมด');
-                return;
-            }
-
-            if (!userId) {
-                console.error('❌ User ID not available');
-                showError('ไม่สามารถระบุตัวตนผู้ใช้ได้');
                 return;
             }
 
@@ -501,36 +374,24 @@
 
             try {
                 console.log('📤 Sending betting message...');
-                console.log('🌐 Fetch URL: /api/send-betting-message');
-                console.log('📦 Request body:', {
-                    groupId: selectedGroupId,
-                    venue,
-                    fireNumber,
-                    roomLink: roomLink || undefined,
-                    note: note || undefined,
-                    userId,
-                    timestamp: new Date().toISOString(),
-                });
                 
-                // Send to backend
                 const response = await fetch('https://line-betting-bot.onrender.com/api/send-betting-message', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        groupId: selectedGroupId,
+                        groupId,
                         venue,
                         fireNumber,
-                        ...(roomLink && { roomLink }),
-                        ...(note && { note }),
+                        roomLink: roomLink || undefined,
+                        note: note || undefined,
                         userId,
                         timestamp: new Date().toISOString(),
                     })
                 });
 
                 console.log('📥 Response status:', response.status);
-                console.log('📥 Response received');
 
                 if (!response.ok) {
                     const error = await response.json();
@@ -541,10 +402,8 @@
                 const result = await response.json();
                 console.log('✅ Betting message sent successfully:', result);
 
-                // Show success
                 showSuccess('✅ ส่งข้อมูลไปยังกลุ่มแล้ว');
 
-                // Close LIFF after 2 seconds
                 setTimeout(() => {
                     if (typeof liff !== 'undefined' && liff.isInClient()) {
                         liff.closeWindow();
@@ -580,10 +439,8 @@
         }
 
         // Close form
-        async function closeForm() {
+        function closeForm() {
             console.log('❌ Cancel button clicked');
-            
-            // Just close the window - no betting data to cancel yet
             if (typeof liff !== 'undefined' && liff.isInClient()) {
                 liff.closeWindow();
             } else {

@@ -265,28 +265,12 @@
         let liff;
         let liffReady = false;
 
-        // Read groupId from URL parameters
-        function getGroupIdFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('groupId');
-        }
-
         // Called when LIFF SDK loads
         function onLiffLoad() {
             console.log('✅ LIFF SDK loaded');
             liffReady = true;
             initLiff();
         }
-
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('📄 DOM loaded - Payment Form');
-            console.log('📍 Current URL:', window.location.href);
-            
-            if (liffReady) {
-                setupFormListener();
-            }
-        });
 
         // Initialize LIFF
         async function initLiff() {
@@ -299,8 +283,7 @@
                     throw new Error('LIFF SDK not available');
                 }
                 
-                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
-                
+                const liffId = '2008804502-EXS0MfDI';
                 console.log('📝 LIFF ID:', liffId);
                 
                 await liff.init({ liffId });
@@ -312,46 +295,21 @@
                     return;
                 }
 
-                // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                
-                console.log('📍 LIFF Context:', context);
-                console.log('📍 Context type:', context.type);
-                console.log('📍 Context groupId:', context.groupId);
-                console.log('📍 Context roomId:', context.roomId);
-                
-                // Try to get groupId from LIFF context first
-                groupId = context.groupId || context.roomId;
-                
-                // If not in LIFF context, try URL parameter
-                if (!groupId) {
-                    groupId = getGroupIdFromUrl();
-                }
-
                 console.log('👤 User ID:', userId);
-                console.log('📍 Group ID (from context or URL):', groupId);
                 
+                loadGroups();
                 setupFormListener();
             } catch (error) {
                 console.error('❌ LIFF init error:', error);
                 showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
             }
         }
-        
+
         // Setup form listener
         function setupFormListener() {
             const form = document.getElementById('paymentForm');
-            if (!form) {
-                console.error('❌ paymentForm element not found');
-                return;
-            }
-            
-            console.log('✅ Setting up form listener');
-            
-            // Load groups
-            loadGroups();
-            
             form.addEventListener('submit', handleFormSubmit);
         }
 

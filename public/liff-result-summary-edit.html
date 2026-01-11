@@ -301,23 +301,10 @@
     <script>
         let userId = null;
         let selectedVenue = null;
-        let selectedGroupId = null;
         let venues = [];
         let groups = [];
         let liff;
-        let groupId = null;
         let liffReady = false;
-
-        function getBaseUrl() {
-            if (typeof liff !== 'undefined') {
-                const protocol = window.location.protocol;
-                const host = window.location.host;
-                return `${protocol}//${host}`;
-            }
-            return '';
-        }
-
-        const baseUrl = getBaseUrl();
 
         // Called when LIFF SDK loads
         function onLiffLoad() {
@@ -325,15 +312,6 @@
             liffReady = true;
             initLiff();
         }
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('📄 DOM loaded - Result Summary Edit Form');
-            console.log('🌐 Base URL:', baseUrl);
-            
-            if (liffReady) {
-                checkFormType();
-            }
-        });
 
         // Initialize LIFF
         async function initLiff() {
@@ -346,8 +324,7 @@
                     throw new Error('LIFF SDK not available');
                 }
                 
-                const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
-                
+                const liffId = '2008804502-EXS0MfDI';
                 console.log('📝 LIFF ID:', liffId);
                 
                 await liff.init({ liffId });
@@ -359,63 +336,15 @@
                     return;
                 }
 
-                // Get user context
                 const context = liff.getContext();
                 userId = context.userId;
-                
-                console.log('📍 LIFF Context:', context);
-                console.log('📍 Context type:', context.type);
-                console.log('📍 Context groupId:', context.groupId);
-                console.log('📍 Context roomId:', context.roomId);
-                
-                // Try to get groupId from LIFF context first
-                groupId = context.groupId || context.roomId;
-
                 console.log('👤 User ID:', userId);
-                console.log('📍 Group ID (from context):', groupId);
                 
-                checkFormType();
+                loadData();
             } catch (error) {
                 console.error('❌ LIFF init error:', error);
                 showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้: ' + error.message);
             }
-        }
-
-        function checkFormType() {
-            const params = new URLSearchParams(window.location.search);
-            const liffState = params.get('liff.state');
-            
-            let formType = 'payment';
-            let groupIdFromUrl = null;
-            
-            if (liffState) {
-                try {
-                    const decodedState = decodeURIComponent(liffState);
-                    const stateParams = new URLSearchParams(decodedState);
-                    formType = stateParams.get('form') || 'payment';
-                    groupIdFromUrl = stateParams.get('groupId');
-                } catch (e) {
-                    console.error('❌ Error parsing liff.state:', e);
-                }
-            } else {
-                formType = params.get('form') || 'payment';
-                groupIdFromUrl = params.get('groupId');
-            }
-            
-            console.log('📋 Form type:', formType);
-            console.log('🔗 Group ID from URL:', groupIdFromUrl);
-            
-            if (formType !== 'result-summary-edit') {
-                console.log('🔄 Wrong form! Redirecting');
-                window.location.replace('/liff-payment-form.html' + window.location.search);
-                return;
-            }
-            
-            if (groupIdFromUrl) {
-                selectedGroupId = groupIdFromUrl;
-            }
-            
-            loadData();
         }
 
         async function loadData() {
@@ -426,11 +355,6 @@
                 console.log('📥 Loading groups list...');
                 
                 try {
-                    // Create abort controller for timeout
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-                    
-                    // Use absolute URL
                     const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                     console.log('🔗 API URL:', apiUrl);
                     
@@ -438,11 +362,9 @@
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json',
-                        },
-                        signal: controller.signal
+                        }
                     });
 
-                    clearTimeout(timeoutId);
                     console.log('📥 Groups response status:', groupsResponse.status);
 
                     if (groupsResponse.ok) {
@@ -455,17 +377,13 @@
                         if (groups.length > 0) {
                             populateGroupSelect();
                         } else {
-                            console.warn('⚠️ No groups found - please add OA to groups first');
+                            console.warn('⚠️ No groups found');
                         }
                     } else {
                         console.warn('⚠️ Failed to load groups:', groupsResponse.status);
                     }
                 } catch (groupError) {
-                    if (groupError.name === 'AbortError') {
-                        console.warn('⚠️ Groups request timeout');
-                    } else {
-                        console.warn('⚠️ Could not load groups:', groupError);
-                    }
+                    console.warn('⚠️ Could not load groups:', groupError);
                 }
                 
                 const url = `https://line-betting-bot.onrender.com/api/result-summary-venues`;
@@ -516,37 +434,10 @@
                 const groupId = group.id || group.groupId;
                 option.value = groupId;
                 option.textContent = group.name || group.groupName || groupId;
-                
-                // Pre-select if this is the groupId from URL
-                if (selectedGroupId === groupId) {
-                    option.selected = true;
-                }
-                
                 select.appendChild(option);
             });
 
             console.log('✅ Group select populated');
-        }
-
-        function renderGroupList() {
-            const groupList = document.getElementById('groupList');
-            groupList.innerHTML = '';
-
-            groups.forEach((group, index) => {
-                const groupItem = document.createElement('div');
-                groupItem.className = 'venue-item';
-                const groupId = group.id || group.groupId;
-                if (selectedGroupId === groupId) {
-                    groupItem.classList.add('selected');
-                }
-                groupItem.innerHTML = `
-                    <div class="venue-name">${group.name || group.groupName || groupId}</div>
-                    <div class="venue-info">${groupId}</div>
-                `;
-                
-                groupItem.addEventListener('click', () => selectGroup(index, groupItem));
-                groupList.appendChild(groupItem);
-            });
         }
 
         function renderVenueList() {

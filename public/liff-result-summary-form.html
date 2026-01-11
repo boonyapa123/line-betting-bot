@@ -315,6 +315,7 @@
     let liff;
     let bettingEvents = [];
     let selectedResults = {};
+    let groups = [];
     let liffReady = false;
 
     // Called when LIFF SDK loads
@@ -334,8 +335,7 @@
           throw new Error('LIFF SDK not available');
         }
         
-        const liffId = '2008804502-EXS0MfDI'; // Your LIFF ID
-        
+        const liffId = '2008804502-EXS0MfDI';
         console.log('📝 LIFF ID:', liffId);
         
         await liff.init({ liffId });
@@ -358,6 +358,41 @@
 
     async function loadBettingEvents() {
       try {
+        // Load groups list
+        console.log('📥 Loading groups list...');
+        
+        try {
+          const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+          console.log('🔗 API URL:', apiUrl);
+          
+          const groupsResponse = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+
+          console.log('📥 Groups response status:', groupsResponse.status);
+
+          if (groupsResponse.ok) {
+            const groupsData = await groupsResponse.json();
+            console.log('✅ Groups data:', groupsData);
+            
+            groups = groupsData.groups || [];
+            console.log('✅ Groups loaded:', groups.length);
+            
+            if (groups.length > 0) {
+              populateGroupSelect();
+            } else {
+              console.warn('⚠️ No groups found');
+            }
+          } else {
+            console.warn('⚠️ Failed to load groups:', groupsResponse.status);
+          }
+        } catch (groupError) {
+          console.warn('⚠️ Could not load groups:', groupError);
+        }
+
         // Get today's date
         const today = new Date();
         const year = today.getFullYear();
@@ -405,6 +440,24 @@
         console.error('Error loading betting events:', error);
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + error.message);
       }
+    }
+
+    function populateGroupSelect() {
+      const select = document.getElementById('groupSelect');
+      
+      // Keep existing options
+      const existingOptions = select.innerHTML;
+      
+      // Add groups as options
+      groups.forEach(group => {
+        const option = document.createElement('option');
+        const groupId = group.id || group.groupId;
+        option.value = groupId;
+        option.textContent = `📍 ${group.name || group.groupName || groupId}`;
+        select.appendChild(option);
+      });
+
+      console.log('✅ Group select populated');
     }
 
     function renderResults() {
@@ -486,15 +539,10 @@
         // Prepare request body
         const requestBody = {
           results,
-          groupSelect,
+          groupId: groupSelect,
           notes,
           userId: context.userId
         };
-
-        // Add groupId if available
-        if (context.groupId) {
-          requestBody.groupId = context.groupId;
-        }
 
         // Send to server
         const response = await fetch('https://line-betting-bot.onrender.com/api/betting/submit-results', {
