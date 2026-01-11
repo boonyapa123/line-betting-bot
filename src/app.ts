@@ -6,7 +6,7 @@
 import express, { Express, Request, Response } from 'express';
 import { config, validateConfig } from './config/environment';
 import { connectDatabase, getDatabaseStatus } from './config/database';
-import { verifyLineSignature } from './config/line';
+import { verifyLineSignature, lineClient } from './config/line';
 import { LineMessageHandler } from './handlers/lineMessageHandler';
 import { PostbackHandler } from './handlers/postbackHandler';
 import { TextMessageHandler } from './handlers/textMessageHandler';
@@ -156,6 +156,223 @@ app.get('/api/groups', (_req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Send betting message to group
+app.post('/api/send-betting-message', async (req: Request, res: Response) => {
+  try {
+    const { groupId, venue, fireNumber, roomLink, note, userId, timestamp } = req.body;
+
+    // Validate required fields
+    if (!groupId || !venue || !fireNumber) {
+      console.warn('⚠️ Missing required fields:', { groupId, venue, fireNumber });
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: groupId, venue, fireNumber',
+      });
+    }
+
+    if (!userId) {
+      console.warn('⚠️ Missing userId');
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: userId',
+      });
+    }
+
+    console.log('📤 Sending betting message:', { groupId, venue, fireNumber, userId });
+
+    // Create Flex Message for group
+    const flexMessage: any = {
+      type: 'flex',
+      altText: `🎯 เปิดรับแทง: ${venue} บั้งไฟ ${fireNumber}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '🎯 เปิดรับแทง',
+              weight: 'bold',
+              size: 'xl',
+              color: '#667eea',
+            },
+          ],
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'md',
+          contents: [
+            {
+              type: 'box',
+              layout: 'baseline',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'สนาม:',
+                  color: '#aaaaaa',
+                  size: 'sm',
+                  flex: 1,
+                },
+                {
+                  type: 'text',
+                  text: venue,
+                  wrap: true,
+                  color: '#666666',
+                  size: 'sm',
+                  flex: 5,
+                },
+              ],
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'บั้งไฟ:',
+                  color: '#aaaaaa',
+                  size: 'sm',
+                  flex: 1,
+                },
+                {
+                  type: 'text',
+                  text: fireNumber,
+                  wrap: true,
+                  color: '#666666',
+                  size: 'sm',
+                  flex: 5,
+                },
+              ],
+            },
+            ...(roomLink
+              ? [
+                  {
+                    type: 'box',
+                    layout: 'baseline',
+                    margin: 'md',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'ห้องแข่ง:',
+                        color: '#aaaaaa',
+                        size: 'sm',
+                        flex: 1,
+                      },
+                      {
+                        type: 'text',
+                        text: roomLink,
+                        wrap: true,
+                        color: '#0099ff',
+                        size: 'sm',
+                        flex: 5,
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(note
+              ? [
+                  {
+                    type: 'box',
+                    layout: 'baseline',
+                    margin: 'md',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: 'หมายเหตุ:',
+                        color: '#aaaaaa',
+                        size: 'sm',
+                        flex: 1,
+                      },
+                      {
+                        type: 'text',
+                        text: note,
+                        wrap: true,
+                        color: '#666666',
+                        size: 'sm',
+                        flex: 5,
+                      },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        },
+      },
+    };
+
+    // Send message to group via LINE API
+    let messageId: string | null = null;
+    try {
+      const response: any = await lineClient.pushMessage(groupId, flexMessage);
+      messageId = response?.messageId || null;
+      console.log('✅ Message sent to group:', groupId);
+    } catch (lineError) {
+      console.error('❌ Failed to send message to group:', lineError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send message to group',
+        details: lineError instanceof Error ? lineError.message : 'Unknown error',
+      });
+    }
+
+    // Record to Google Sheets
+    let sheetRecorded = false;
+    let sheetError: string | null = null;
+    try {
+      const openBettingRecordService = require('./services/openBettingRecordService');
+      const recordResult = await openBettingRecordService.recordOpenBetting({
+        venue,
+        fireNumber,
+        roomLink: roomLink || '',
+        note: note || '',
+        adminId: userId,
+        date: new Date().toISOString().split('T')[0],
+      });
+
+      if (recordResult.success) {
+        sheetRecorded = true;
+        console.log('✅ Betting event recorded to Google Sheets');
+      } else {
+        sheetError = recordResult.error;
+        console.warn('⚠️ Failed to record to Google Sheets:', sheetError);
+      }
+    } catch (sheetError_) {
+      sheetError = sheetError_ instanceof Error ? sheetError_.message : 'Unknown error';
+      console.warn('⚠️ Error recording to Google Sheets:', sheetError);
+    }
+
+    // Return response
+    if (sheetRecorded) {
+      res.json({
+        success: true,
+        message: 'Betting message sent successfully',
+        messageId,
+        sheetRecorded: true,
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'Betting message sent but failed to record to sheet',
+        messageId,
+        sheetRecorded: false,
+        sheetError,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in send-betting-message endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

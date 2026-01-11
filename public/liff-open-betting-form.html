@@ -252,6 +252,7 @@
         let userId = null;
         let liff;
         let liffReady = false;
+        let formData = {}; // Store form data for retry
 
         // Called when LIFF SDK loads
         function onLiffLoad() {
@@ -299,10 +300,11 @@
         async function loadGroups() {
             try {
                 console.log('📥 Loading groups from API...');
-                console.log('👤 Current userId:', userId);
                 
                 const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
                 console.log('🔗 API URL:', apiUrl);
+                
+                showLoadingState(true);
                 
                 const response = await fetch(apiUrl, {
                     method: 'GET',
@@ -313,7 +315,6 @@
                 });
 
                 console.log('📥 Response status:', response.status);
-                console.log('📥 Response headers:', response.headers);
 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -345,18 +346,18 @@
                     console.log('✅ Total groups added:', select.options.length - 1);
                 } else {
                     console.warn('⚠️ No groups found or success is false');
-                    console.warn('⚠️ data.success:', data.success);
-                    console.warn('⚠️ data.groups:', data.groups);
                     select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
                 }
+                
+                showLoadingState(false);
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
-                console.error('❌ Error stack:', error.stack);
                 const select = document.getElementById('groupId');
                 if (select) {
                     select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
                 }
-                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
+                showLoadingState(false);
+                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message + ' - กรุณาลองใหม่อีกครั้ง');
             }
         }
 
@@ -379,17 +380,18 @@
 
             console.log('📋 Form data:', { groupId, venue, fireNumber, roomLink, note });
 
+            // Store form data for retry
+            formData = { groupId, venue, fireNumber, roomLink, note };
+
             // Validate
             if (!groupId || !venue || !fireNumber) {
                 console.error('❌ Validation failed');
-                showError('กรุณากรอกข้อมูลที่จำเป็นทั้งหมด');
+                showError('กรุณากรอกข้อมูลที่จำเป็นทั้งหมด (สนาม, บั้งไฟ, และเลือกกลุ่ม)');
                 return;
             }
 
             // Show loading
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('bettingForm').style.opacity = '0.5';
-            document.getElementById('bettingForm').style.pointerEvents = 'none';
+            showLoadingState(true);
 
             try {
                 console.log('📤 Sending betting message...');
@@ -422,6 +424,9 @@
                 console.log('✅ Betting message sent successfully:', result);
 
                 showSuccess('✅ ส่งข้อมูลไปยังกลุ่มแล้ว');
+                
+                // Clear form data after success
+                formData = {};
 
                 setTimeout(() => {
                     if (typeof liff !== 'undefined' && liff.isInClient()) {
@@ -432,11 +437,25 @@
                 }, 2000);
             } catch (error) {
                 console.error('❌ Error sending betting message:', error);
-                showError('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + error.message);
+                showError('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + error.message + ' - กรุณาลองใหม่อีกครั้ง');
             } finally {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('bettingForm').style.opacity = '1';
-                document.getElementById('bettingForm').style.pointerEvents = 'auto';
+                showLoadingState(false);
+            }
+        }
+
+        // Show/hide loading state
+        function showLoadingState(isLoading) {
+            const loading = document.getElementById('loading');
+            const form = document.getElementById('bettingForm');
+            
+            if (isLoading) {
+                loading.style.display = 'block';
+                form.style.opacity = '0.5';
+                form.style.pointerEvents = 'none';
+            } else {
+                loading.style.display = 'none';
+                form.style.opacity = '1';
+                form.style.pointerEvents = 'auto';
             }
         }
 
@@ -445,9 +464,12 @@
             const errorEl = document.getElementById('errorMsg');
             errorEl.textContent = message;
             errorEl.style.display = 'block';
+            console.error('❌ Error displayed:', message);
+            
+            // Auto-hide after 7 seconds
             setTimeout(() => {
                 errorEl.style.display = 'none';
-            }, 5000);
+            }, 7000);
         }
 
         // Show success message
@@ -455,6 +477,7 @@
             const successEl = document.getElementById('successMsg');
             successEl.textContent = message;
             successEl.style.display = 'block';
+            console.log('✅ Success displayed:', message);
         }
 
         // Close form
