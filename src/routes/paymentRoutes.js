@@ -232,8 +232,8 @@ router.get('/groups', async (req, res) => {
     
     let groups = [];
     
+    // Try to get groups from Google Sheets first
     try {
-      // Try to get groups from Google Sheets first
       const googleSheetsService = require('../services/googleSheetsService');
       
       console.log('📊 Fetching groups from Google Sheets...');
@@ -241,22 +241,32 @@ router.get('/groups', async (req, res) => {
       // Get all rows from "Groups" sheet
       const result = await googleSheetsService.getSheetData('Groups');
       
-      if (result.success && result.data && result.data.length > 0) {
-        console.log('📊 Groups from Sheets:', result.data.length);
+      console.log('📊 Google Sheets result:', result);
+      
+      if (result.success && result.data && result.data.length > 1) {
+        console.log('📊 Groups from Sheets:', result.data.length, 'rows');
         
         // Skip header row and map data
         result.data.forEach((row, index) => {
-          if (index === 0) return; // Skip header
+          if (index === 0) {
+            console.log('📋 Header row:', row);
+            return; // Skip header
+          }
+          
+          console.log(`📝 Row ${index}:`, row);
           
           if (row[1] && row[2]) { // groupId and groupName
             groups.push({
               id: row[1],
               name: row[2],
             });
+            console.log(`✅ Added group: ${row[2]} (${row[1]})`);
           }
         });
         
         console.log('✅ Groups loaded from Google Sheets:', groups.length);
+      } else {
+        console.warn('⚠️ No data in Groups sheet or sheet not found');
       }
     } catch (error) {
       console.warn('⚠️ Could not get groups from Google Sheets:', error.message);
@@ -266,8 +276,15 @@ router.get('/groups', async (req, res) => {
     if (groups.length === 0) {
       console.log('📥 Falling back to local group management service');
       const groupManagementService = require('../services/groupManagementService');
-      groups = groupManagementService.getAllGroups();
-      console.log('📊 Groups found from local service:', groups.length);
+      const localGroups = groupManagementService.getAllGroups();
+      console.log('📊 Groups found from local service:', localGroups.length);
+      
+      if (localGroups && localGroups.length > 0) {
+        groups = localGroups.map(g => ({
+          id: g.id,
+          name: g.name,
+        }));
+      }
     }
     
     // Final fallback to environment variable
@@ -302,12 +319,14 @@ router.get('/groups', async (req, res) => {
     res.json({
       success: true,
       groups,
+      count: groups.length,
     });
   } catch (error) {
     console.error('❌ Error getting groups:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get groups',
+      message: error.message,
     });
   }
 });

@@ -349,11 +349,15 @@
                     }
                 });
 
+                console.log('📥 Groups response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error('Failed to load groups');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
                 const data = await response.json();
+                console.log('✅ Groups data:', data);
+                
                 const select = document.getElementById('groupId');
 
                 // Clear existing options
@@ -370,12 +374,13 @@
                     });
                 } else {
                     console.warn('⚠️ No groups found');
-                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
+                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ - กรุณาเพิ่ม OA เข้ากลุ่มก่อน</option>';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
                 const select = document.getElementById('groupId');
                 select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
         }
 

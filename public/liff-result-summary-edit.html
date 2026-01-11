@@ -430,14 +430,22 @@
                         }
                     });
 
+                    console.log('📥 Groups response status:', groupsResponse.status);
+
                     if (groupsResponse.ok) {
                         const groupsData = await groupsResponse.json();
+                        console.log('✅ Groups data:', groupsData);
+                        
                         groups = groupsData.groups || [];
                         console.log('✅ Groups loaded:', groups.length);
                         
                         if (groups.length > 0) {
                             populateGroupSelect();
+                        } else {
+                            console.warn('⚠️ No groups found - please add OA to groups first');
                         }
+                    } else {
+                        console.warn('⚠️ Failed to load groups:', groupsResponse.status);
                     }
                 } catch (groupError) {
                     console.warn('⚠️ Could not load groups:', groupError);
