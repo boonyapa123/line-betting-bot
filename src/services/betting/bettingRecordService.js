@@ -94,7 +94,7 @@ class BettingRecordService {
         amount,
         result: 'pending',
         userId,
-      });
+      }, sheetName);
 
       if (response.success) {
         logger.info('Betting record saved', {

@@ -4,8 +4,18 @@ const { getGoogleCredentials, getGoogleAuthClient } = require('../config/googleC
 
 // Google Sheets API setup
 let sheets = null;
-let spreadsheetId = process.env.GOOGLE_SHEETS_ID;
 let authClient = null;
+
+/**
+ * Get spreadsheet ID from environment
+ */
+function getSpreadsheetId() {
+  const id = process.env.GOOGLE_SHEETS_ID;
+  if (!id) {
+    console.warn('⚠️ GOOGLE_SHEETS_ID not set in environment');
+  }
+  return id;
+}
 
 /**
  * Initialize Google Sheets API
@@ -19,9 +29,12 @@ const initializeGoogleSheets = async () => {
 
     sheets = google.sheets({ version: 'v4', auth: authClient });
     logger.info('Google Sheets API initialized');
+    console.log('✅ Google Sheets API initialized');
+    console.log('📊 GOOGLE_SHEETS_ID:', getSpreadsheetId());
     return true;
   } catch (error) {
     logger.error('Error initializing Google Sheets API', error);
+    console.error('❌ Error initializing Google Sheets API:', error.message);
     return false;
   }
 };
@@ -29,8 +42,9 @@ const initializeGoogleSheets = async () => {
 /**
  * Append bet to Google Sheets
  */
-const appendBet = async (bet) => {
+const appendBet = async (bet, sheetName = 'Bets') => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -49,7 +63,7 @@ const appendBet = async (bet) => {
 
     const request = {
       spreadsheetId,
-      range: 'Bets!A:F',
+      range: `${sheetName}!A:F`,
       valueInputOption: 'USER_ENTERED',
       resource: {
         values,
@@ -74,6 +88,7 @@ const appendBet = async (bet) => {
  */
 const appendRoundSummary = async (round, bets) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -149,6 +164,7 @@ const extractAmount = (details) => {
  */
 const getAllBets = async () => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -198,6 +214,7 @@ const getAllBets = async () => {
  */
 const updateBetResult = async (lineName, venue, amount, result) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -250,6 +267,7 @@ const updateBetResult = async (lineName, venue, amount, result) => {
  */
 const createSheet = async (sheetName) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -288,6 +306,7 @@ const createSheet = async (sheetName) => {
  */
 const clearSheet = async (sheetName) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -313,6 +332,7 @@ const clearSheet = async (sheetName) => {
  */
 const updateBetStatus = async (identifier, status) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -367,6 +387,7 @@ const updateBetStatus = async (identifier, status) => {
  */
 const getSheetData = async (sheetName) => {
   try {
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       logger.warn('Google Sheets not initialized');
       return { success: false, error: 'Google Sheets not initialized' };
@@ -399,6 +420,7 @@ const getSheetData = async (sheetName) => {
 const appendRow = async (sheetName, values) => {
   try {
     // Initialize if not already initialized
+    const spreadsheetId = getSpreadsheetId();
     if (!sheets || !spreadsheetId) {
       console.log('📊 Sheets not initialized, initializing now...');
       try {
