@@ -300,10 +300,10 @@
             }
         }
 
-        // Load groups from Google Sheets via API
+        // Load groups directly from Google Sheets
         async function loadGroups() {
             try {
-                console.log('📥 Loading groups from API...');
+                console.log('📥 Loading groups directly from Google Sheets...');
                 
                 const select = document.getElementById('groupId');
                 if (!select) {
@@ -313,84 +313,73 @@
                 
                 select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
                 
+                // Call backend to get groups from Google Sheets
+                const response = await fetch('/api/debug/groups-from-sheets', {
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                console.log('📥 Response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ Raw result:', JSON.stringify(result, null, 2));
+                
+                const rawData = result.rawResult.data || [];
+                console.log('📊 Raw data rows:', rawData.length);
+                
                 let groups = [];
                 
-                // Try to get groups from API (using relative path like เช็คห้องแชท command)
-                try {
-                    console.log('📥 Fetching groups from API...');
-                    const apiUrl = '/api/groups';
-                    console.log('🔗 API URL:', apiUrl);
+                // Parse rows (skip header row at index 0)
+                for (let i = 1; i < rawData.length; i++) {
+                    const row = rawData[i];
+                    console.log(`📝 Row ${i}:`, row);
                     
-                    const response = await fetch(apiUrl, {
-                        method: 'GET',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    console.log('📥 API Response status:', response.status);
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log('✅ API response:', JSON.stringify(data, null, 2));
+                    if (row && row.length >= 3) {
+                        const groupId = (row[1] || '').trim();
+                        const groupName = (row[2] || '').trim();
                         
-                        if (data.groups && data.groups.length > 0) {
-                            groups = data.groups.map(group => ({
-                                id: group.id,
-                                name: group.name
-                            }));
-                            console.log('✅ Groups from API:', groups.length);
-                            showDebugInfo(`✅ พบกลุ่มจาก ${data.source}: ${groups.length} กลุ่ม`);
-                        } else {
-                            console.warn('⚠️ API returned no groups');
-                            showDebugInfo(`⚠️ API ไม่พบกลุ่ม (source: ${data.source})`);
+                        if (groupId && groupName) {
+                            groups.push({
+                                id: groupId,
+                                name: groupName
+                            });
+                            console.log(`✅ Added group: ${groupName} (${groupId})`);
                         }
-                    } else {
-                        const errorText = await response.text();
-                        console.warn('⚠️ API returned status:', response.status, errorText);
-                        showDebugInfo(`⚠️ API error: ${response.status}`);
                     }
-                } catch (apiError) {
-                    console.warn('⚠️ API fetch failed:', apiError);
-                    showDebugInfo(`❌ API fetch error: ${apiError.message}`);
                 }
                 
+                console.log('✅ Total groups parsed:', groups.length);
+                
                 // Populate select
-                select.innerHTML = '<option value="">-- เลือกกลุ่ม --</option>';
+                select.innerHTML = '<option value="">-- เลือกห้องแชท --</option>';
                 
                 if (groups.length > 0) {
-                    console.log('✅ Total groups loaded:', groups.length);
-                    
-                    groups.forEach((group, index) => {
-                        console.log(`📝 Adding group ${index}:`, group);
+                    groups.forEach(group => {
                         const option = document.createElement('option');
                         option.value = group.id;
                         option.textContent = group.name;
                         select.appendChild(option);
+                        console.log(`✅ Added option: ${group.name}`);
                     });
-                    
-                    // Pre-select group from URL if available
-                    if (urlGroupId) {
-                        select.value = urlGroupId;
-                        console.log('✅ Pre-selected group from URL:', urlGroupId);
-                    }
-                    
-                    setTimeout(hideDebugInfo, 5000);
+                    console.log('✅ Dropdown populated with', groups.length, 'groups');
                 } else {
                     console.warn('⚠️ No groups found');
-                    select.innerHTML = '<option value="">ไม่พบกลุ่มใดๆ</option>';
-                    showDebugInfo('❌ ไม่พบกลุ่มใดๆ - ตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว');
-                    showError('ไม่พบกลุ่มใดๆ กรุณาตรวจสอบว่า OA ได้เข้ากลุ่มแล้ว และข้อมูลถูกบันทึกใน Google Sheets หรือ local file');
+                    select.innerHTML = '<option value="">ไม่พบห้องแชทใดๆ</option>';
                 }
             } catch (error) {
                 console.error('❌ Error loading groups:', error);
+                console.error('❌ Error stack:', error.stack);
                 const select = document.getElementById('groupId');
                 if (select) {
-                    select.innerHTML = '<option value="">ไม่สามารถโหลดกลุ่มได้</option>';
+                    select.innerHTML = '<option value="">ไม่สามารถโหลดห้องแชทได้</option>';
                 }
-                showDebugInfo('❌ ' + error.message);
-                showError('ไม่สามารถโหลดรายการกลุ่มได้: ' + error.message);
             }
         }
 

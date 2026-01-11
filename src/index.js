@@ -242,6 +242,44 @@ app.get('/api/debug/groups-from-sheets', async (req, res) => {
   }
 });
 
+// Debug endpoint - list all sheets
+app.get('/api/debug/sheets', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Listing all sheets');
+    
+    const googleSheetsService = require('./services/googleSheetsService');
+    
+    // Initialize
+    console.log('🔄 Initializing Google Sheets...');
+    await googleSheetsService.initializeGoogleSheets();
+    console.log('✅ Google Sheets initialized');
+    
+    // Get spreadsheet metadata
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+    console.log('📊 Spreadsheet ID:', spreadsheetId);
+    
+    const sheets = require('googleapis').google.sheets({ version: 'v4', auth: googleSheetsService.getAuthClient() });
+    const response = await sheets.spreadsheets.get({ spreadsheetId });
+    
+    const sheetNames = response.data.sheets.map(sheet => sheet.properties.title);
+    console.log('📋 Sheet names:', sheetNames);
+    
+    res.status(200).json({
+      debug: true,
+      spreadsheetId,
+      sheets: sheetNames,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({
+      debug: true,
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
 // Debug endpoint - test webhook manually
 app.post('/api/test-webhook', express.json(), (req, res) => {
   try {
