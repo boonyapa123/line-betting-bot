@@ -334,7 +334,11 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
                 
-                const response = await fetch('/api/groups', {
+                // Use absolute URL instead of relative
+                const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                console.log('🔗 API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
