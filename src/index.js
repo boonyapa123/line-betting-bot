@@ -115,6 +115,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Get all groups/rooms where bot is active
+// Get all groups/rooms where bot is active
 app.get('/api/groups', async (req, res) => {
   try {
     console.log('📥 GET /api/groups requested');
@@ -124,10 +125,18 @@ app.get('/api/groups', async (req, res) => {
     
     // Try Google Sheets first
     try {
+      console.log('📊 Attempting to load from Google Sheets...');
       const googleSheetsService = require('./services/googleSheetsService');
-      await googleSheetsService.initializeGoogleSheets();
       
+      // Initialize Google Sheets
+      console.log('🔄 Initializing Google Sheets...');
+      await googleSheetsService.initializeGoogleSheets();
+      console.log('✅ Google Sheets initialized');
+      
+      // Get sheet data
+      console.log('📥 Fetching Groups sheet data...');
       const sheetsResult = await googleSheetsService.getSheetData('Groups');
+      console.log('📊 Sheet result:', JSON.stringify(sheetsResult, null, 2));
       
       if (sheetsResult.success && sheetsResult.data && sheetsResult.data.length > 1) {
         // Parse data from Google Sheets (skip header row)
@@ -139,17 +148,25 @@ app.get('/api/groups', async (req, res) => {
         })).filter((g) => g.id && g.name); // Filter out empty rows
         
         console.log('✅ Groups loaded from Google Sheets:', groups.length);
+        console.log('📋 Groups:', JSON.stringify(groups, null, 2));
         source = 'google-sheets';
+      } else {
+        console.warn('⚠️ No data from Google Sheets or success is false');
+        console.warn('⚠️ sheetsResult.success:', sheetsResult.success);
+        console.warn('⚠️ sheetsResult.data length:', sheetsResult.data ? sheetsResult.data.length : 'undefined');
       }
     } catch (error) {
       console.warn('⚠️ Could not load from Google Sheets:', error.message);
+      console.warn('⚠️ Error stack:', error.stack);
     }
     
     // If no groups from Sheets, try local file
     if (groups.length === 0) {
       try {
+        console.log('📁 Attempting to load from local file...');
         const groupManagementService = require('./services/groupManagementService');
         const localGroups = groupManagementService.getAllGroups();
+        console.log('📁 Local groups:', JSON.stringify(localGroups, null, 2));
         
         if (localGroups && localGroups.length > 0) {
           groups = localGroups.map(g => ({
@@ -161,9 +178,12 @@ app.get('/api/groups', async (req, res) => {
           
           console.log('✅ Groups loaded from local file:', groups.length);
           source = 'local-file';
+        } else {
+          console.warn('⚠️ No groups in local file');
         }
       } catch (error) {
         console.warn('⚠️ Could not load from local file:', error.message);
+        console.warn('⚠️ Error stack:', error.stack);
       }
     }
     
@@ -180,10 +200,44 @@ app.get('/api/groups', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in GET /api/groups:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
       groups: [],
+    });
+  }
+});
+
+// Debug endpoint - get groups directly from Google Sheets
+app.get('/api/debug/groups-from-sheets', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Getting groups directly from Google Sheets');
+    
+    const googleSheetsService = require('./services/googleSheetsService');
+    
+    // Initialize
+    console.log('🔄 Initializing Google Sheets...');
+    await googleSheetsService.initializeGoogleSheets();
+    console.log('✅ Google Sheets initialized');
+    
+    // Get raw data
+    console.log('📥 Fetching raw Groups sheet data...');
+    const result = await googleSheetsService.getSheetData('Groups');
+    
+    console.log('📊 Raw result:', JSON.stringify(result, null, 2));
+    
+    res.status(200).json({
+      debug: true,
+      rawResult: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    res.status(500).json({
+      debug: true,
+      error: error.message,
+      stack: error.stack,
     });
   }
 });
@@ -397,35 +451,39 @@ async function handleEvent(event) {
     if (messageText === 'เช็คห้องแชท') {
       console.log('🔍 Check groups command detected');
       try {
-        const googleSheetsService = require('./services/googleSheetsService');
+        // Use the same API endpoint as LIFF forms
+        console.log('📥 Fetching groups from API...');
+        const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
         
-        // Initialize Google Sheets
-        await googleSheetsService.initializeGoogleSheets();
-        
-        // Get groups from Groups sheet
-        const result = await googleSheetsService.getSheetData('Groups');
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        console.log('📥 API Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ API error:', errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ API response:', JSON.stringify(data, null, 2));
         
         let responseText = '📊 ห้องแชทที่มีในระบบ:\n\n';
         
-        if (result.success && result.data && result.data.length > 1) {
-          // Skip header row
-          result.data.forEach((row, index) => {
-            if (index === 0) return; // Skip header
-            
-            if (row && row.length >= 3 && row[1] && row[2]) {
-              const timestamp = (row[0] || '-').trim();
-              const groupId = (row[1] || '').trim();
-              const groupName = (row[2] || '').trim();
-              const status = (row[3] || 'Active').trim();
-              
-              responseText += `${index}. ${groupName}\n`;
-              responseText += `   ID: ${groupId}\n`;
-              responseText += `   สถานะ: ${status}\n`;
-              responseText += `   เข้าร่วม: ${timestamp}\n\n`;
-            }
+        if (data.groups && data.groups.length > 0) {
+          data.groups.forEach((group, index) => {
+            responseText += `${index + 1}. ${group.name}\n`;
+            responseText += `   ID: ${group.id}\n\n`;
           });
           
-          responseText += `✅ รวมทั้งหมด ${result.data.length - 1} ห้องแชท`;
+          responseText += `✅ รวมทั้งหมด ${data.groups.length} ห้องแชท\n`;
+          responseText += `📊 ที่มา: ${data.source}`;
         } else {
           responseText = '⚠️ ไม่พบห้องแชทในระบบ';
         }
@@ -437,6 +495,7 @@ async function handleEvent(event) {
         });
       } catch (error) {
         console.error('❌ Error in check groups command:', error);
+        console.error('❌ Error stack:', error.stack);
         await client.replyMessage(event.replyToken, {
           type: 'text',
           text: '❌ เกิดข้อผิดพลาด: ' + error.message,

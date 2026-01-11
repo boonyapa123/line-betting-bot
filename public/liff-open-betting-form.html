@@ -313,17 +313,12 @@
                 
                 select.innerHTML = '<option value="">-- กำลังโหลด --</option>';
                 
-                // Get groupId from URL parameter (if passed from webhook)
-                const urlParams = new URLSearchParams(window.location.search);
-                const urlGroupId = urlParams.get('groupId');
-                console.log('📋 URL groupId:', urlGroupId);
-                
                 let groups = [];
                 
-                // Try to get groups from API
+                // Try to get groups from API (using relative path like เช็คห้องแชท command)
                 try {
                     console.log('📥 Fetching groups from API...');
-                    const apiUrl = 'https://line-betting-bot.onrender.com/api/groups';
+                    const apiUrl = '/api/groups';
                     console.log('🔗 API URL:', apiUrl);
                     
                     const response = await fetch(apiUrl, {
