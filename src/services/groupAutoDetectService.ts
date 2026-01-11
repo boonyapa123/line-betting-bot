@@ -41,6 +41,9 @@ export class GroupAutoDetectService {
       // Save group to local storage
       this.saveGroupLocally(groupId, groupName, timestamp);
 
+      // Record group to Google Sheets
+      await this.recordGroupToSheets(groupId, groupName, timestamp);
+
       // Auto-update .env file with first group ID
       await this.updateEnvFile(groupId);
 
@@ -204,6 +207,39 @@ export class GroupAutoDetectService {
       console.log('✅ Welcome message sent to group:', groupId);
     } catch (error) {
       console.error('❌ Error sending welcome message:', error);
+    }
+  }
+
+  /**
+   * Record group to Google Sheets
+   */
+  private static async recordGroupToSheets(
+    groupId: string,
+    groupName: string,
+    timestamp: string
+  ): Promise<void> {
+    try {
+      const googleSheetsService = require('./googleSheetsService');
+      
+      console.log('📊 Recording group to Google Sheets:', { groupId, groupName });
+      
+      // Add group to "Bets" sheet with special marker
+      const result = await googleSheetsService.appendRow('Bets', [
+        timestamp,
+        `[GROUP] ${groupName}`,
+        'กลุ่ม',
+        groupId,
+        'Active',
+        '',
+      ]);
+      
+      if (result.success) {
+        console.log('✅ Group recorded to Google Sheets (Bets sheet)');
+      } else {
+        console.warn('⚠️ Failed to record group to Google Sheets:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error recording group to Google Sheets:', error);
     }
   }
 

@@ -522,6 +522,13 @@ async function handleEvent(event) {
         console.error('❌ Failed to store message:', result.error);
       }
       
+      // Auto-reply to 1-on-1 chat
+      console.log('📤 Sending auto-reply to 1-on-1 chat');
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: `✅ ได้รับข้อความของคุณแล้ว\n\n📝 ข้อความ: "${messageText}"\n\n💬 ข้อมูลของคุณได้ถูกบันทึกแล้ว`,
+      });
+      
       return Promise.resolve(null);
     }
 
