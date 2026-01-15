@@ -638,87 +638,140 @@ app.post('/webhook', async (req, res) => {
     console.log(`   Events count: ${events.length}`);
     
     for (const event of events) {
-      if (event.type !== 'message' || event.message.type !== 'text') {
-        continue;
-      }
-      
-      // Support both group and 1on1 chat
-      if (event.source.type !== 'group' && event.source.type !== 'user') {
-        continue;
-      }
-      
-      const message = {
-        replyToken: event.replyToken,
-        userId: event.source.userId,
-        messageId: event.message.id,
-        quotedMessageId: event.message.quotedMessageId || null,
-        content: event.message.text,
-        timestamp: event.timestamp,
-        groupId: event.source.groupId || event.source.userId, // Use userId for 1on1
-        sourceType: event.source.type
-      };
-      
-      console.log(`📨 Processing message`);
-      console.log(`   From: ${message.userId}`);
-      console.log(`   Text: "${message.content}"`);
-      console.log(`   MessageID: ${message.messageId}`);
-      if (message.quotedMessageId) {
-        console.log(`   Replying to: ${message.quotedMessageId}`);
-      }
-      
-      // Check if this is a command
-      if (message.content.toLowerCase().includes('สรุปยอดแทง')) {
-        console.log(`📋 Summary command detected`);
-        const summary = await generateBettingSummary(message.groupId, message.sourceType);
-        await sendLineMessage(message.groupId, summary);
-        console.log(`✅ Summary sent`);
-      } else {
-        // Check if this is a result announcement
-        const resultData = parseResultMessage(message.content);
+      if (event.type === 'message' && event.message.type === 'text') {
+        // Handle text messages
+        if (event.source.type !== 'group' && event.source.type !== 'user') {
+          continue;
+        }
         
-        if (resultData) {
-          console.log(`📊 Result announcement detected`);
-          console.log(`   Firework: ${resultData.fireworkName}`);
-          console.log(`   Number: ${resultData.resultNumber}`);
-          console.log(`   Result: ${resultData.result}`);
-          
-          // Find matching bets
-          const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
-          console.log(`   Found ${matchingBets.length} matching bet(s)`);
-          
-          // Update each matching bet
-          for (const bet of matchingBets) {
-            await updateBetResult(bet.rowIndex, resultData.resultNumber, resultData.result);
-          }
-          
-          if (matchingBets.length > 0) {
-            console.log(`✅ Results updated successfully`);
-          }
+        const message = {
+          replyToken: event.replyToken,
+          userId: event.source.userId,
+          messageId: event.message.id,
+          quotedMessageId: event.message.quotedMessageId || null,
+          content: event.message.text,
+          timestamp: event.timestamp,
+          groupId: event.source.groupId || event.source.userId,
+          sourceType: event.source.type
+        };
+        
+        console.log(`📨 Processing message`);
+        console.log(`   From: ${message.userId}`);
+        console.log(`   Text: "${message.content}"`);
+        console.log(`   MessageID: ${message.messageId}`);
+        if (message.quotedMessageId) {
+          console.log(`   Replying to: ${message.quotedMessageId}`);
+        }
+        
+        // Check if this is a command
+        if (message.content.toLowerCase().includes('สรุปยอดแทง')) {
+          console.log(`📋 Summary command detected`);
+          const summary = await generateBettingSummary(message.groupId, message.sourceType);
+          await sendLineMessage(message.groupId, summary);
+          console.log(`✅ Summary sent`);
         } else {
-          // Detect pair
-          const pair = detectPair(message);
+          // Check if this is a result announcement
+          const resultData = parseResultMessage(message.content);
           
-          if (pair) {
-            console.log(`   messageA: "${pair.messageA}"`);
-            console.log(`   messageB: "${pair.messageB}"`);
+          if (resultData) {
+            console.log(`📊 Result announcement detected`);
+            console.log(`   Firework: ${resultData.fireworkName}`);
+            console.log(`   Number: ${resultData.resultNumber}`);
+            console.log(`   Result: ${resultData.result}`);
             
-            // Fetch user names and group name
-            console.log('👤 Fetching user profiles and group name...');
-            const userAName = await getLineUserProfile(pair.userA);
-            const userBName = await getLineUserProfile(pair.userB);
-            const groupName = await getLineGroupName(pair.groupId);
+            // Find matching bets
+            const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
+            console.log(`   Found ${matchingBets.length} matching bet(s)`);
             
-            console.log(`   User A: ${userAName}`);
-            console.log(`   User B: ${userBName}`);
-            console.log(`   Group: ${groupName}`);
+            // Update each matching bet
+            for (const bet of matchingBets) {
+              await updateBetResult(bet.rowIndex, resultData.resultNumber, resultData.result);
+            }
             
-            // Record to Google Sheets
-            await appendToGoogleSheets(pair, userAName, userBName, groupName);
-            console.log(`✅ Pair recorded successfully`);
+            if (matchingBets.length > 0) {
+              console.log(`✅ Results updated successfully`);
+            }
           } else {
-            console.log(`⏭️  No pair detected (waiting for reply)`);
+            // Detect pair
+            const pair = detectPair(message);
+            
+            if (pair) {
+              console.log(`   messageA: "${pair.messageA}"`);
+              console.log(`   messageB: "${pair.messageB}"`);
+              
+              // Fetch user names and group name
+              console.log('👤 Fetching user profiles and group name...');
+              const userAName = await getLineUserProfile(pair.userA);
+              const userBName = await getLineUserProfile(pair.userB);
+              const groupName = await getLineGroupName(pair.groupId);
+              
+              console.log(`   User A: ${userAName}`);
+              console.log(`   User B: ${userBName}`);
+              console.log(`   Group: ${groupName}`);
+              
+              // Record to Google Sheets
+              await appendToGoogleSheets(pair, userAName, userBName, groupName);
+              console.log(`✅ Pair recorded successfully`);
+            } else {
+              console.log(`⏭️  No pair detected (waiting for reply)`);
+            }
           }
         }
+      } else if (event.type === 'unsend') {
+        // Handle unsend (message deletion)
+        console.log(`\n❌ Message unsend detected`);
+        
+        const unsendEvent = event;
+        const userId = event.source.userId;
+        const messageId = event.unsend.messageId;
+        const timestamp = event.timestamp;
+        
+        console.log(`   Message ID: ${messageId}`);
+        console.log(`   User ID: ${userId}`);
+        
+        // Get user name
+        const userName = await getLineUserProfile(userId);
+        
+        // Get group name
+        const groupId = event.source.groupId || event.source.userId;
+        const groupName = await getLineGroupName(groupId);
+        
+        // Calculate time difference
+        const now = new Date();
+        const unsendTime = new Date(timestamp);
+        const diffSeconds = Math.floor((now - unsendTime) / 1000);
+        
+        let timeAgo = '';
+        if (diffSeconds < 60) {
+          timeAgo = `${diffSeconds} วินาทีที่แล้ว`;
+        } else if (diffSeconds < 3600) {
+          timeAgo = `${Math.floor(diffSeconds / 60)} นาทีที่แล้ว`;
+        } else {
+          timeAgo = `${Math.floor(diffSeconds / 3600)} ชั่วโมงที่แล้ว`;
+        }
+        
+        const unsendTime24h = unsendTime.toLocaleString('th-TH', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        // Create unsend report
+        const unsendReport = `❌ [ พบการยกเลิกข้อความ ]\n` +
+          `❌\n` +
+          `• ผู้ยกเลิก: ${userName}\n` +
+          `• ยกเลิกเมื่อ: ${timeAgo}\n` +
+          `• เวลา: ${unsendTime24h} ที่ยกเลิก\n` +
+          `• Message ID: ${messageId}\n` +
+          `• Group: ${groupName}`;
+        
+        console.log(`📤 Sending unsend report...`);
+        console.log(unsendReport);
+        
+        // Send report to group
+        await sendLineMessage(groupId, unsendReport);
+        console.log(`✅ Unsend report sent`);
       }
     }
     
