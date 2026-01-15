@@ -25,13 +25,23 @@ const GOOGLE_WORKSHEET_NAME = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
 // Load Google credentials
 let googleAuth;
 try {
-  const credentialsPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json';
-  const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+  let credentials;
+  
+  // Try to load from environment variable first (for production)
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    console.log('✅ Google Sheets credentials loaded from environment');
+  } else {
+    // Fall back to file (for local development)
+    const credentialsPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json';
+    credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+    console.log('✅ Google Sheets credentials loaded from file');
+  }
+  
   googleAuth = new GoogleAuth({
     credentials: credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
-  console.log('✅ Google Sheets credentials loaded');
 } catch (error) {
   console.error('❌ Failed to load Google credentials:', error.message);
 }
