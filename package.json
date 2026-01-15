@@ -1,35 +1,17 @@
 {
   "name": "line-betting-bot",
   "version": "1.0.0",
-  "description": "LINE Bot for managing fireworks betting",
-  "main": "src/index.js",
+  "description": "LINE Bot for betting data extraction",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "add-venue": "node src/scripts/addVenue.js",
-    "setup-sheets": "node src/scripts/setupGoogleSheets.js",
-    "setup-rich-menu": "node src/scripts/setupRichMenu.js",
-    "delete-rich-menu": "node src/scripts/deleteAndCreateRichMenu.js",
-    "upload-rich-menu-image": "node src/scripts/uploadRichMenuImage.js",
-    "generate-rich-menu-image": "node src/scripts/generateRichMenuImage.js",
-    "lint": "eslint src/",
-    "test": "jest --run",
-    "test:all-commands": "node test-all-commands.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "keywords": [
-    "line",
-    "bot",
-    "betting"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@line/bot-sdk": "7.7.0",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "dotenv": "^16.3.1",
     "googleapis": "^118.0.0",
-    "mongoose": "^7.5.0",
-    "sharp": "^0.34.5"
+    "google-auth-library": "^8.8.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
