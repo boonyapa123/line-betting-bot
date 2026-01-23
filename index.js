@@ -468,6 +468,7 @@ function extractFireworkName(message) {
 // ===== PAIR DETECTION =====
 const messageMap = new Map(); // messageId -> message data
 const recordedPairs = new Set();
+const unsendLog = new Map(); // messageId -> unsend details
 
 function detectPair(currentMessage) {
   const { userId, messageId, content, timestamp, groupId, quotedMessageId } = currentMessage;
@@ -507,7 +508,8 @@ function detectPair(currentMessage) {
       userId,
       content,
       timestamp,
-      groupId
+      groupId,
+      userName: null // Will be filled when needed
     });
     console.log(`   📦 Stored message with ID: ${messageId}`);
   }
@@ -717,6 +719,37 @@ app.post('/webhook', async (req, res) => {
             }
           }
         }
+      } else if (event.type === 'join') {
+        // Handle join event (bot joined a new group)
+        console.log(`\n✅ Bot joined a new group`);
+        
+        const groupId = event.source.groupId;
+        const timestamp = event.timestamp;
+        
+        console.log(`   Group ID: ${groupId}`);
+        console.log(`   Timestamp: ${timestamp}`);
+        
+        // Get group name
+        const groupName = await getLineGroupName(groupId);
+        console.log(`   Group Name: ${groupName}`);
+        
+        // Send welcome message
+        const welcomeMessage = `👋 สวัสดีค่ะ ฉันเป็น LINE Betting Bot\n\n` +
+          `📝 วิธีใช้:\n` +
+          `1. ส่งข้อความแทง (เช่น "ชล 100")\n` +
+          `2. ตอบกลับข้อความของคนอื่น เพื่อสร้างคู่แทง\n` +
+          `3. ส่ง "สรุปยอดแทง" เพื่อดูสรุปยอด\n\n` +
+          `✅ ระบบพร้อมบันทึกข้อมูลแทงของกลุ่ม: ${groupName}`;
+        
+        await sendLineMessage(groupId, welcomeMessage);
+        console.log(`✅ Welcome message sent to new group`);
+      } else if (event.type === 'leave') {
+        // Handle leave event (bot left a group)
+        console.log(`\n👋 Bot left a group`);
+        
+        const groupId = event.source.groupId;
+        console.log(`   Group ID: ${groupId}`);
+        console.log(`   ℹ️  Bot will no longer receive messages from this group`);
       } else if (event.type === 'unsend') {
         // Handle unsend (message deletion)
         console.log(`\n❌ Message unsend detected`);
