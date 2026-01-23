@@ -271,9 +271,12 @@ async function generateBettingSummary(groupId, sourceType) {
       // Column N (index 13) = ชื่อกลุ่มแชท
       const rowGroupName = row[13] || '';
       
+      console.log(`   Row ${i}: groupName="${rowGroupName}", length=${row.length}`);
+      
       // Store group name from the first row (for group chat)
       if (sourceType === 'group' && rowGroupName && currentGroupName === 'Unknown Group') {
         currentGroupName = rowGroupName;
+        console.log(`   ✅ Set currentGroupName to: ${currentGroupName}`);
       }
       
       // Column J (index 9) = ผลแพ้ชนะ User A
