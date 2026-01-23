@@ -276,8 +276,12 @@ async function generateBettingSummary(groupId, sourceType) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
-      // Column N (index 13) = ชื่อกลุ่มแชท
-      const rowGroupName = row[13] || '';
+      // Try to get group name from column N (index 13)
+      // If not available, use a default
+      let rowGroupName = '';
+      if (row.length > 13) {
+        rowGroupName = row[13] || '';
+      }
       
       if (i <= 3) {
         console.log(`   Row ${i}: length=${row.length}, col13="${rowGroupName}"`);
@@ -336,8 +340,8 @@ async function generateBettingSummary(groupId, sourceType) {
     let summary = '📊 สรุปยอดแทง 1on1\n';
     summary += '═══════════════════\n\n';
     
-    // Add group name if it's a group chat
-    if (sourceType === 'group') {
+    // Add group name if available
+    if (currentGroupName !== 'Unknown Group') {
       summary += `🏘️  กลุ่มแชท: ${currentGroupName}\n`;
       summary += '═══════════════════\n\n';
     }
