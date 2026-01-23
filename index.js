@@ -270,19 +270,10 @@ async function generateBettingSummary(groupId, sourceType) {
       
       // Column N (index 13) = ชื่อกลุ่มแชท
       const rowGroupName = row[13] || '';
-      const rowGroupId = row[13] || '';
       
-      // For 1on1 chat, get all bets (no filter by groupId)
-      // For group chat, filter by groupId
-      if (sourceType === 'user') {
-        // 1on1 chat - get all bets
-      } else if (sourceType === 'group') {
-        // Group chat - filter by groupId
-        if (rowGroupId !== groupId) continue;
-        // Store group name from the first matching row
-        if (rowGroupName) {
-          currentGroupName = rowGroupName;
-        }
+      // Store group name from the first row (for group chat)
+      if (sourceType === 'group' && rowGroupName && currentGroupName === 'Unknown Group') {
+        currentGroupName = rowGroupName;
       }
       
       // Column J (index 9) = ผลแพ้ชนะ User A
