@@ -263,17 +263,30 @@ async function generateBettingSummary(groupId, sourceType) {
     const bets = [];
     let currentGroupName = 'Unknown Group';
     
+    console.log(`📊 Total rows: ${rows.length}`);
+    if (rows.length > 0) {
+      console.log(`   Header (${rows[0].length} cols): ${JSON.stringify(rows[0])}`);
+    }
+    if (rows.length > 1) {
+      console.log(`   Row 1 (${rows[1].length} cols): ${JSON.stringify(rows[1])}`);
+    }
+    
     // Parse all bets (skip header)
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      if (!row || row.length < 14) continue;
+      if (!row || row.length < 1) continue;
       
       // Column N (index 13) = ชื่อกลุ่มแชท
       const rowGroupName = row[13] || '';
       
+      if (i <= 3) {
+        console.log(`   Row ${i}: length=${row.length}, col13="${rowGroupName}"`);
+      }
+      
       // Store group name from any row that has it
       if (rowGroupName && currentGroupName === 'Unknown Group') {
         currentGroupName = rowGroupName;
+        console.log(`   ✅ Found group name: ${currentGroupName}`);
       }
       
       // Column J (index 9) = ผลแพ้ชนะ User A
