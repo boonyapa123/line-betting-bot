@@ -261,6 +261,7 @@ async function generateBettingSummary(groupId, sourceType) {
     
     const rows = response.data.values || [];
     const bets = [];
+    let currentGroupName = 'Unknown Group';
     
     // Parse all bets (skip header)
     for (let i = 1; i < rows.length; i++) {
@@ -268,6 +269,7 @@ async function generateBettingSummary(groupId, sourceType) {
       if (!row || row.length < 14) continue;
       
       // Column N (index 13) = ชื่อกลุ่มแชท
+      const rowGroupName = row[13] || '';
       const rowGroupId = row[13] || '';
       
       // For 1on1 chat, get all bets (no filter by groupId)
@@ -277,6 +279,10 @@ async function generateBettingSummary(groupId, sourceType) {
       } else if (sourceType === 'group') {
         // Group chat - filter by groupId
         if (rowGroupId !== groupId) continue;
+        // Store group name from the first matching row
+        if (rowGroupName) {
+          currentGroupName = rowGroupName;
+        }
       }
       
       // Column J (index 9) = ผลแพ้ชนะ User A
@@ -328,8 +334,7 @@ async function generateBettingSummary(groupId, sourceType) {
     
     // Add group name if it's a group chat
     if (sourceType === 'group') {
-      const groupName = await getLineGroupName(groupId);
-      summary += `🏘️  กลุ่มแชท: ${groupName}\n`;
+      summary += `🏘️  กลุ่มแชท: ${currentGroupName}\n`;
       summary += '═══════════════════\n\n';
     }
     
