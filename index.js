@@ -326,6 +326,13 @@ async function generateBettingSummary(groupId, sourceType) {
     let summary = '📊 สรุปยอดแทง 1on1\n';
     summary += '═══════════════════\n\n';
     
+    // Add group name if it's a group chat
+    if (sourceType === 'group') {
+      const groupName = await getLineGroupName(groupId);
+      summary += `🏘️  กลุ่มแชท: ${groupName}\n`;
+      summary += '═══════════════════\n\n';
+    }
+    
     for (const [pairKey, pairData] of Object.entries(pairs)) {
       let userAWins = 0;
       let userBWins = 0;
