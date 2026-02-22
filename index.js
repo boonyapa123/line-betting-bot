@@ -939,24 +939,30 @@ app.post('/webhook', async (req, res) => {
         
         console.log(`   Group ID: ${groupId}`);
         console.log(`   Timestamp: ${timestamp}`);
+        console.log(`   Account: ${accountNumber}`);
         
-        // Get group name
-        const groupName = await getLineGroupName(groupId, accessToken);
-        console.log(`   Group Name: ${groupName}`);
-        
-        // Register group
-        registerGroup(groupId, groupName, accountNumber);
-        
-        // Send welcome message
-        const welcomeMessage = `👋 สวัสดีค่ะ ฉันเป็น LINE Betting Bot\n\n` +
-          `📝 วิธีใช้:\n` +
-          `1. ส่งข้อความแทง (เช่น "ชล 100")\n` +
-          `2. ตอบกลับข้อความของคนอื่น เพื่อสร้างคู่แทง\n` +
-          `3. ส่ง "สรุปยอดแทง" เพื่อดูสรุปยอด\n\n` +
-          `✅ ระบบพร้อมบันทึกข้อมูลแทงของกลุ่ม: ${groupName}`;
-        
-        await sendLineMessage(groupId, welcomeMessage, accessToken);
-        console.log(`✅ Welcome message sent to new group`);
+        try {
+          // Get group name
+          const groupName = await getLineGroupName(groupId, accessToken);
+          console.log(`   Group Name: ${groupName}`);
+          
+          // Register group
+          registerGroup(groupId, groupName, accountNumber);
+          console.log(`   ✅ Group registered successfully`);
+          
+          // Send welcome message
+          const welcomeMessage = `👋 สวัสดีค่ะ ฉันเป็น LINE Betting Bot\n\n` +
+            `📝 วิธีใช้:\n` +
+            `1. ส่งข้อความแทง (เช่น "ชล 100")\n` +
+            `2. ตอบกลับข้อความของคนอื่น เพื่อสร้างคู่แทง\n` +
+            `3. ส่ง "สรุปยอดแทง" เพื่อดูสรุปยอด\n\n` +
+            `✅ ระบบพร้อมบันทึกข้อมูลแทงของกลุ่ม: ${groupName}`;
+          
+          await sendLineMessage(groupId, welcomeMessage, accessToken);
+          console.log(`✅ Welcome message sent to new group`);
+        } catch (error) {
+          console.error(`❌ Error handling join event:`, error.message);
+        }
       } else if (event.type === 'leave') {
         // Handle leave event (bot left a group)
         console.log(`\n👋 Bot left a group`);
