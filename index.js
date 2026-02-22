@@ -17,10 +17,86 @@ app.use(express.json({
 }));
 
 // ===== CONFIGURATION =====
+// Primary Account
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID;
+
+// Secondary Account
+const LINE_CHANNEL_SECRET_2 = process.env.LINE_CHANNEL_SECRET_2;
+const LINE_CHANNEL_ACCESS_TOKEN_2 = process.env.LINE_CHANNEL_ACCESS_TOKEN_2;
+const LINE_CHANNEL_ID_2 = process.env.LINE_CHANNEL_ID_2;
+
+// Google Sheets
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_WORKSHEET_NAME = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
+
+// Helper to get correct credentials based on channel ID
+function getLineCredentials(channelId) {
+  if (channelId === LINE_CHANNEL_ID) {
+    return {
+      secret: LINE_CHANNEL_SECRET,
+      token: LINE_CHANNEL_ACCESS_TOKEN
+    };
+  } else if (channelId === LINE_CHANNEL_ID_2) {
+    return {
+      secret: LINE_CHANNEL_SECRET_2,
+      token: LINE_CHANNEL_ACCESS_TOKEN_2
+    };
+  }
+  return null;
+}
+
+// Load groups data
+let groupsData = {};
+try {
+  groupsData = JSON.parse(fs.readFileSync('data/groups.json', 'utf8'));
+  console.log('✅ Groups data loaded');
+} catch (error) {
+  console.log('⚠️  Groups data file not found, starting with empty groups');
+  groupsData = {};
+}
+
+// Save groups data to file
+function saveGroupsData() {
+  try {
+    fs.writeFileSync('data/groups.json', JSON.stringify(groupsData, null, 2));
+    console.log('✅ Groups data saved');
+  } catch (error) {
+    console.error('❌ Failed to save groups data:', error.message);
+  }
+}
+
+// Register group with account
+function registerGroup(groupId, groupName, accountNumber) {
+  if (!groupsData[groupId]) {
+    groupsData[groupId] = {
+      id: groupId,
+      name: groupName,
+      account: accountNumber,
+      createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString()
+    };
+    saveGroupsData();
+    console.log(`✅ Registered new group: ${groupName} (Account ${accountNumber})`);
+  } else {
+    // Update last active
+    groupsData[groupId].lastActive = new Date().toISOString();
+    saveGroupsData();
+  }
+}
+
+// Get account number from channel ID
+function getAccountNumber(channelId) {
+  if (channelId === LINE_CHANNEL_ID) return 1;
+  if (channelId === LINE_CHANNEL_ID_2) return 2;
+  return null;
+}
+
+// Get groups for specific account
+function getGroupsForAccount(accountNumber) {
+  return Object.values(groupsData).filter(group => group.account === accountNumber);
+}
 
 // Load Google credentials
 let googleAuth;
@@ -50,24 +126,24 @@ const sheets = google.sheets('v4');
 
 // ===== HELPER FUNCTIONS =====
 
-function validateLineSignature(signature, body) {
+function validateLineSignature(signature, body, channelSecret) {
   if (!signature) return false;
   const hash = crypto
-    .createHmac('sha256', LINE_CHANNEL_SECRET)
+    .createHmac('sha256', channelSecret)
     .update(body)
     .digest('base64');
   return hash === signature;
 }
 
 // LINE API: Get user profile
-async function getLineUserProfile(userId) {
+async function getLineUserProfile(userId, accessToken) {
   return new Promise((resolve) => {
     const options = {
       hostname: 'api.line.me',
       path: `/v2/bot/profile/${userId}`,
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        'Authorization': `Bearer ${accessToken}`
       }
     };
 
@@ -92,14 +168,14 @@ async function getLineUserProfile(userId) {
 }
 
 // LINE API: Get group name
-async function getLineGroupName(groupId) {
+async function getLineGroupName(groupId, accessToken) {
   return new Promise((resolve) => {
     const options = {
       hostname: 'api.line.me',
       path: `/v2/bot/group/${groupId}/summary`,
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        'Authorization': `Bearer ${accessToken}`
       }
     };
 
@@ -245,9 +321,46 @@ function getOppositeResultSymbol(resultSymbol) {
   return opposites[resultSymbol] || '';
 }
 
-// ===== SUMMARY FUNCTIONS =====
+// ===== CALCULATION FUNCTIONS =====
 
-async function generateBettingSummary(groupId, sourceType) {
+function calculateWinnings(amount, result) {
+  const betAmount = parseInt(amount) || 0;
+  
+  if (result === '✅') {
+    // Win: deduct 10% commission
+    const commission = betAmount * 0.1;
+    const winnings = betAmount + (betAmount - commission);
+    return {
+      commission: commission,
+      winnings: winnings,
+      net: winnings - betAmount
+    };
+  } else if (result === '❌') {
+    // Loss: lose the bet amount
+    return {
+      commission: 0,
+      winnings: 0,
+      net: -betAmount
+    };
+  } else if (result === '⛔️') {
+    // Draw: deduct 5% from both
+    const commission = betAmount * 0.05;
+    const returned = betAmount - commission;
+    return {
+      commission: commission,
+      winnings: returned,
+      net: -commission
+    };
+  }
+  
+  return {
+    commission: 0,
+    winnings: 0,
+    net: 0
+  };
+}
+
+async function generateBettingSummary(groupId, sourceType, accountNumber) {
   if (!googleAuth) {
     return 'ไม่สามารถเข้าถึง Google Sheets';
   }
@@ -271,13 +384,17 @@ async function generateBettingSummary(groupId, sourceType) {
       console.log(`   Row 1 (${rows[1].length} cols): ${JSON.stringify(rows[1])}`);
     }
     
+    // Get groups for this account
+    const accountGroups = getGroupsForAccount(accountNumber);
+    const accountGroupNames = accountGroups.map(g => g.name);
+    console.log(`   📍 Groups for Account ${accountNumber}: ${accountGroupNames.join(', ')}`);
+    
     // Parse all bets (skip header)
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
-      // Try to get group name from column N (index 13)
-      // If not available, use a default
+      // Column N (index 13) = ชื่อกลุ่มแชท
       let rowGroupName = '';
       if (row.length > 13) {
         rowGroupName = row[13] || '';
@@ -285,6 +402,11 @@ async function generateBettingSummary(groupId, sourceType) {
       
       if (i <= 3) {
         console.log(`   Row ${i}: length=${row.length}, col13="${rowGroupName}"`);
+      }
+      
+      // Only include bets from groups in this account
+      if (!accountGroupNames.includes(rowGroupName)) {
+        continue;
       }
       
       // Store group name from any row that has it
@@ -314,7 +436,8 @@ async function generateBettingSummary(groupId, sourceType) {
         resultB: resultB,
         userB: row[11],
         userBName: row[11],
-        betTypeB: row[12]
+        betTypeB: row[12],
+        groupName: rowGroupName
       });
     }
     
@@ -340,9 +463,10 @@ async function generateBettingSummary(groupId, sourceType) {
     let summary = '📊 สรุปยอดแทง 1on1\n';
     summary += '═══════════════════\n\n';
     
-    // Add group name if available
-    if (currentGroupName !== 'Unknown Group') {
-      summary += `🏘️  กลุ่มแชท: ${currentGroupName}\n`;
+    // Add group names if available
+    const uniqueGroups = [...new Set(bets.map(b => b.groupName))];
+    if (uniqueGroups.length > 0) {
+      summary += `🏘️  กลุ่มแชท: ${uniqueGroups.join(', ')}\n`;
       summary += '═══════════════════\n\n';
     }
     
@@ -351,35 +475,71 @@ async function generateBettingSummary(groupId, sourceType) {
       let userBWins = 0;
       let draws = 0;
       let totalAmount = 0;
+      let userATotal = 0;
+      let userBTotal = 0;
+      let userACommission = 0;
+      let userBCommission = 0;
       
       summary += `🎯 ${pairData.userAName} vs ${pairData.userBName}\n`;
       
       for (const bet of pairData.bets) {
-        totalAmount += parseInt(bet.amount) || 0;
+        const betAmount = parseInt(bet.amount) || 0;
+        totalAmount += betAmount;
         
         // Show bet details
         summary += `\n   📝 ${bet.messageA}\n`;
         summary += `   ผลที่ออก: ${bet.resultNumber}\n`;
+        summary += `   ยอดเดิมพัน: ${betAmount} บาท\n`;
         
         if (bet.resultA === '✅') {
           userAWins++;
-          summary += `   ${pairData.userAName} ชนะ\n`;
+          const calcA = calculateWinnings(betAmount, '✅');
+          const calcB = calculateWinnings(betAmount, '❌');
+          
+          userATotal += calcA.net;
+          userBTotal += calcB.net;
+          userACommission += calcA.commission;
+          userBCommission += calcB.commission;
+          
+          summary += `   ✅ ${pairData.userAName} ชนะ\n`;
+          summary += `      ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 10%: ${calcA.commission.toFixed(0)} บาท)\n`;
+          summary += `      ${pairData.userBName} เสีย: ${betAmount} บาท\n`;
         } else if (bet.resultA === '❌') {
           userBWins++;
-          summary += `   ${pairData.userBName} ชนะ\n`;
+          const calcA = calculateWinnings(betAmount, '❌');
+          const calcB = calculateWinnings(betAmount, '✅');
+          
+          userATotal += calcA.net;
+          userBTotal += calcB.net;
+          userACommission += calcA.commission;
+          userBCommission += calcB.commission;
+          
+          summary += `   ❌ ${pairData.userBName} ชนะ\n`;
+          summary += `      ${pairData.userAName} เสีย: ${betAmount} บาท\n`;
+          summary += `      ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 10%: ${calcB.commission.toFixed(0)} บาท)\n`;
         } else if (bet.resultA === '⛔️') {
           draws++;
-          summary += `   เสมอ\n`;
+          const calcA = calculateWinnings(betAmount, '⛔️');
+          const calcB = calculateWinnings(betAmount, '⛔️');
+          
+          userATotal += calcA.net;
+          userBTotal += calcB.net;
+          userACommission += calcA.commission;
+          userBCommission += calcB.commission;
+          
+          summary += `   🤝 เสมอ\n`;
+          summary += `      ${pairData.userAName} ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 5%: ${calcA.commission.toFixed(0)} บาท)\n`;
+          summary += `      ${pairData.userBName} ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 5%: ${calcB.commission.toFixed(0)} บาท)\n`;
         }
       }
       
       summary += `\n   ═══════════════════\n`;
-      summary += `   ${pairData.userAName}: ${userAWins} ชนะ\n`;
-      summary += `   ${pairData.userBName}: ${userBWins} ชนะ\n`;
-      if (draws > 0) {
-        summary += `   เสมอ: ${draws}\n`;
-      }
-      summary += `   💰 ยอดรวม: ${totalAmount} บาท\n`;
+      summary += `   📊 สรุปผลลัพธ์:\n`;
+      summary += `   ${pairData.userAName}: ${userAWins} ชนะ | ${userBWins} แพ้ | ${draws} เสมอ\n`;
+      summary += `   ${pairData.userBName}: ${userBWins} ชนะ | ${userAWins} แพ้ | ${draws} เสมอ\n`;
+      summary += `\n   💰 ยอดรวม:\n`;
+      summary += `   ${pairData.userAName}: ${userATotal >= 0 ? '+' : ''}${userATotal.toFixed(0)} บาท (หัก commission: ${userACommission.toFixed(0)} บาท)\n`;
+      summary += `   ${pairData.userBName}: ${userBTotal >= 0 ? '+' : ''}${userBTotal.toFixed(0)} บาท (หัก commission: ${userBCommission.toFixed(0)} บาท)\n`;
       summary += `   📝 รายการ: ${pairData.bets.length} ครั้ง\n\n`;
     }
     
@@ -391,7 +551,7 @@ async function generateBettingSummary(groupId, sourceType) {
 }
 
 // Send LINE message
-async function sendLineMessage(groupId, message) {
+async function sendLineMessage(groupId, message, accessToken) {
   return new Promise((resolve) => {
     const body = JSON.stringify({
       to: groupId,
@@ -408,7 +568,7 @@ async function sendLineMessage(groupId, message) {
       path: '/v2/bot/message/push',
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body)
       }
@@ -648,16 +808,36 @@ app.post('/webhook', async (req, res) => {
     console.log('\n🔔 Webhook received');
     console.log(`   Body:`, JSON.stringify(req.body, null, 2));
     
-    // Validate signature
-    if (!validateLineSignature(signature, body)) {
+    // Determine which account this webhook is for
+    let credentials = null;
+    let channelId = null;
+    
+    // Try primary account first
+    if (validateLineSignature(signature, body, LINE_CHANNEL_SECRET)) {
+      credentials = { secret: LINE_CHANNEL_SECRET, token: LINE_CHANNEL_ACCESS_TOKEN };
+      channelId = LINE_CHANNEL_ID;
+      console.log(`   ✅ Validated with Primary Account`);
+    } 
+    // Try secondary account
+    else if (LINE_CHANNEL_SECRET_2 && validateLineSignature(signature, body, LINE_CHANNEL_SECRET_2)) {
+      credentials = { secret: LINE_CHANNEL_SECRET_2, token: LINE_CHANNEL_ACCESS_TOKEN_2 };
+      channelId = LINE_CHANNEL_ID_2;
+      console.log(`   ✅ Validated with Secondary Account`);
+    }
+    // Invalid signature
+    else {
       console.log('❌ Invalid signature');
       res.status(400).json({ error: 'Invalid signature' });
       return;
     }
     
+    const accessToken = credentials.token;
     const events = req.body.events || [];
+    const accountNumber = getAccountNumber(channelId);
+    
     console.log(`📨 Webhook handler started`);
     console.log(`   Events count: ${events.length}`);
+    console.log(`   Account: ${accountNumber}`);
     
     for (const event of events) {
       if (event.type === 'message' && event.message.type === 'text') {
@@ -685,11 +865,17 @@ app.post('/webhook', async (req, res) => {
           console.log(`   Replying to: ${message.quotedMessageId}`);
         }
         
+        // Register group if it's a group message
+        if (message.sourceType === 'group') {
+          const groupName = await getLineGroupName(message.groupId, accessToken);
+          registerGroup(message.groupId, groupName, accountNumber);
+        }
+        
         // Check if this is a command
         if (message.content.toLowerCase().includes('สรุปยอดแทง')) {
           console.log(`📋 Summary command detected`);
-          const summary = await generateBettingSummary(message.groupId, message.sourceType);
-          await sendLineMessage(message.groupId, summary);
+          const summary = await generateBettingSummary(message.groupId, message.sourceType, accountNumber);
+          await sendLineMessage(message.groupId, summary, accessToken);
           console.log(`✅ Summary sent`);
         } else {
           // Check if this is a result announcement
@@ -723,9 +909,9 @@ app.post('/webhook', async (req, res) => {
               
               // Fetch user names and group name
               console.log('👤 Fetching user profiles and group name...');
-              const userAName = await getLineUserProfile(pair.userA);
-              const userBName = await getLineUserProfile(pair.userB);
-              const groupName = await getLineGroupName(pair.groupId);
+              const userAName = await getLineUserProfile(pair.userA, accessToken);
+              const userBName = await getLineUserProfile(pair.userB, accessToken);
+              const groupName = await getLineGroupName(pair.groupId, accessToken);
               
               console.log(`   User A: ${userAName}`);
               console.log(`   User B: ${userBName}`);
@@ -750,8 +936,11 @@ app.post('/webhook', async (req, res) => {
         console.log(`   Timestamp: ${timestamp}`);
         
         // Get group name
-        const groupName = await getLineGroupName(groupId);
+        const groupName = await getLineGroupName(groupId, accessToken);
         console.log(`   Group Name: ${groupName}`);
+        
+        // Register group
+        registerGroup(groupId, groupName, accountNumber);
         
         // Send welcome message
         const welcomeMessage = `👋 สวัสดีค่ะ ฉันเป็น LINE Betting Bot\n\n` +
@@ -761,7 +950,7 @@ app.post('/webhook', async (req, res) => {
           `3. ส่ง "สรุปยอดแทง" เพื่อดูสรุปยอด\n\n` +
           `✅ ระบบพร้อมบันทึกข้อมูลแทงของกลุ่ม: ${groupName}`;
         
-        await sendLineMessage(groupId, welcomeMessage);
+        await sendLineMessage(groupId, welcomeMessage, accessToken);
         console.log(`✅ Welcome message sent to new group`);
       } else if (event.type === 'leave') {
         // Handle leave event (bot left a group)
@@ -783,11 +972,11 @@ app.post('/webhook', async (req, res) => {
         console.log(`   User ID: ${userId}`);
         
         // Get user name
-        const userName = await getLineUserProfile(userId);
+        const userName = await getLineUserProfile(userId, accessToken);
         
         // Get group name
         const groupId = event.source.groupId || event.source.userId;
-        const groupName = await getLineGroupName(groupId);
+        const groupName = await getLineGroupName(groupId, accessToken);
         
         // Calculate time difference
         const now = new Date();
@@ -823,7 +1012,7 @@ app.post('/webhook', async (req, res) => {
         console.log(unsendReport);
         
         // Send report to group
-        await sendLineMessage(groupId, unsendReport);
+        await sendLineMessage(groupId, unsendReport, accessToken);
         console.log(`✅ Unsend report sent`);
       }
     }
