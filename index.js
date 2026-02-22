@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json({
   verify: (req, res, buf, encoding) => {
-    req.rawBody = buf.toString((encoding) || 'utf8');
+    req.rawBody = buf;
   }
 }));
 
@@ -803,9 +803,11 @@ app.get('/health', (req, res) => {
 app.post('/webhook', async (req, res) => {
   try {
     const signature = req.headers['x-line-signature'];
-    const body = req.rawBody || JSON.stringify(req.body);
+    const body = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
     
     console.log('\n🔔 Webhook received');
+    console.log(`   Signature: ${signature}`);
+    console.log(`   Body length: ${body.length}`);
     console.log(`   Body:`, JSON.stringify(req.body, null, 2));
     
     // Determine which account this webhook is for
