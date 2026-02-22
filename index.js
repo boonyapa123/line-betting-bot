@@ -829,6 +829,9 @@ app.post('/webhook', async (req, res) => {
     // Invalid signature
     else {
       console.log('❌ Invalid signature');
+      console.log(`   Expected (Account 1): ${crypto.createHmac('sha256', LINE_CHANNEL_SECRET).update(body).digest('base64')}`);
+      console.log(`   Expected (Account 2): ${crypto.createHmac('sha256', LINE_CHANNEL_SECRET_2).update(body).digest('base64')}`);
+      console.log(`   Received: ${signature}`);
       res.status(400).json({ error: 'Invalid signature' });
       return;
     }
