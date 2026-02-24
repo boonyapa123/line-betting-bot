@@ -23,7 +23,6 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
   router.post('/slip-verified', async (req, res) => {
     try {
       console.log('\n🔔 Webhook จาก Slip2Go');
-      console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
       console.log(`   Body:`, JSON.stringify(req.body, null, 2));
 
       const {
@@ -47,55 +46,65 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
         return;
       }
 
+      // ตอบสนองทันทีเพื่อหลีกเลี่ยง timeout
+      res.status(200).json({ success: true, message: 'Webhook received' });
+
+      // ประมวลผลในพื้นหลัง
       if (status === 'verified') {
         console.log(`✅ สลิปตรวจสอบแล้ว: ${slipId} (${amount} บาท)`);
 
-        // บันทึกลงชีท Players
-        console.log(`📝 บันทึกลงชีท Players...`);
-        const playerResult = await _recordPlayerToSheet(
-          googleAuth,
-          googleSheetId,
-          userId,
-          amount
-        );
+        try {
+          // บันทึกลงชีท Players
+          console.log(`📝 บันทึกลงชีท Players...`);
+          const playerResult = await _recordPlayerToSheet(
+            googleAuth,
+            googleSheetId,
+            userId,
+            amount
+          );
 
-        // บันทึกลงชีท Transactions
-        console.log(`📝 บันทึกลงชีท Transactions...`);
-        await _recordTransactionToSheet(
-          googleAuth,
-          googleSheetId,
-          userId,
-          amount,
-          slipId,
-          referenceId,
-          transRef,
-          dateTime
-        );
+          // บันทึกลงชีท Transactions
+          console.log(`📝 บันทึกลงชีท Transactions...`);
+          await _recordTransactionToSheet(
+            googleAuth,
+            googleSheetId,
+            userId,
+            amount,
+            slipId,
+            referenceId,
+            transRef,
+            dateTime
+          );
 
-        // ส่ง automessage ไปที่ LINE OA
-        console.log(`📤 ส่ง automessage ไปที่ LINE OA...`);
-        const automessage = `✅ ตรวจสอบสลิปสำเร็จ\n\n` +
-          `💰 เติมเงิน: ${amount} บาท\n` +
-          `💳 ยอดเงินใหม่: ${playerResult.newBalance} บาท\n` +
-          `📝 Reference ID: ${referenceId}\n` +
-          `🏦 ธนาคารผู้รับ: ${receiver?.bank?.name || 'N/A'}\n\n` +
-          `🎉 พร้อมเล่นแล้ว!`;
+          // ส่ง automessage ไปที่ LINE OA
+          console.log(`📤 ส่ง automessage ไปที่ LINE OA...`);
+          const automessage = `✅ ตรวจสอบสลิปสำเร็จ\n\n` +
+            `💰 เติมเงิน: ${amount} บาท\n` +
+            `💳 ยอดเงินใหม่: ${playerResult.newBalance} บาท\n` +
+            `📝 Reference ID: ${referenceId}\n` +
+            `🏦 ธนาคารผู้รับ: ${receiver?.bank?.name || 'N/A'}\n\n` +
+            `🎉 พร้อมเล่นแล้ว!`;
 
-        await _sendLineMessage(userId, automessage, registrationBotAccessToken);
+          await _sendLineMessage(userId, automessage, registrationBotAccessToken);
 
-        console.log(`✅ บันทึกและส่งข้อความสำเร็จ`);
+          console.log(`✅ บันทึกและส่งข้อความสำเร็จ`);
+        } catch (error) {
+          console.error(`❌ ข้อผิดพลาดในการประมวลผล: ${error.message}`);
+        }
       } else {
         console.log(`❌ สลิปไม่ถูกต้อง: ${message}`);
 
-        // ส่งข้อความแจ้งว่าสลิปไม่ถูกต้อง
-        const errorMessage = `❌ สลิปไม่ถูกต้อง\n\n` +
-          `เหตุผล: ${message}\n\n` +
-          `📸 กรุณาส่งสลิปใหม่`;
+        try {
+          // ส่งข้อความแจ้งว่าสลิปไม่ถูกต้อง
+          const errorMessage = `❌ สลิปไม่ถูกต้อง\n\n` +
+            `เหตุผล: ${message}\n\n` +
+            `📸 กรุณาส่งสลิปใหม่`;
 
-        await _sendLineMessage(userId, errorMessage, registrationBotAccessToken);
+          await _sendLineMessage(userId, errorMessage, registrationBotAccessToken);
+        } catch (error) {
+          console.error(`❌ ข้อผิดพลาดในการส่งข้อความ: ${error.message}`);
+        }
       }
-
-      res.status(200).json({ success: true });
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
       console.error(`   Stack:`, error.stack);
