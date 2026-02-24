@@ -16,6 +16,23 @@ app.use(express.json({
   }
 }));
 
+// Add raw body middleware for Slip2Go webhook
+app.use((req, res, next) => {
+  if (req.path === '/slip2go/slip-verified') {
+    let data = '';
+    req.on('data', chunk => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      req.rawBody = data;
+      req.body = JSON.parse(data);
+      next();
+    });
+  } else {
+    next();
+  }
+});
+
 // ===== CONFIGURATION =====
 // Primary Account
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
@@ -1095,9 +1112,20 @@ async function start() {
   try {
     await initializeSheets();
     
+    // Register Slip2Go webhook router
+    const createSlip2GoWebhookRouter = require('./routes/slip2GoWebhook');
+    const slip2GoRouter = createSlip2GoWebhookRouter(
+      googleAuth,
+      GOOGLE_SHEET_ID,
+      LINE_CHANNEL_ACCESS_TOKEN_2,
+      process.env.SLIP2GO_SECRET_KEY
+    );
+    app.use('/slip2go', slip2GoRouter);
+    
     app.listen(PORT, () => {
       console.log(`\n🚀 LINE Betting Bot listening on port ${PORT}`);
       console.log(`📍 Webhook URL: http://localhost:${PORT}/webhook`);
+      console.log(`📍 Slip2Go Webhook URL: http://localhost:${PORT}/slip2go/slip-verified`);
       console.log(`✅ Ready to receive messages\n`);
     });
   } catch (error) {
