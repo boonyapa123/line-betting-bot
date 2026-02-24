@@ -933,50 +933,172 @@ app.post('/webhook', async (req, res) => {
           await sendLineMessage(message.groupId, summary, accessToken);
           console.log(`✅ Summary sent`);
         } else {
-          // Check if this is a result announcement
-          const resultData = parseResultMessage(message.content);
+          // Check if this is a slip verification message from LINE OA
+          const LineSlipParserService = require('./services/betting/lineSlipParserService');
+          const slipParser = new LineSlipParserService();
           
-          if (resultData) {
-            console.log(`📊 Result announcement detected`);
-            console.log(`   Firework: ${resultData.fireworkName}`);
-            console.log(`   Number: ${resultData.resultNumber}`);
-            console.log(`   Result: ${resultData.result}`);
+          if (slipParser.isValidSlip(message.content)) {
+            console.log(`📸 Slip verification message detected`);
+            const slipData = slipParser.parseSlipMessage(message.content);
             
-            // Find matching bets
-            const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
-            console.log(`   Found ${matchingBets.length} matching bet(s)`);
-            
-            // Update each matching bet
-            for (const bet of matchingBets) {
-              await updateBetResult(bet.rowIndex, resultData.resultNumber, resultData.result);
-            }
-            
-            if (matchingBets.length > 0) {
-              console.log(`✅ Results updated successfully`);
+            if (slipData && slipData.amount) {
+              console.log(`✅ Valid slip found: ${slipData.amount} บาท`);
+              
+              // Record to Players sheet
+              console.log(`📝 Recording to Players sheet...`);
+              const playerResult = await _recordPlayerToSheetFromSlip(
+                googleAuth,
+                GOOGLE_SHEET_ID,
+                message.userId,
+                slipData.amount
+              );
+              
+              // Record to Transactions sheet
+              console.log(`📝 Recording to Transactions sheet...`);
+              await _recordTransactionToSheetFromSlip(
+                googleAuth,
+                GOOGLE_SHEET_ID,
+                message.userId,
+                slipData
+              );
+              
+              // Send confirmation message
+              const confirmMessage = `✅ ตรวจสอบสลิปสำเร็จ\n\n` +
+                `💰 เติมเงิน: ${slipData.amount} บาท\n` +
+                `💳 ยอดเงินใหม่: ${playerResult.newBalance} บาท\n\n` +
+                `🎉 พร้อมเล่นแล้ว!`;
+              
+              await sendLineMessageToUser(message.userId, confirmMessage, accessToken);
+              console.log(`✅ Confirmation sent`);
             }
           } else {
-            // Detect pair
-            const pair = detectPair(message);
+            // Check if this is a result announcement
+            const resultData = parseResultMessage(message.content);
             
-            if (pair) {
-              console.log(`   messageA: "${pair.messageA}"`);
-              console.log(`   messageB: "${pair.messageB}"`);
+            if (resultData) {
+              console.log(`📊 Result announcement detected`);
+              console.log(`   Firework: ${resultData.fireworkName}`);
+              console.log(`   Number: ${resultData.resultNumber}`);
+              console.log(`   Result: ${resultData.result}`);
               
-              // Fetch user names and group name
-              console.log('👤 Fetching user profiles and group name...');
-              const userAName = await getLineUserProfile(pair.userA, accessToken);
-              const userBName = await getLineUserProfile(pair.userB, accessToken);
-              const groupName = await getLineGroupName(pair.groupId, accessToken);
+              // Find matching bets
+              const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
+              console.log(`   Found ${matchingBets.length} matching bet(s)`);
               
-              console.log(`   User A: ${userAName}`);
-              console.log(`   User B: ${userBName}`);
-              console.log(`   Group: ${groupName}`);
+              // Update each matching bet
+              for (const bet of matchingBets) {
+                await updateBetResult(bet.rowIndex, resultData.resultNumber, resultData.result, accessToken);
+              }
               
-              // Record to Google Sheets
-              await appendToGoogleSheets(pair, userAName, userBName, groupName);
-              console.log(`✅ Pair recorded successfully`);
+              if (matchingBets.length > 0) {
+                console.log(`✅ Results updated successfully`);
+              }
             } else {
-              console.log(`⏭️  No pair detected (waiting for reply)`);
+              // Detect pair
+              const pair = detectPair(message);
+              
+              if (pair) {
+                console.log(`   messageA: "${pair.messageA}"`);
+                console.log(`   messageB: "${pair.messageB}"`);
+                
+                // Extract bet details
+                const betDetailsA = {
+                  fireworkName: extractFireworkName(pair.messageA),
+                  betType: extractBetType(pair.messageA),
+                  betAmount: extractBetAmount(pair.messageA)
+                };
+                
+                const betDetailsB = {
+                  fireworkName: extractFireworkName(pair.messageB),
+                  betType: extractBetType(pair.messageB),
+                  betAmount: extractBetAmount(pair.messageB)
+                };
+                
+                // Validate betting limits
+                const betAmount = Math.max(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
+                let validationResult = { valid: true, message: 'OK' };
+                
+                // Fetch user names first
+                console.log('👤 Fetching user profiles and group name...');
+                const userAName = await getLineUserProfile(pair.userA, accessToken);
+                const userBName = await getLineUserProfile(pair.userB, accessToken);
+                const groupName = await getLineGroupName(pair.groupId, accessToken);
+                
+                console.log(`   User A: ${userAName}`);
+                console.log(`   User B: ${userBName}`);
+                console.log(`   Group: ${groupName}`);
+                console.log(`   📱 Using LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
+                
+                // Get player balances
+                const userABalance = await getPlayerBalance(pair.userA, userAName);
+                const userBBalance = await getPlayerBalance(pair.userB, userBName);
+                
+                if (bettingLimitValidator) {
+                  validationResult = bettingLimitValidator.validateBet({
+                    amount: betAmount,
+                    bettingType: betDetailsA.betType,
+                    playerBalance: userABalance || 999999,
+                    totalAmount: 0
+                  });
+                }
+                
+                if (!validationResult.valid) {
+                  console.log(`❌ Betting limit validation failed: ${validationResult.message}`);
+                  console.log(`   📱 Sending error via LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
+                  const errorMessage = `❌ ${validationResult.message}`;
+                  await sendLineMessage(message.groupId, errorMessage, accessToken);
+                  
+                  // Use Registration Bot (Secondary Account) for insufficient balance notifications
+                  const registrationBotToken = LINE_CHANNEL_ACCESS_TOKEN_2;
+                  
+                  // Check if it's insufficient balance error
+                  if (validationResult.message.includes('ยอดเงินไม่เพียงพอ')) {
+                    // Send detailed message to User A if balance is insufficient
+                    if (userABalance !== null && userABalance < betAmount) {
+                      const userADetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
+                        `ชื่อ: ${userAName}\n` +
+                        `ข้อความ: ${pair.messageA}\n` +
+                        `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
+                        `ต้องการ: ${betAmount} บาท\n` +
+                        `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท`;
+                      console.log(`   📤 Sending insufficient balance message to ${userAName} via Registration Bot`);
+                      await sendLineMessageToUser(pair.userA, userADetailMessage, registrationBotToken);
+                    }
+                    
+                    // Send detailed message to User B if balance is insufficient
+                    if (userBBalance !== null && userBBalance < betAmount) {
+                      const userBDetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
+                        `ชื่อ: ${userBName}\n` +
+                        `ข้อความ: ${pair.messageB}\n` +
+                        `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
+                        `ต้องการ: ${betAmount} บาท\n` +
+                        `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท`;
+                      console.log(`   📤 Sending insufficient balance message to ${userBName} via Registration Bot`);
+                      await sendLineMessageToUser(pair.userB, userBDetailMessage, registrationBotToken);
+                    }
+                  } else {
+                    // Send generic error to both users
+                    const userADetailMessage = `❌ ข้อผิดพลาด\n\n` +
+                      `ชื่อ: ${userAName}\n` +
+                      `ข้อความ: ${pair.messageA}\n\n` +
+                      `${validationResult.message}`;
+                    const userBDetailMessage = `❌ ข้อผิดพลาด\n\n` +
+                      `ชื่อ: ${userBName}\n` +
+                      `ข้อความ: ${pair.messageB}\n\n` +
+                      `${validationResult.message}`;
+                    
+                    console.log(`   📤 Sending error message to ${userAName} and ${userBName}`);
+                    await sendLineMessageToUser(pair.userA, userADetailMessage, registrationBotToken);
+                    await sendLineMessageToUser(pair.userB, userBDetailMessage, registrationBotToken);
+                  }
+                } else {
+                  // Record to Google Sheets
+                  await appendToGoogleSheets(pair, userAName, userBName, groupName);
+                  console.log(`✅ Pair recorded successfully`);
+                }
+              } else {
+                console.log(`⏭️  No pair detected (waiting for reply)`);
+              }
             }
           }
         }
@@ -1137,6 +1259,221 @@ async function initializeSheets() {
     console.log('✅ Headers created');
   } catch (error) {
     console.warn('⚠️  Warning: Could not initialize sheets:', error.message);
+  }
+}
+
+// ===== HELPER FUNCTIONS FOR SLIP RECORDING =====
+
+async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, amount) {
+  try {
+    const sheets = google.sheets('v4');
+
+    // ตรวจสอบว่าผู้เล่นมีอยู่แล้วหรือไม่
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `Players!A:J`,
+    });
+
+    const rows = response.data.values || [];
+    let playerRowIndex = null;
+    let currentBalance = 0;
+    let totalDeposits = 0;
+
+    // หาแถวของผู้เล่น
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i] && rows[i][0] === userId) {
+        playerRowIndex = i + 1;
+        currentBalance = parseFloat(rows[i][4]) || 0;
+        totalDeposits = parseFloat(rows[i][5]) || 0;
+        break;
+      }
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleString('th-TH', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const newBalance = currentBalance + amount;
+    const newTotalDeposits = totalDeposits + amount;
+
+    if (playerRowIndex) {
+      // อัปเดตผู้เล่นที่มีอยู่แล้ว
+      console.log(`   📝 อัปเดตผู้เล่น: ${userId}`);
+
+      const updateResponse = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: googleSheetId,
+        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+      });
+
+      const currentRow = updateResponse.data.values ? updateResponse.data.values[0] : [];
+
+      const newRow = [
+        userId,
+        currentRow[1] || 'Unknown',
+        currentRow[2] || '',
+        currentRow[3] || '',
+        newBalance,
+        newTotalDeposits,
+        currentRow[6] || 0,
+        'active',
+        currentRow[8] || dateStr,
+        dateStr,
+      ];
+
+      await sheets.spreadsheets.values.update({
+        auth: googleAuth,
+        spreadsheetId: googleSheetId,
+        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [newRow],
+        },
+      });
+
+      console.log(`   ✅ อัปเดตสำเร็จ: ${newBalance} บาท`);
+    } else {
+      // สร้างผู้เล่นใหม่
+      console.log(`   📝 สร้างผู้เล่นใหม่: ${userId}`);
+
+      const newRow = [
+        userId,
+        'Unknown',
+        '',
+        '',
+        amount,
+        amount,
+        0,
+        'active',
+        dateStr,
+        dateStr,
+      ];
+
+      const nextRowIndex = rows.length + 1;
+
+      await sheets.spreadsheets.values.update({
+        auth: googleAuth,
+        spreadsheetId: googleSheetId,
+        range: `Players!A${nextRowIndex}:J${nextRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [newRow],
+        },
+      });
+
+      console.log(`   ✅ สร้างสำเร็จ: ${amount} บาท`);
+    }
+
+    return {
+      success: true,
+      newBalance: newBalance,
+    };
+  } catch (error) {
+    console.error(`   ❌ ข้อผิดพลาด: ${error.message}`);
+    throw error;
+  }
+}
+
+async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, userId, slipData) {
+  try {
+    const sheets = google.sheets('v4');
+
+    // ดึงข้อมูลผู้เล่นเพื่อหาชื่อ
+    const playerResponse = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `Players!A:B`,
+    });
+
+    const playerRows = playerResponse.data.values || [];
+    let playerName = 'Unknown';
+
+    for (let i = 1; i < playerRows.length; i++) {
+      if (playerRows[i] && playerRows[i][0] === userId) {
+        playerName = playerRows[i][1] || 'Unknown';
+        break;
+      }
+    }
+
+    // ดึงจำนวนแถวปัจจุบัน
+    const transResponse = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `Transactions!A:A`,
+    });
+
+    const transRows = transResponse.data.values || [];
+    const nextRowIndex = transRows.length + 1;
+
+    const now = new Date();
+    const dateStr = now.toLocaleString('th-TH', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    const timeStr = now.toLocaleString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    // ดึงยอดเงินก่อนหน้า
+    const playerData = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `Players!A:E`,
+    });
+
+    const playerDataRows = playerData.data.values || [];
+    let balanceBefore = 0;
+
+    for (let i = 1; i < playerDataRows.length; i++) {
+      if (playerDataRows[i] && playerDataRows[i][0] === userId) {
+        balanceBefore = parseFloat(playerDataRows[i][4]) || 0;
+        break;
+      }
+    }
+
+    const balanceAfter = balanceBefore + slipData.amount;
+
+    const transactionRow = [
+      dateStr,
+      playerName,
+      'deposit',
+      slipData.amount,
+      slipData.referenceId || '',
+      '',
+      'verified',
+      `Slip verified from LINE OA - Ref: ${slipData.referenceId}`,
+      balanceBefore,
+      balanceAfter,
+      `${dateStr} ${timeStr}`,
+    ];
+
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `Transactions!A${nextRowIndex}:K${nextRowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [transactionRow],
+      },
+    });
+
+    console.log(`   ✅ บันทึกรายการเงินสำเร็จ`);
+  } catch (error) {
+    console.error(`   ❌ ข้อผิดพลาด: ${error.message}`);
+    throw error;
   }
 }
 
