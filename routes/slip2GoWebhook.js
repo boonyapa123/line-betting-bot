@@ -22,8 +22,18 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
    */
   router.post('/slip-verified', async (req, res) => {
     try {
-      console.log('\n🔔 Webhook จาก Slip2Go');
-      console.log(`   Body:`, JSON.stringify(req.body, null, 2));
+      console.log('\n🔔 Slip2Go webhook received');
+      console.log(`   Path: ${req.path}`);
+      console.log(`   Method: ${req.method}`);
+      console.log(`   Body:`, req.body);
+
+      // ตรวจสอบว่าเป็น Slip2Go webhook หรือ LINE webhook
+      if (req.body.events && req.body.destination) {
+        console.log(`⚠️  This is a LINE webhook, not Slip2Go webhook`);
+        console.log(`   Waiting for Slip2Go to verify the slip...`);
+        res.status(200).json({ success: true, message: 'LINE webhook received, waiting for Slip2Go verification' });
+        return;
+      }
 
       const {
         userId,
