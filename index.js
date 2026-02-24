@@ -16,26 +16,16 @@ app.use(express.json({
   }
 }));
 
-// Add raw body middleware for Slip2Go webhook
+// Add logging middleware for Slip2Go webhook
 app.use((req, res, next) => {
   if (req.path === '/slip2go/slip-verified') {
-    let data = '';
-    req.on('data', chunk => {
-      data += chunk;
-    });
-    req.on('end', () => {
-      try {
-        req.body = JSON.parse(data);
-        req.rawBody = data;
-        next();
-      } catch (error) {
-        console.error('❌ Failed to parse Slip2Go webhook body:', error.message);
-        res.status(400).json({ error: 'Invalid JSON' });
-      }
-    });
-  } else {
-    next();
+    console.log('\n🔔 Slip2Go webhook received');
+    console.log(`   Path: ${req.path}`);
+    console.log(`   Method: ${req.method}`);
+    console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
   }
+  next();
 });
 
 // ===== CONFIGURATION =====
