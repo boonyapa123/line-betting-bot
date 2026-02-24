@@ -15,6 +15,7 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
   router.post('/slip-verified', async (req, res) => {
     try {
       console.log('\n🔔 Webhook จาก Slip2Go');
+      console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
       console.log(`   Body:`, JSON.stringify(req.body, null, 2));
 
       const {
@@ -29,6 +30,8 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
         receiver,
         sender,
       } = req.body;
+
+      console.log(`   Parsed data:`, { userId, slipId, amount, status, message });
 
       if (status === 'verified') {
         console.log(`✅ สลิปตรวจสอบแล้ว: ${slipId} (${amount} บาท)`);
@@ -81,6 +84,7 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
       res.status(200).json({ success: true });
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
+      console.error(`   Stack:`, error.stack);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

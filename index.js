@@ -24,9 +24,14 @@ app.use((req, res, next) => {
       data += chunk;
     });
     req.on('end', () => {
-      req.rawBody = data;
-      req.body = JSON.parse(data);
-      next();
+      try {
+        req.body = JSON.parse(data);
+        req.rawBody = data;
+        next();
+      } catch (error) {
+        console.error('❌ Failed to parse Slip2Go webhook body:', error.message);
+        res.status(400).json({ error: 'Invalid JSON' });
+      }
     });
   } else {
     next();
