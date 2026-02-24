@@ -812,6 +812,26 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Test endpoint for Slip2Go webhook
+app.post('/slip2go/test', async (req, res) => {
+  try {
+    console.log('\n🧪 Slip2Go webhook test');
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
+    
+    const { userId, amount, status } = req.body;
+    
+    if (!userId || !amount) {
+      return res.status(400).json({ error: 'Missing userId or amount' });
+    }
+    
+    console.log(`✅ Test data received: userId=${userId}, amount=${amount}, status=${status}`);
+    res.status(200).json({ success: true, message: 'Test webhook received' });
+  } catch (error) {
+    console.error(`❌ Test error: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/webhook', async (req, res) => {
   try {
     const signature = req.headers['x-line-signature'];
