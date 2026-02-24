@@ -9,6 +9,14 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
   const router = express.Router();
 
   /**
+   * Health check endpoint
+   */
+  router.get('/health', (req, res) => {
+    console.log('✅ Slip2Go webhook health check');
+    res.status(200).json({ status: 'ok', message: 'Slip2Go webhook is running' });
+  });
+
+  /**
    * Webhook endpoint สำหรับ Slip2Go
    * รับข้อมูลการตรวจสอบสลิป และบันทึกลงชีท
    */
@@ -32,6 +40,12 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
       } = req.body;
 
       console.log(`   Parsed data:`, { userId, slipId, amount, status, message });
+
+      if (!userId || !amount) {
+        console.log(`❌ Missing required fields: userId=${userId}, amount=${amount}`);
+        res.status(400).json({ error: 'Missing required fields' });
+        return;
+      }
 
       if (status === 'verified') {
         console.log(`✅ สลิปตรวจสอบแล้ว: ${slipId} (${amount} บาท)`);
@@ -85,7 +99,7 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
       console.error(`   Stack:`, error.stack);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   });
 
