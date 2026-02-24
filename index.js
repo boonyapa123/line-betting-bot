@@ -29,15 +29,20 @@ app.use((req, res, next) => {
 });
 
 // ===== CONFIGURATION =====
-// Primary Account
+// Account 1 (Primary - Verify betting data)
 const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID;
 
-// Secondary Account
+// Account 2 (Same as Account 1)
 const LINE_CHANNEL_SECRET_2 = process.env.LINE_CHANNEL_SECRET_2;
 const LINE_CHANNEL_ACCESS_TOKEN_2 = process.env.LINE_CHANNEL_ACCESS_TOKEN_2;
 const LINE_CHANNEL_ID_2 = process.env.LINE_CHANNEL_ID_2;
+
+// Account 3 (Slip Verification & Balance Management)
+const LINE_CHANNEL_SECRET_3 = process.env.LINE_CHANNEL_SECRET_3;
+const LINE_CHANNEL_ACCESS_TOKEN_3 = process.env.LINE_CHANNEL_ACCESS_TOKEN_3;
+const LINE_CHANNEL_ID_3 = process.env.LINE_CHANNEL_ID_3;
 
 // Google Sheets
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -54,6 +59,11 @@ function getLineCredentials(channelId) {
     return {
       secret: LINE_CHANNEL_SECRET_2,
       token: LINE_CHANNEL_ACCESS_TOKEN_2
+    };
+  } else if (channelId === LINE_CHANNEL_ID_3) {
+    return {
+      secret: LINE_CHANNEL_SECRET_3,
+      token: LINE_CHANNEL_ACCESS_TOKEN_3
     };
   }
   return null;
@@ -102,6 +112,7 @@ function registerGroup(groupId, groupName, accountNumber) {
 function getAccountNumber(channelId) {
   if (channelId === LINE_CHANNEL_ID) return 1;
   if (channelId === LINE_CHANNEL_ID_2) return 2;
+  if (channelId === LINE_CHANNEL_ID_3) return 3;
   return null;
 }
 
@@ -846,23 +857,30 @@ app.post('/webhook', async (req, res) => {
     let credentials = null;
     let channelId = null;
     
-    // Try primary account first
+    // Try account 1 first
     if (validateLineSignature(signature, body, LINE_CHANNEL_SECRET)) {
       credentials = { secret: LINE_CHANNEL_SECRET, token: LINE_CHANNEL_ACCESS_TOKEN };
       channelId = LINE_CHANNEL_ID;
-      console.log(`   ✅ Validated with Primary Account`);
+      console.log(`   ✅ Validated with Account 1`);
     } 
-    // Try secondary account
+    // Try account 2
     else if (LINE_CHANNEL_SECRET_2 && validateLineSignature(signature, body, LINE_CHANNEL_SECRET_2)) {
       credentials = { secret: LINE_CHANNEL_SECRET_2, token: LINE_CHANNEL_ACCESS_TOKEN_2 };
       channelId = LINE_CHANNEL_ID_2;
-      console.log(`   ✅ Validated with Secondary Account`);
+      console.log(`   ✅ Validated with Account 2`);
+    }
+    // Try account 3
+    else if (LINE_CHANNEL_SECRET_3 && validateLineSignature(signature, body, LINE_CHANNEL_SECRET_3)) {
+      credentials = { secret: LINE_CHANNEL_SECRET_3, token: LINE_CHANNEL_ACCESS_TOKEN_3 };
+      channelId = LINE_CHANNEL_ID_3;
+      console.log(`   ✅ Validated with Account 3`);
     }
     // Invalid signature
     else {
       console.log('❌ Invalid signature');
       console.log(`   Expected (Account 1): ${crypto.createHmac('sha256', LINE_CHANNEL_SECRET).update(body).digest('base64')}`);
       console.log(`   Expected (Account 2): ${crypto.createHmac('sha256', LINE_CHANNEL_SECRET_2).update(body).digest('base64')}`);
+      console.log(`   Expected (Account 3): ${crypto.createHmac('sha256', LINE_CHANNEL_SECRET_3).update(body).digest('base64')}`);
       console.log(`   Received: ${signature}`);
       res.status(400).json({ error: 'Invalid signature' });
       return;
@@ -1132,7 +1150,7 @@ async function start() {
     const slip2GoRouter = createSlip2GoWebhookRouter(
       googleAuth,
       GOOGLE_SHEET_ID,
-      LINE_CHANNEL_ACCESS_TOKEN_2,
+      LINE_CHANNEL_ACCESS_TOKEN_3,
       process.env.SLIP2GO_SECRET_KEY
     );
     app.use('/slip2go', slip2GoRouter);
