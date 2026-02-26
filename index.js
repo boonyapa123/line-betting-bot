@@ -1491,11 +1491,23 @@ async function start() {
       process.env.SLIP2GO_SECRET_KEY
     );
     app.use('/slip2go', slip2GoRouter);
+
+    // Register Line Slip Verification router
+    const createLineSlipVerificationRouter = require('./routes/lineSlipVerificationWebhook');
+    const slipVerificationRouter = createLineSlipVerificationRouter(
+      process.env.SLIP2GO_SECRET_KEY,
+      process.env.LINE_SLIP_VERIFICATION_ACCESS_TOKEN,
+      process.env.LINE_SLIP_VERIFICATION_CHANNEL_SECRET,
+      googleAuth,
+      GOOGLE_SHEET_ID
+    );
+    app.use('/', slipVerificationRouter);
     
     app.listen(PORT, () => {
       console.log(`\n🚀 LINE Betting Bot listening on port ${PORT}`);
       console.log(`📍 Webhook URL: http://localhost:${PORT}/webhook`);
       console.log(`📍 Slip2Go Webhook URL: http://localhost:${PORT}/slip2go/slip-verified`);
+      console.log(`📍 Slip Verification Webhook URL: http://localhost:${PORT}/webhook/line-slip-verification`);
       console.log(`✅ Ready to receive messages\n`);
     });
   } catch (error) {
