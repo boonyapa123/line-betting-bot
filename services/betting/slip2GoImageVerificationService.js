@@ -30,38 +30,46 @@ class Slip2GoImageVerificationService {
         contentType: 'image/jpeg'
       });
 
-      // Build payload with check conditions
-      const payload = {
-        checkDuplicate: checkCondition.checkDuplicate !== false
-      };
+      // Add form fields (not JSON payload)
+      form.append('checkDuplicate', checkCondition.checkDuplicate !== false ? 'true' : 'false');
 
       // Add checkReceiver if provided
       if (checkCondition.checkReceiver && checkCondition.checkReceiver.length > 0) {
-        payload.checkReceiver = checkCondition.checkReceiver;
+        form.append('checkReceiver', JSON.stringify(checkCondition.checkReceiver));
       }
 
       // Add checkAmount if provided
       if (checkCondition.checkAmount) {
-        payload.checkAmount = checkCondition.checkAmount;
+        form.append('checkAmount', JSON.stringify(checkCondition.checkAmount));
       }
 
       // Add checkDate if provided
       if (checkCondition.checkDate) {
+        form.append('checkDate', JSON.stringify(checkCondition.checkDate));
+      }
+
+      const payload = {
+        checkDuplicate: checkCondition.checkDuplicate !== false
+      };
+      if (checkCondition.checkReceiver && checkCondition.checkReceiver.length > 0) {
+        payload.checkReceiver = checkCondition.checkReceiver;
+      }
+      if (checkCondition.checkAmount) {
+        payload.checkAmount = checkCondition.checkAmount;
+      }
+      if (checkCondition.checkDate) {
         payload.checkDate = checkCondition.checkDate;
       }
 
-      form.append('payload', JSON.stringify(payload));
-
       console.log(`   📤 Sending request to Slip2Go API...`);
-      console.log(`   URL: ${this.apiUrl}/verify-slip/qr-image/info`);
+      console.log(`   URL: ${this.apiUrl}/api/slip/verify`);
       console.log(`   Payload:`, JSON.stringify(payload, null, 2));
 
       const response = await axios.post(
-        `${this.apiUrl}/verify-slip/qr-image/info`,
+        `${this.apiUrl}/api/slip/verify`,
         form,
         {
           headers: {
-            'Authorization': `Bearer ${this.secretKey}`,
             ...form.getHeaders()
           }
         }
@@ -85,7 +93,7 @@ class Slip2GoImageVerificationService {
    * @returns {boolean}
    */
   isVerified(response) {
-    return response?.code === '200000' || response?.code === '200200';
+    return response?.code === '200000' || response?.code === '200200' || response?.success === true;
   }
 
   /**
