@@ -18,7 +18,7 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
    */
   router.post('/webhook', (req, res) => {
     try {
-      console.log(`\n📨 รับ Webhook จาก LINE`);
+      console.log(`\n🔔 Webhook received at /webhook`);
       
       // ตรวจสอบ LINE signature
       const signature = req.headers['x-line-signature'];
@@ -29,6 +29,7 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
       }
 
       const { events } = req.body;
+      console.log(`📨 Events received: ${events?.length || 0}`);
 
       if (!events || events.length === 0) {
         console.log(`   ⏭️  ไม่มี events`);
@@ -40,17 +41,25 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
       res.status(200).json({ message: 'OK' });
 
       // ประมวลผลแต่ละ Event แบบ async ในพื้นหลัง
+      console.log(`🔄 Starting async event processing...`);
       (async () => {
+        console.log(`⚙️  Inside async IIFE`);
         for (const event of events) {
+          console.log(`📌 Processing event type: ${event.type}`);
           try {
             await _handleLineEvent(event);
           } catch (error) {
             console.error(`❌ ข้อผิดพลาดในการจัดการ Event: ${error.message}`);
+            console.error(error.stack);
           }
         }
+        console.log(`✅ Async event processing completed`);
       })();
+      
+      console.log(`📤 Response sent to LINE`);
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
+      console.error(error.stack);
       res.status(200).json({ message: 'OK' });
     }
   });
