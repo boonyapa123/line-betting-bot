@@ -999,6 +999,7 @@ app.post('/webhook', async (req, res) => {
     }
     
     let accessToken = credentials.token;
+    const accountNumber = getAccountNumber(channelId);
     
     // For Account 3 (Slip Verification), use the dedicated access token
     if (accountNumber === 3) {
