@@ -873,41 +873,43 @@ async function downloadLineImage(messageId, accessToken) {
     console.log(`   🔑 Access Token (first 30 chars): ${accessToken.substring(0, 30)}...`);
     console.log(`   🔑 Access Token length: ${accessToken.length}`);
     
-    // Try multiple endpoints
-    const endpoints = [
-      `https://api.line.me/v2/bot/message/${messageId}/content`,
-      `https://obs.line-scdn.net/message/${messageId}/image`
-    ];
+    // Try LINE Messaging API endpoint
+    const url = `https://api.line.me/v2/bot/message/${messageId}/content`;
     
-    for (const url of endpoints) {
-      try {
-        console.log(`   📡 Trying: ${url}`);
-        
-        const response = await axios.get(url, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          responseType: 'arraybuffer',
-          timeout: 5000
-        });
-        
-        console.log(`   ✅ Downloaded from ${url} (${response.data.length} bytes)`);
-        return Buffer.from(response.data);
-      } catch (error) {
-        console.log(`   ⚠️  Failed: ${error.response?.status || error.message}`);
-        if (error.response?.data) {
-          try {
-            const errorData = JSON.parse(error.response.data.toString());
-            console.log(`   Response: ${JSON.stringify(errorData)}`);
-          } catch (e) {
-            console.log(`   Response: ${error.response.data.toString().substring(0, 100)}`);
-          }
-        }
-        continue;
+    try {
+      console.log(`   📡 Trying: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        responseType: 'arraybuffer',
+        timeout: 5000
+      });
+      
+      console.log(`   ✅ Downloaded (${response.data.length} bytes)`);
+      return Buffer.from(response.data);
+    } catch (error) {
+      console.log(`   ⚠️  Failed: ${error.response?.status || error.message}`);
+      if (error.response?.status === 404) {
+        console.log(`   ℹ️  404 - Message not found or access denied`);
+      } else if (error.response?.status === 401) {
+        console.log(`   ℹ️  401 - Unauthorized (invalid token)`);
+      } else if (error.response?.status === 400) {
+        console.log(`   ℹ️  400 - Bad request`);
       }
+      
+      if (error.response?.data) {
+        try {
+          const errorData = JSON.parse(error.response.data.toString());
+          console.log(`   Response: ${JSON.stringify(errorData)}`);
+        } catch (e) {
+          console.log(`   Response: ${error.response.data.toString().substring(0, 200)}`);
+        }
+      }
+      
+      throw error;
     }
-    
-    throw new Error('All endpoints failed');
   } catch (error) {
     console.error(`   ❌ Error: ${error.message}`);
     throw error;
