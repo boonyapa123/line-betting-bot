@@ -1209,7 +1209,44 @@ app.post('/webhook', async (req, res) => {
               console.log(`   Number: ${resultData.resultNumber}`);
               console.log(`   Result: ${resultData.result}`);
               
-              // Find matching bets
+              // ใช้ AutoMatchingService
+              const AutoMatchingService = require('./services/betting/autoMatchingService');
+              const matchingService = new AutoMatchingService(googleAuth, GOOGLE_SHEET_ID, GOOGLE_WORKSHEET_NAME);
+              
+              // ดึงข้อมูลยอดเงินของผู้เล่น
+              const playerBalances = await getPlayerBalances();
+              
+              // จับคู่เล่นอัตโนมัติ
+              const matchedPairs = await matchingService.autoMatchPlayers(resultData.fireworkName, playerBalances);
+              console.log(`   ✅ จับคู่สำเร็จ ${matchedPairs.length} คู่`);
+              
+              // คำนวนแพ้ชนะและส่งข้อความให้ผู้เล่น
+              for (const pair of matchedPairs) {
+                try {
+                  // คำนวนแพ้ชนะ
+                  const winLoss = matchingService.calculateWinLoss(pair, resultData.result);
+                  
+                  // อัปเดตผลลัพธ์
+                  await matchingService.updateResultAndBalance(pair, winLoss);
+                  
+                  // สร้างข้อความแจ้งผล
+                  const resultMessages = matchingService.createResultMessage(pair, winLoss);
+                  
+                  // ส่งข้อความให้ผู้เล่น A
+                  console.log(`   📤 ส่งข้อความให้ ${pair.playerA.userAName}`);
+                  await sendLineMessageToUser(pair.playerA.userA, resultMessages.messageA, accessToken);
+                  
+                  // ส่งข้อความให้ผู้เล่น B
+                  console.log(`   📤 ส่งข้อความให้ ${pair.playerB.userAName}`);
+                  await sendLineMessageToUser(pair.playerB.userA, resultMessages.messageB, accessToken);
+                  
+                  console.log(`   ✅ ส่งข้อความสำเร็จ`);
+                } catch (pairError) {
+                  console.error(`   ❌ ข้อผิดพลาด: ${pairError.message}`);
+                }
+              }
+              
+              // Find matching bets (legacy)
               const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
               console.log(`   Found ${matchingBets.length} matching bet(s)`);
               
@@ -1688,6 +1725,59 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
   } catch (error) {
     console.error(`   ❌ ข้อผิดพลาด: ${error.message}`);
     throw error;
+  }
+}
+
+// Get player balance
+async function getPlayerBalance(userId, userName) {
+  if (!googleAuth) return null;
+  
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:E`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i] && rows[i][0] === userId) {
+        return parseFloat(rows[i][4]) || 0;
+      }
+    }
+    
+    return 0;
+  } catch (error) {
+    console.error('❌ Error getting player balance:', error.message);
+    return 0;
+  }
+}
+
+// Get all player balances
+async function getPlayerBalances() {
+  if (!googleAuth) return {};
+  
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:E`,
+    });
+    
+    const rows = response.data.values || [];
+    const balances = {};
+    
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i] && rows[i][0]) {
+        balances[rows[i][0]] = parseFloat(rows[i][4]) || 0;
+      }
+    }
+    
+    return balances;
+  } catch (error) {
+    console.error('❌ Error getting player balances:', error.message);
+    return {};
   }
 }
 
