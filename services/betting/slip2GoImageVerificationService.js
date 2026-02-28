@@ -30,24 +30,7 @@ class Slip2GoImageVerificationService {
         contentType: 'image/jpeg'
       });
 
-      // Add form fields (not JSON payload)
-      form.append('checkDuplicate', checkCondition.checkDuplicate !== false ? 'true' : 'false');
-
-      // Add checkReceiver if provided
-      if (checkCondition.checkReceiver && checkCondition.checkReceiver.length > 0) {
-        form.append('checkReceiver', JSON.stringify(checkCondition.checkReceiver));
-      }
-
-      // Add checkAmount if provided
-      if (checkCondition.checkAmount) {
-        form.append('checkAmount', JSON.stringify(checkCondition.checkAmount));
-      }
-
-      // Add checkDate if provided
-      if (checkCondition.checkDate) {
-        form.append('checkDate', JSON.stringify(checkCondition.checkDate));
-      }
-
+      // Build payload object
       const payload = {
         checkDuplicate: checkCondition.checkDuplicate !== false
       };
@@ -60,6 +43,9 @@ class Slip2GoImageVerificationService {
       if (checkCondition.checkDate) {
         payload.checkDate = checkCondition.checkDate;
       }
+
+      // Append payload as JSON string
+      form.append('payload', JSON.stringify(payload));
 
       console.log(`   📤 Sending request to Slip2Go API...`);
       console.log(`   URL: ${this.apiUrl}/api/verify-slip/qr-image/info`);
