@@ -873,13 +873,25 @@ async function downloadLineImage(messageId, accessToken) {
       path: `/message/${messageId}/image`,
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'X-Line-ChannelAccessToken': accessToken,
+        'User-Agent': 'LINE-BOT'
       },
     };
 
+    console.log(`   📡 Requesting: https://obs.line-scdn.net/message/${messageId}/image`);
+    console.log(`   🔑 Using X-Line-ChannelAccessToken header`);
+
     https.request(options, (res) => {
+      console.log(`   📡 Response status: ${res.statusCode}`);
+      
       if (res.statusCode !== 200) {
-        reject(new Error(`Failed to download image: ${res.statusCode}`));
+        let errorData = '';
+        res.on('data', chunk => {
+          errorData += chunk;
+        });
+        res.on('end', () => {
+          reject(new Error(`Failed to download image: ${res.statusCode} - ${errorData}`));
+        });
         return;
       }
 
@@ -888,9 +900,11 @@ async function downloadLineImage(messageId, accessToken) {
         data = Buffer.concat([data, chunk]);
       });
       res.on('end', () => {
+        console.log(`   ✅ Downloaded (${data.length} bytes)`);
         resolve(data);
       });
     }).on('error', (err) => {
+      console.error(`   ❌ Request error: ${err.message}`);
       reject(err);
     }).end();
   });
