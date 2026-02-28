@@ -869,17 +869,15 @@ app.post('/slip2go/test', async (req, res) => {
 async function downloadLineImage(messageId, accessToken) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'obs.line-scdn.net',
-      path: `/message/${messageId}/image`,
+      hostname: 'api.line.me',
+      path: `/v2/bot/message/${messageId}/content`,
       method: 'GET',
       headers: {
-        'X-Line-ChannelAccessToken': accessToken,
-        'User-Agent': 'LINE-BOT'
+        'Authorization': `Bearer ${accessToken}`,
       },
     };
 
-    console.log(`   📡 Requesting: https://obs.line-scdn.net/message/${messageId}/image`);
-    console.log(`   🔑 Using X-Line-ChannelAccessToken header`);
+    console.log(`   📡 Requesting: https://api.line.me/v2/bot/message/${messageId}/content`);
 
     https.request(options, (res) => {
       console.log(`   📡 Response status: ${res.statusCode}`);
@@ -890,7 +888,8 @@ async function downloadLineImage(messageId, accessToken) {
           errorData += chunk;
         });
         res.on('end', () => {
-          reject(new Error(`Failed to download image: ${res.statusCode} - ${errorData}`));
+          console.error(`   ❌ Error response: ${errorData}`);
+          reject(new Error(`Failed to download image: ${res.statusCode}`));
         });
         return;
       }
