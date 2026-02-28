@@ -867,46 +867,33 @@ app.post('/slip2go/test', async (req, res) => {
  * ดาวน์โหลดรูปภาพจาก LINE
  */
 async function downloadLineImage(messageId, accessToken) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.line.me',
-      path: `/v2/bot/message/${messageId}/content`,
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    };
-
+  try {
+    const axios = require('axios');
+    
     console.log(`   📡 Requesting: https://api.line.me/v2/bot/message/${messageId}/content`);
-
-    https.request(options, (res) => {
-      console.log(`   📡 Response status: ${res.statusCode}`);
-      
-      if (res.statusCode !== 200) {
-        let errorData = '';
-        res.on('data', chunk => {
-          errorData += chunk;
-        });
-        res.on('end', () => {
-          console.error(`   ❌ Error response: ${errorData}`);
-          reject(new Error(`Failed to download image: ${res.statusCode}`));
-        });
-        return;
+    
+    const response = await axios.get(
+      `https://api.line.me/v2/bot/message/${messageId}/content`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        responseType: 'arraybuffer'
       }
-
-      let data = Buffer.alloc(0);
-      res.on('data', chunk => {
-        data = Buffer.concat([data, chunk]);
-      });
-      res.on('end', () => {
-        console.log(`   ✅ Downloaded (${data.length} bytes)`);
-        resolve(data);
-      });
-    }).on('error', (err) => {
-      console.error(`   ❌ Request error: ${err.message}`);
-      reject(err);
-    }).end();
-  });
+    );
+    
+    console.log(`   📡 Response status: ${response.status}`);
+    console.log(`   ✅ Downloaded (${response.data.length} bytes)`);
+    
+    return Buffer.from(response.data);
+  } catch (error) {
+    console.error(`   ❌ Error: ${error.message}`);
+    if (error.response) {
+      console.error(`   Status: ${error.response.status}`);
+      console.error(`   Data: ${JSON.stringify(error.response.data)}`);
+    }
+    throw error;
+  }
 }
 
 /**

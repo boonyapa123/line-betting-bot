@@ -17,78 +17,66 @@ class Slip2GoImageVerificationService {
    * @returns {Promise<Object>} ผลลัพธ์การตรวจสอบ
    */
   async verifySlipFromImage(imageBuffer, checkCondition = {}) {
-    return new Promise((resolve, reject) => {
-      try {
-        console.log(`🔍 Verifying slip with Slip2Go API...`);
-        
-        const form = new FormData();
-        
-        // Add image file
-        form.append('file', imageBuffer, {
-          filename: 'slip.jpg',
-          contentType: 'image/jpeg'
-        });
+    try {
+      const axios = require('axios');
+      
+      console.log(`🔍 Verifying slip with Slip2Go API...`);
+      
+      const form = new FormData();
+      
+      // Add image file
+      form.append('file', imageBuffer, {
+        filename: 'slip.jpg',
+        contentType: 'image/jpeg'
+      });
 
-        // Add payload with check conditions
-        const payload = {
-          checkDuplicate: checkCondition.checkDuplicate !== false,
-          checkReceiver: checkCondition.checkReceiver || [],
-          checkAmount: checkCondition.checkAmount || undefined,
-          checkDate: checkCondition.checkDate || undefined
-        };
+      // Build payload with check conditions
+      const payload = {
+        checkDuplicate: checkCondition.checkDuplicate !== false
+      };
 
-        // Remove undefined fields
-        Object.keys(payload).forEach(key => {
-          if (payload[key] === undefined) {
-            delete payload[key];
-          }
-        });
+      // Add checkReceiver if provided
+      if (checkCondition.checkReceiver && checkCondition.checkReceiver.length > 0) {
+        payload.checkReceiver = checkCondition.checkReceiver;
+      }
 
-        form.append('payload', JSON.stringify(payload));
+      // Add checkAmount if provided
+      if (checkCondition.checkAmount) {
+        payload.checkAmount = checkCondition.checkAmount;
+      }
 
-        const options = {
-          hostname: 'api.slip2go.com',
-          path: '/api/verify-slip/qr-image/info',
-          method: 'POST',
+      // Add checkDate if provided
+      if (checkCondition.checkDate) {
+        payload.checkDate = checkCondition.checkDate;
+      }
+
+      form.append('payload', JSON.stringify(payload));
+
+      console.log(`   📤 Sending request to Slip2Go API...`);
+      console.log(`   URL: ${this.apiUrl}/api/verify-slip/qr-image/info`);
+      console.log(`   Payload:`, JSON.stringify(payload, null, 2));
+
+      const response = await axios.post(
+        `${this.apiUrl}/api/verify-slip/qr-image/info`,
+        form,
+        {
           headers: {
             'Authorization': `Bearer ${this.secretKey}`,
             ...form.getHeaders()
           }
-        };
+        }
+      );
 
-        console.log(`   📤 Sending request to Slip2Go API...`);
-        console.log(`   Payload:`, payload);
-
-        const req = https.request(options, (res) => {
-          let data = '';
-
-          res.on('data', chunk => {
-            data += chunk;
-          });
-
-          res.on('end', () => {
-            try {
-              const response = JSON.parse(data);
-              console.log(`   ✅ Response received:`, response);
-              resolve(response);
-            } catch (error) {
-              console.error(`   ❌ Failed to parse response:`, error.message);
-              reject(new Error(`Failed to parse Slip2Go response: ${error.message}`));
-            }
-          });
-        });
-
-        req.on('error', (error) => {
-          console.error(`   ❌ Request error:`, error.message);
-          reject(error);
-        });
-
-        form.pipe(req);
-      } catch (error) {
-        console.error(`   ❌ Error:`, error.message);
-        reject(error);
+      console.log(`   ✅ Response received:`, JSON.stringify(response.data, null, 2));
+      return response.data;
+    } catch (error) {
+      console.error(`   ❌ Error:`, error.message);
+      if (error.response) {
+        console.error(`   Status: ${error.response.status}`);
+        console.error(`   Data:`, error.response.data);
       }
-    });
+      throw error;
+    }
   }
 
   /**
