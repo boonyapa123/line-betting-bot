@@ -998,9 +998,18 @@ app.post('/webhook', async (req, res) => {
       return;
     }
     
-    const accessToken = credentials.token;
+    let accessToken = credentials.token;
+    
+    // For Account 3 (Slip Verification), use the dedicated access token
+    if (accountNumber === 3) {
+      const slipVerificationToken = process.env.LINE_SLIP_VERIFICATION_ACCESS_TOKEN;
+      if (slipVerificationToken) {
+        console.log(`   🔑 Using LINE_SLIP_VERIFICATION_ACCESS_TOKEN for Account 3`);
+        accessToken = slipVerificationToken;
+      }
+    }
+    
     const events = req.body.events || [];
-    const accountNumber = getAccountNumber(channelId);
     
     console.log(`📨 Webhook handler started`);
     console.log(`   Events count: ${events.length}`);
