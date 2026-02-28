@@ -870,28 +870,35 @@ async function downloadLineImage(messageId, accessToken) {
   try {
     const axios = require('axios');
     
-    console.log(`   📡 Requesting: https://api.line.me/v2/bot/message/${messageId}/content`);
-    
-    const response = await axios.get(
+    // Try multiple endpoints
+    const endpoints = [
       `https://api.line.me/v2/bot/message/${messageId}/content`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        responseType: 'arraybuffer'
+      `https://obs.line-scdn.net/message/${messageId}/image`
+    ];
+    
+    for (const url of endpoints) {
+      try {
+        console.log(`   📡 Trying: ${url}`);
+        
+        const response = await axios.get(url, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          responseType: 'arraybuffer',
+          timeout: 5000
+        });
+        
+        console.log(`   ✅ Downloaded from ${url} (${response.data.length} bytes)`);
+        return Buffer.from(response.data);
+      } catch (error) {
+        console.log(`   ⚠️  Failed: ${error.response?.status || error.message}`);
+        continue;
       }
-    );
+    }
     
-    console.log(`   📡 Response status: ${response.status}`);
-    console.log(`   ✅ Downloaded (${response.data.length} bytes)`);
-    
-    return Buffer.from(response.data);
+    throw new Error('All endpoints failed');
   } catch (error) {
     console.error(`   ❌ Error: ${error.message}`);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data: ${JSON.stringify(error.response.data)}`);
-    }
     throw error;
   }
 }
