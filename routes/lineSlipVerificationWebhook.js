@@ -69,12 +69,16 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
     try {
       console.log(`\n📌 Event Type: ${event.type}`);
       console.log(`   User ID: ${event.source.userId}`);
+      console.log(`   Event Object:`, JSON.stringify(event, null, 2));
 
       // ตรวจสอบว่าเป็น Message Event
       if (event.type !== 'message') {
         console.log(`   ⏭️  ข้ามการประมวลผล (ไม่ใช่ message event)`);
         return;
       }
+
+      console.log(`   Message Type: ${event.message?.type}`);
+      console.log(`   Message Object:`, JSON.stringify(event.message, null, 2));
 
       // ตรวจสอบว่าเป็นรูปภาพ
       if (event.message.type !== 'image') {
