@@ -30,22 +30,25 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
 
       const { events } = req.body;
 
-      // ส่ง response 200 ทันที (ไม่รอให้ประมวลผลเสร็จ)
-      res.status(200).json({ message: 'OK' });
-
       if (!events || events.length === 0) {
         console.log(`   ⏭️  ไม่มี events`);
+        res.status(200).json({ message: 'OK' });
         return;
       }
 
-      // ประมวลผลแต่ละ Event แบบ async ในพื้นหลัง (ไม่รอให้เสร็จ)
-      setImmediate(() => {
+      // ส่ง response 200 ทันที
+      res.status(200).json({ message: 'OK' });
+
+      // ประมวลผลแต่ละ Event แบบ async ในพื้นหลัง
+      (async () => {
         for (const event of events) {
-          _handleLineEvent(event).catch(error => {
+          try {
+            await _handleLineEvent(event);
+          } catch (error) {
             console.error(`❌ ข้อผิดพลาดในการจัดการ Event: ${error.message}`);
-          });
+          }
         }
-      });
+      })();
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
       res.status(200).json({ message: 'OK' });
@@ -67,22 +70,20 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
    */
   async function _handleLineEvent(event) {
     try {
-      console.log(`\n📌 Event Type: ${event.type}`);
-      console.log(`   User ID: ${event.source.userId}`);
-      console.log(`   Event Object:`, JSON.stringify(event, null, 2));
+      console.log(`\n📌 Processing Event Type: ${event.type}`);
+      console.log(`   User ID: ${event.source?.userId}`);
 
       // ตรวจสอบว่าเป็น Message Event
       if (event.type !== 'message') {
-        console.log(`   ⏭️  ข้ามการประมวลผล (ไม่ใช่ message event)`);
+        console.log(`   ⏭️  Skipping (not a message event)`);
         return;
       }
 
       console.log(`   Message Type: ${event.message?.type}`);
-      console.log(`   Message Object:`, JSON.stringify(event.message, null, 2));
 
       // ตรวจสอบว่าเป็นรูปภาพ
-      if (event.message.type !== 'image') {
-        console.log(`   ⏭️  ข้ามการประมวลผล (ไม่ใช่รูปภาพ)`);
+      if (event.message?.type !== 'image') {
+        console.log(`   ⏭️  Skipping (not an image)`);
         return;
       }
 
@@ -90,35 +91,43 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
       const userId = event.source.userId;
       const groupId = event.source.groupId || event.source.roomId;
 
-      console.log(`   📸 รับรูปภาพ Message ID: ${messageId}`);
+      console.log(`   📸 Image Message ID: ${messageId}`);
+      console.log(`   🔄 Starting slip verification...`);
 
       // ดาวน์โหลดรูปภาพจาก LINE
       const imageBuffer = await _downloadLineImage(messageId);
-      console.log(`   ✅ ดาวน์โหลดรูปภาพสำเร็จ (${imageBuffer.length} bytes)`);
+      console.log(`   ✅ Downloaded image (${imageBuffer.length} bytes)`);
 
       // ตรวจสอบสลิป
+      console.log(`   🔍 Verifying slip...`);
       const verificationResult = await verificationService.verifySlipFromLineImage(imageBuffer);
+      console.log(`   ✅ Verification result:`, verificationResult);
 
       // สร้างข้อความตอบกลับ
       const replyMessage = verificationService.createLineMessage(verificationResult);
+      console.log(`   📝 Reply message created`);
 
       // ส่งข้อความตอบกลับไปยัง LINE
+      console.log(`   📤 Sending reply to user...`);
       await _sendLineMessage(userId, replyMessage);
 
       // บันทึกข้อมูลสลิป (ถ้าตรวจสอบสำเร็จ)
       if (verificationResult.success) {
         const slipData = verificationService.extractSlipData(verificationResult);
-        console.log(`\n💾 บันทึกข้อมูลสลิป:`, slipData);
+        console.log(`\n💾 Recording slip data:`, slipData);
         
         // บันทึกลง Google Sheets ถ้ามี
         if (recordingService) {
           try {
             await recordingService.recordSlip(slipData);
+            console.log(`   ✅ Recorded to Google Sheets`);
           } catch (recordError) {
-            console.error(`⚠️  ไม่สามารถบันทึกลง Google Sheets: ${recordError.message}`);
+            console.error(`   ⚠️  Failed to record to Google Sheets: ${recordError.message}`);
           }
         }
       }
+      
+      console.log(`\n✅ Event processing completed\n`);
     } catch (error) {
       console.error(`❌ ข้อผิดพลาดในการจัดการ Event: ${error.message}`);
     }
@@ -142,6 +151,8 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
    */
   async function _downloadLineImage(messageId) {
     return new Promise((resolve, reject) => {
+      console.log(`   🌐 Downloading from LINE (messageId: ${messageId})...`);
+      
       const timeout = setTimeout(() => {
         reject(new Error('Download timeout'));
       }, 10000); // 10 second timeout
@@ -156,6 +167,8 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
       };
 
       https.request(options, (res) => {
+        console.log(`   📡 Response status: ${res.statusCode}`);
+        
         if (res.statusCode !== 200) {
           clearTimeout(timeout);
           reject(new Error(`Failed to download image: ${res.statusCode}`));
@@ -168,10 +181,12 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
         });
         res.on('end', () => {
           clearTimeout(timeout);
+          console.log(`   ✅ Download complete (${data.length} bytes)`);
           resolve(data);
         });
       }).on('error', (err) => {
         clearTimeout(timeout);
+        console.error(`   ❌ Download error: ${err.message}`);
         reject(err);
       }).end();
     });
@@ -183,6 +198,8 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
    */
   async function _sendLineMessage(userId, message) {
     return new Promise((resolve) => {
+      console.log(`   📤 Sending message to user: ${userId}`);
+      
       const body = JSON.stringify({
         to: userId,
         messages: [
@@ -209,15 +226,15 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => {
           if (res.statusCode === 200) {
-            console.log(`   ✅ ส่งข้อความสำเร็จ`);
+            console.log(`   ✅ Message sent successfully`);
           } else {
-            console.log(`   ⚠️  ส่งข้อความ: ${res.statusCode}`);
+            console.log(`   ⚠️  Message send status: ${res.statusCode}`);
           }
           resolve(true);
         });
       })
         .on('error', (err) => {
-          console.log(`   ❌ ข้อผิดพลาดในการส่งข้อความ: ${err.message}`);
+          console.log(`   ❌ Error sending message: ${err.message}`);
           resolve(false);
         })
         .write(body);
