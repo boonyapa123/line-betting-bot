@@ -943,6 +943,7 @@ async function sendLineMessageToUser(userId, message, accessToken) {
 }
 
 // ===== WEBHOOK HANDLER =====
+app.post('/webhook', async (req, res) => {
   try {
     const signature = req.headers['x-line-signature'];
     const body = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
