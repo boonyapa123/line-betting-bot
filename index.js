@@ -870,7 +870,8 @@ async function downloadLineImage(messageId, accessToken) {
   try {
     const axios = require('axios');
     
-    console.log(`   🔑 Access Token: ${accessToken.substring(0, 20)}...`);
+    console.log(`   🔑 Access Token (first 30 chars): ${accessToken.substring(0, 30)}...`);
+    console.log(`   🔑 Access Token length: ${accessToken.length}`);
     
     // Try multiple endpoints
     const endpoints = [
@@ -895,7 +896,12 @@ async function downloadLineImage(messageId, accessToken) {
       } catch (error) {
         console.log(`   ⚠️  Failed: ${error.response?.status || error.message}`);
         if (error.response?.data) {
-          console.log(`   Response: ${JSON.stringify(error.response.data)}`);
+          try {
+            const errorData = JSON.parse(error.response.data.toString());
+            console.log(`   Response: ${JSON.stringify(errorData)}`);
+          } catch (e) {
+            console.log(`   Response: ${error.response.data.toString().substring(0, 100)}`);
+          }
         }
         continue;
       }
