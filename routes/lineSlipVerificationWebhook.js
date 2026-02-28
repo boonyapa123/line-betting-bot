@@ -1,4 +1,6 @@
 const express = require('express');
+const crypto = require('crypto');
+const https = require('https');
 const LineSlipVerificationService = require('../services/betting/lineSlipVerificationService');
 const SlipRecordingService = require('../services/betting/slipRecordingService');
 
@@ -11,13 +13,21 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
   const recordingService = googleAuth && googleSheetId ? new SlipRecordingService(googleAuth, googleSheetId, 'Slip Verification') : null;
 
   /**
-   * POST /webhook/line-slip-verification
+   * POST /webhook
    * รับ Webhook จาก LINE OA เมื่อมีการส่งรูปภาพสลิป
    */
-  router.post('/webhook/line-slip-verification', async (req, res) => {
+  router.post('/webhook', (req, res) => {
     try {
       console.log(`\n📨 รับ Webhook จาก LINE`);
       
+      // ตรวจสอบ LINE signature
+      const signature = req.headers['x-line-signature'];
+      if (!_validateLineSignature(signature, req.rawBody || JSON.stringify(req.body), lineChannelSecret)) {
+        console.log(`❌ Signature ไม่ถูกต้อง`);
+        res.status(401).json({ error: 'Invalid signature' });
+        return;
+      }
+
       const { events } = req.body;
 
       // ส่ง response 200 ทันที (ไม่รอให้ประมวลผลเสร็จ)
@@ -28,16 +38,27 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
         return;
       }
 
-      // ประมวลผลแต่ละ Event แบบ async (ไม่รอให้เสร็จ)
-      for (const event of events) {
-        _handleLineEvent(event).catch(error => {
-          console.error(`❌ ข้อผิดพลาดในการจัดการ Event: ${error.message}`);
-        });
-      }
+      // ประมวลผลแต่ละ Event แบบ async ในพื้นหลัง (ไม่รอให้เสร็จ)
+      setImmediate(() => {
+        for (const event of events) {
+          _handleLineEvent(event).catch(error => {
+            console.error(`❌ ข้อผิดพลาดในการจัดการ Event: ${error.message}`);
+          });
+        }
+      });
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
       res.status(200).json({ message: 'OK' });
     }
+  });
+
+  /**
+   * GET /webhook
+   * Health check endpoint สำหรับ LINE verification
+   */
+  router.get('/webhook', (req, res) => {
+    console.log(`✅ Webhook health check`);
+    res.status(200).json({ status: 'ok', message: 'Webhook is running' });
   });
 
   /**
@@ -68,17 +89,17 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
       console.log(`   📸 รับรูปภาพ Message ID: ${messageId}`);
 
       // ดาวน์โหลดรูปภาพจาก LINE
-      const imageUrl = await _getLineImageUrl(messageId);
-      console.log(`   🔗 Image URL: ${imageUrl}`);
+      const imageBuffer = await _downloadLineImage(messageId);
+      console.log(`   ✅ ดาวน์โหลดรูปภาพสำเร็จ (${imageBuffer.length} bytes)`);
 
       // ตรวจสอบสลิป
-      const verificationResult = await verificationService.verifySlipFromLineImage(imageUrl);
+      const verificationResult = await verificationService.verifySlipFromLineImage(imageBuffer);
 
       // สร้างข้อความตอบกลับ
       const replyMessage = verificationService.createLineMessage(verificationResult);
 
       // ส่งข้อความตอบกลับไปยัง LINE
-      await _sendLineMessage(userId, replyMessage, groupId);
+      await _sendLineMessage(userId, replyMessage);
 
       // บันทึกข้อมูลสลิป (ถ้าตรวจสอบสำเร็จ)
       if (verificationResult.success) {
@@ -100,24 +121,65 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
   }
 
   /**
+   * ตรวจสอบ LINE Signature
+   * @private
+   */
+  function _validateLineSignature(signature, body, secret) {
+    const hash = crypto
+      .createHmac('sha256', secret)
+      .update(body)
+      .digest('base64');
+    return signature === hash;
+  }
+
+  /**
    * ดาวน์โหลดรูปภาพจาก LINE
    * @private
    */
-  async function _getLineImageUrl(messageId) {
-    // LINE API endpoint สำหรับดาวน์โหลดรูปภาพ
-    // ใช้ messageId เพื่อดึงรูปภาพ
-    return `https://obs.line-scdn.net/..../message/${messageId}/image`;
+  async function _downloadLineImage(messageId) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Download timeout'));
+      }, 10000); // 10 second timeout
+
+      const options = {
+        hostname: 'obs.line-scdn.net',
+        path: `/message/${messageId}/image`,
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${lineAccessToken}`,
+        },
+      };
+
+      https.request(options, (res) => {
+        if (res.statusCode !== 200) {
+          clearTimeout(timeout);
+          reject(new Error(`Failed to download image: ${res.statusCode}`));
+          return;
+        }
+
+        let data = Buffer.alloc(0);
+        res.on('data', chunk => {
+          data = Buffer.concat([data, chunk]);
+        });
+        res.on('end', () => {
+          clearTimeout(timeout);
+          resolve(data);
+        });
+      }).on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      }).end();
+    });
   }
 
   /**
    * ส่งข้อความตอบกลับไปยัง LINE
    * @private
    */
-  async function _sendLineMessage(userId, message, groupId) {
-    try {
-      const axios = require('axios');
-
-      const payload = {
+  async function _sendLineMessage(userId, message) {
+    return new Promise((resolve) => {
+      const body = JSON.stringify({
         to: userId,
         messages: [
           {
@@ -125,26 +187,37 @@ function createLineSlipVerificationRouter(slip2GoSecretKey, lineAccessToken, lin
             text: message,
           },
         ],
-      };
+      });
 
-      // ถ้าเป็น Group ให้ส่งไปยัง Group แทน
-      if (groupId) {
-        payload.to = groupId;
-      }
-
-      const response = await axios.post('https://api.line.biz/v1/bot/message/push', payload, {
+      const options = {
+        hostname: 'api.line.me',
+        path: '/v2/bot/message/push',
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${lineAccessToken}`,
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
         },
-      });
+      };
 
-      console.log(`   ✅ ส่งข้อความสำเร็จ`);
-      return response.data;
-    } catch (error) {
-      console.error(`   ❌ ข้อผิดพลาดในการส่งข้อความ: ${error.message}`);
-      throw error;
-    }
+      https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            console.log(`   ✅ ส่งข้อความสำเร็จ`);
+          } else {
+            console.log(`   ⚠️  ส่งข้อความ: ${res.statusCode}`);
+          }
+          resolve(true);
+        });
+      })
+        .on('error', (err) => {
+          console.log(`   ❌ ข้อผิดพลาดในการส่งข้อความ: ${err.message}`);
+          resolve(false);
+        })
+        .write(body);
+    });
   }
 
   return router;

@@ -15,18 +15,20 @@ class LineSlipVerificationService {
 
   /**
    * ตรวจสอบสลิปจาก LINE Message (รูปภาพ)
-   * @param {string} imageUrl - URL ของรูปภาพจาก LINE
+   * @param {Buffer|string} imageData - Buffer ของรูปภาพหรือ URL
    * @param {Object} checkCondition - เงื่อนไขการตรวจสอบ
    * @returns {Promise<Object>} ผลการตรวจสอบ
    */
-  async verifySlipFromLineImage(imageUrl, checkCondition = {}) {
+  async verifySlipFromLineImage(imageData, checkCondition = {}) {
     try {
       console.log(`🔍 ตรวจสอบสลิปจาก LINE Image`);
 
       // วิธีที่ 1: ลองสแกน QR Code จากรูปภาพ
       try {
         console.log(`   📸 พยายามสแกน QR Code จากรูปภาพ...`);
-        const qrCode = await this.qrScanner.scanQRCodeFromUrl(imageUrl);
+        const qrCode = Buffer.isBuffer(imageData) 
+          ? await this.qrScanner.scanQRCodeFromBuffer(imageData)
+          : await this.qrScanner.scanQRCodeFromUrl(imageData);
         
         console.log(`   ✅ พบ QR Code: ${qrCode}`);
         
@@ -38,7 +40,9 @@ class LineSlipVerificationService {
         console.log(`   📸 พยายามตรวจสอบจากรูปภาพโดยตรง...`);
         
         // วิธีที่ 2: ตรวจสอบจากรูปภาพโดยตรง
-        const result = await this.imageVerifier.verifySlipFromUrl(imageUrl, checkCondition);
+        const result = Buffer.isBuffer(imageData)
+          ? await this.imageVerifier.verifySlipFromBuffer(imageData, checkCondition)
+          : await this.imageVerifier.verifySlipFromUrl(imageData, checkCondition);
         return result;
       }
     } catch (error) {

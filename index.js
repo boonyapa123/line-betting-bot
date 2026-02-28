@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
+const multer = require('multer');
 const { google } = require('googleapis');
 const { GoogleAuth } = require('google-auth-library');
 const fs = require('fs');
@@ -15,6 +16,23 @@ app.use(express.json({
     req.rawBody = buf;
   }
 }));
+
+// Multer สำหรับรับไฟล์
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    // ตรวจสอบประเภทไฟล์
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('ไฟล์ต้องเป็น JPEG หรือ PNG เท่านั้น'));
+    }
+  },
+});
 
 // Add logging middleware for Slip2Go webhook
 app.use((req, res, next) => {
@@ -1482,6 +1500,11 @@ async function start() {
   try {
     await initializeSheets();
     
+    // Register Slip Check API router
+    const createSlipCheckApiRouter = require('./routes/slipCheckApi');
+    const slipCheckApiRouter = createSlipCheckApiRouter(process.env.SLIP2GO_SECRET_KEY);
+    app.use(upload.single('file'), slipCheckApiRouter);
+
     // Register Slip2Go webhook router
     const createSlip2GoWebhookRouter = require('./routes/slip2GoWebhook');
     const slip2GoRouter = createSlip2GoWebhookRouter(
@@ -1506,8 +1529,8 @@ async function start() {
     app.listen(PORT, () => {
       console.log(`\n🚀 LINE Betting Bot listening on port ${PORT}`);
       console.log(`📍 Webhook URL: http://localhost:${PORT}/webhook`);
+      console.log(`📍 Slip Check API: http://localhost:${PORT}/api/slip/verify`);
       console.log(`📍 Slip2Go Webhook URL: http://localhost:${PORT}/slip2go/slip-verified`);
-      console.log(`📍 Slip Verification Webhook URL: http://localhost:${PORT}/webhook/line-slip-verification`);
       console.log(`✅ Ready to receive messages\n`);
     });
   } catch (error) {

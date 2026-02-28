@@ -66,6 +66,51 @@ class Slip2GoVerificationService {
   }
 
   /**
+   * ตรวจสอบสลิปจาก Buffer
+   * @param {Buffer} imageBuffer - Buffer ของรูปภาพสลิป
+   * @param {Object} options - ตัวเลือกการตรวจสอบ
+   * @returns {Promise<Object>} ผลการตรวจสอบ
+   */
+  async verifySlipFromBuffer(imageBuffer, options = {}) {
+    try {
+      console.log(`🔍 ตรวจสอบสลิปจาก Buffer (${imageBuffer.length} bytes)`);
+
+      // สร้าง payload
+      const payload = {
+        checkDuplicate: options.checkDuplicate !== false,
+        checkReceiver: options.checkReceiver || [],
+        checkAmount: options.checkAmount || {},
+        checkDate: options.checkDate || {},
+      };
+
+      // เรียก API
+      const result = await this._callSlip2GoApi(imageBuffer, 'slip.jpg', payload);
+
+      if (result.code === '200000') {
+        console.log(`✅ สลิปถูกต้อง`);
+        return {
+          success: true,
+          data: result.data,
+          message: result.message,
+        };
+      } else {
+        console.log(`❌ สลิปไม่ถูกต้อง: ${result.message}`);
+        return {
+          success: false,
+          message: result.message,
+          code: result.code,
+        };
+      }
+    } catch (error) {
+      console.error(`❌ ข้อผิดพลาด: ${error.message}`);
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  /**
    * ตรวจสอบสลิปจาก URL
    * @param {string} imageUrl - URL ของรูปภาพสลิป
    * @param {Object} options - ตัวเลือกการตรวจสอบ
@@ -147,18 +192,27 @@ class Slip2GoVerificationService {
         },
       };
 
+      console.log(`   📤 ส่ง request ไปยัง Slip2Go API...`);
+      console.log(`   🔗 ${options.hostname}${options.path}`);
+      console.log(`   📦 Payload:`, payload);
+
       https.request(options, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
           try {
+            console.log(`   📥 Response Status: ${res.statusCode}`);
+            console.log(`   📥 Response Body:`, data);
+            
             const result = JSON.parse(data);
             resolve(result);
           } catch (error) {
+            console.error(`   ❌ ไม่สามารถแปลง response: ${error.message}`);
             reject(new Error(`ไม่สามารถแปลง response: ${error.message}`));
           }
         });
       }).on('error', (err) => {
+        console.error(`   ❌ HTTP Error: ${err.message}`);
         reject(err);
       }).end(bodyBuffer);
     });
