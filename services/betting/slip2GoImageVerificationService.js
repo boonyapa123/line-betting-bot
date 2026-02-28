@@ -48,11 +48,11 @@ class Slip2GoImageVerificationService {
       form.append('payload', JSON.stringify(payload));
 
       console.log(`   📤 Sending request to Slip2Go API...`);
-      console.log(`   URL: ${this.apiUrl}/api/verify-slip/qr-image/info`);
+      console.log(`   URL: ${this.apiUrl}`);
       console.log(`   Payload:`, JSON.stringify(payload, null, 2));
 
       const response = await axios.post(
-        `${this.apiUrl}/api/verify-slip/qr-image/info`,
+        `${this.apiUrl}`,
         form,
         {
           headers: {
