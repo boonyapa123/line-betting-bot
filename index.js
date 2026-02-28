@@ -861,7 +861,88 @@ app.post('/slip2go/test', async (req, res) => {
   }
 });
 
-app.post('/webhook', async (req, res) => {
+// ===== HELPER FUNCTIONS =====
+
+/**
+ * ดาวน์โหลดรูปภาพจาก LINE
+ */
+async function downloadLineImage(messageId, accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'obs.line-scdn.net',
+      path: `/message/${messageId}/image`,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    };
+
+    https.request(options, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`Failed to download image: ${res.statusCode}`));
+        return;
+      }
+
+      let data = Buffer.alloc(0);
+      res.on('data', chunk => {
+        data = Buffer.concat([data, chunk]);
+      });
+      res.on('end', () => {
+        resolve(data);
+      });
+    }).on('error', (err) => {
+      reject(err);
+    }).end();
+  });
+}
+
+/**
+ * ส่งข้อความไปยังผู้ใช้ LINE
+ */
+async function sendLineMessageToUser(userId, message, accessToken) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      to: userId,
+      messages: [
+        {
+          type: 'text',
+          text: message,
+        },
+      ],
+    });
+
+    const options = {
+      hostname: 'api.line.me',
+      path: '/v2/bot/message/push',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log(`   ✅ Message sent successfully`);
+        } else {
+          console.log(`   ⚠️  Message send status: ${res.statusCode}`);
+        }
+        resolve(true);
+      });
+    })
+      .on('error', (err) => {
+        console.log(`   ❌ Error sending message: ${err.message}`);
+        resolve(false);
+      })
+      .write(body);
+  });
+}
+
+// ===== WEBHOOK HANDLER =====
   try {
     const signature = req.headers['x-line-signature'];
     const body = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
@@ -919,15 +1000,82 @@ app.post('/webhook', async (req, res) => {
         console.log(`   Message ID: ${event.message.id}`);
         console.log(`   User ID: ${event.source.userId}`);
         
-        // Forward to Slip2Go for verification
         try {
-          console.log(`🔄 Forwarding to Slip2Go...`);
+          // Download image from LINE
+          console.log(`🌐 Downloading image from LINE...`);
+          const imageBuffer = await downloadLineImage(event.message.id, accessToken);
+          console.log(`   ✅ Downloaded (${imageBuffer.length} bytes)`);
+
+          // Verify slip with Slip2Go API
+          console.log(`🔍 Verifying slip with Slip2Go API...`);
+          const Slip2GoImageVerificationService = require('../services/betting/slip2GoImageVerificationService');
+          const verificationService = new Slip2GoImageVerificationService(process.env.SLIP2GO_SECRET_KEY);
           
-          // Slip2Go will handle the verification and send webhook back
-          // No need to do anything here, just acknowledge
-          console.log(`✅ Image forwarded to Slip2Go`);
+          const checkCondition = {
+            checkDuplicate: process.env.SLIP_CHECK_DUPLICATE === 'true',
+            checkReceiver: process.env.SLIP_CHECK_RECEIVER === 'true' ? [
+              {
+                accountType: '01004',
+                accountNumber: accountNumber
+              }
+            ] : []
+          };
+
+          const verificationResult = await verificationService.verifySlipFromImage(imageBuffer, checkCondition);
+          console.log(`   ✅ Verification result:`, verificationResult);
+
+          // Create reply message
+          const replyMessage = verificationService.createLineMessage(verificationResult);
+          console.log(`   📝 Reply message created`);
+
+          // Send reply to user
+          console.log(`   📤 Sending reply to user...`);
+          await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
+          console.log(`   ✅ Reply sent`);
+
+          // Record to Google Sheets if verified
+          if (verificationService.isVerified(verificationResult)) {
+            const slipData = verificationService.extractSlipData(verificationResult);
+            console.log(`\n💾 Recording slip data:`, slipData);
+            
+            try {
+              // Record to Players sheet
+              console.log(`📝 Recording to Players sheet...`);
+              await _recordPlayerToSheetFromSlip(
+                googleAuth,
+                GOOGLE_SHEET_ID,
+                event.source.userId,
+                verificationResult.data.amount
+              );
+
+              // Record to Transactions sheet
+              console.log(`📝 Recording to Transactions sheet...`);
+              await _recordTransactionToSheetFromSlip(
+                googleAuth,
+                GOOGLE_SHEET_ID,
+                event.source.userId,
+                slipData
+              );
+
+              console.log(`   ✅ Recorded to Google Sheets`);
+            } catch (recordError) {
+              console.error(`   ⚠️  Failed to record to Google Sheets: ${recordError.message}`);
+            }
+          }
         } catch (error) {
-          console.error(`❌ Error forwarding to Slip2Go: ${error.message}`);
+          console.error(`❌ Error processing image: ${error.message}`);
+          console.error(error.stack);
+          
+          // Send error message to user
+          const errorMessage = `❌ เกิดข้อผิดพลาดในการตรวจสอบสลิป\n\n` +
+            `เหตุผล: ${error.message}\n\n` +
+            `📸 กรุณาส่งสลิปใหม่`;
+          
+          try {
+            await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+          } catch (sendError) {
+            console.error(`❌ Failed to send error message: ${sendError.message}`);
+          }
         }
         continue;
       }
