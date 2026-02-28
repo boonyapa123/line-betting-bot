@@ -1048,14 +1048,29 @@ app.post('/webhook', async (req, res) => {
           const verificationResult = await verificationService.verifySlipFromImage(imageBuffer, checkCondition);
           console.log(`   ✅ Verification result:`, verificationResult);
 
+          // Get LINE user profile
+          console.log(`👤 Getting LINE user profile...`);
+          let lineUserName = 'Unknown';
+          try {
+            const userProfile = await getLineUserProfile(event.source.userId, accessToken);
+            lineUserName = userProfile.displayName || 'Unknown';
+            console.log(`   ✅ User name: ${lineUserName}`);
+          } catch (profileError) {
+            console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
+          }
+
           // Create reply message
           const replyMessage = verificationService.createLineMessage(verificationResult);
           console.log(`   📝 Reply message created`);
 
-          // Send reply to user
+          // Send reply to user FIRST (before recording)
           console.log(`   📤 Sending reply to user...`);
-          await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
-          console.log(`   ✅ Reply sent`);
+          try {
+            await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
+            console.log(`   ✅ Reply sent`);
+          } catch (replyError) {
+            console.error(`   ⚠️  Failed to send reply: ${replyError.message}`);
+          }
 
           // Record to Google Sheets if verified
           if (verificationService.isVerified(verificationResult)) {
@@ -1069,6 +1084,8 @@ app.post('/webhook', async (req, res) => {
                 googleAuth,
                 GOOGLE_SHEET_ID,
                 event.source.userId,
+                lineUserName,
+                accessToken,
                 verificationResult.data.amount
               );
 
@@ -1078,6 +1095,8 @@ app.post('/webhook', async (req, res) => {
                 googleAuth,
                 GOOGLE_SHEET_ID,
                 event.source.userId,
+                lineUserName,
+                accessToken,
                 slipData
               );
 
@@ -1473,7 +1492,7 @@ async function initializeSheets() {
 
 // ===== HELPER FUNCTIONS FOR SLIP RECORDING =====
 
-async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, amount) {
+async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, amount) {
   try {
     const sheets = google.sheets('v4');
 
@@ -1481,7 +1500,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Players!A:J`,
+      range: `Players!A:K`,
     });
 
     const rows = response.data.values || [];
@@ -1520,14 +1539,14 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
       const updateResponse = await sheets.spreadsheets.values.get({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+        range: `Players!A${playerRowIndex}:K${playerRowIndex}`,
       });
 
       const currentRow = updateResponse.data.values ? updateResponse.data.values[0] : [];
 
       const newRow = [
         userId,
-        currentRow[1] || 'Unknown',
+        lineUserName,
         currentRow[2] || '',
         currentRow[3] || '',
         newBalance,
@@ -1536,12 +1555,13 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
         'active',
         currentRow[8] || dateStr,
         dateStr,
+        accessToken,
       ];
 
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+        range: `Players!A${playerRowIndex}:K${playerRowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [newRow],
@@ -1555,7 +1575,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
 
       const newRow = [
         userId,
-        'Unknown',
+        lineUserName,
         '',
         '',
         amount,
@@ -1564,6 +1584,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
         'active',
         dateStr,
         dateStr,
+        accessToken,
       ];
 
       const nextRowIndex = rows.length + 1;
@@ -1571,7 +1592,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${nextRowIndex}:J${nextRowIndex}`,
+        range: `Players!A${nextRowIndex}:K${nextRowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [newRow],
@@ -1591,26 +1612,9 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, a
   }
 }
 
-async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, userId, slipData) {
+async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, slipData) {
   try {
     const sheets = google.sheets('v4');
-
-    // ดึงข้อมูลผู้เล่นเพื่อหาชื่อ
-    const playerResponse = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: googleSheetId,
-      range: `Players!A:B`,
-    });
-
-    const playerRows = playerResponse.data.values || [];
-    let playerName = 'Unknown';
-
-    for (let i = 1; i < playerRows.length; i++) {
-      if (playerRows[i] && playerRows[i][0] === userId) {
-        playerName = playerRows[i][1] || 'Unknown';
-        break;
-      }
-    }
 
     // ดึงจำนวนแถวปัจจุบัน
     const transResponse = await sheets.spreadsheets.values.get({
@@ -1657,7 +1661,7 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
 
     const transactionRow = [
       dateStr,
-      playerName,
+      lineUserName,
       'deposit',
       slipData.amount,
       slipData.referenceId || '',
@@ -1667,12 +1671,13 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
       balanceBefore,
       balanceAfter,
       `${dateStr} ${timeStr}`,
+      accessToken,
     ];
 
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Transactions!A${nextRowIndex}:K${nextRowIndex}`,
+      range: `Transactions!A${nextRowIndex}:L${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [transactionRow],

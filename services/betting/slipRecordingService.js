@@ -29,7 +29,7 @@ class SlipRecordingService {
       // บันทึกลง Google Sheets
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.googleSheetId,
-        range: `${this.worksheetName}!A:L`,
+        range: `${this.worksheetName}!A:N`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [row]
@@ -69,7 +69,7 @@ class SlipRecordingService {
       // บันทึกลง Google Sheets
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.googleSheetId,
-        range: `${this.worksheetName}!A:L`,
+        range: `${this.worksheetName}!A:N`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: rows
@@ -101,7 +101,7 @@ class SlipRecordingService {
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.googleSheetId,
-        range: `${this.worksheetName}!A:L`
+        range: `${this.worksheetName}!A:N`
       });
 
       const rows = response.data.values || [];
@@ -189,7 +189,9 @@ class SlipRecordingService {
       slipData.receiverName || '',                // I: ชื่อผู้รับ
       slipData.receiverAccount || '',             // J: บัญชีผู้รับ
       slipData.receiverBank || '',                // K: ธนาคารผู้รับ
-      slipData.status || 'verified'               // L: สถานะ
+      slipData.status || 'verified',              // L: สถานะ
+      slipData.lineUserName || 'Unknown',         // M: ชื่อ LINE
+      slipData.accessToken || ''                  // N: Access Token
     ];
   }
 
@@ -243,7 +245,7 @@ class SlipRecordingService {
         // เพิ่ม Header
         await this.sheets.spreadsheets.values.update({
           spreadsheetId: this.googleSheetId,
-          range: `${this.worksheetName}!A1:L1`,
+          range: `${this.worksheetName}!A1:N1`,
           valueInputOption: 'USER_ENTERED',
           resource: {
             values: [[
@@ -258,7 +260,9 @@ class SlipRecordingService {
               'ชื่อผู้รับ',
               'บัญชีผู้รับ',
               'ธนาคารผู้รับ',
-              'สถานะ'
+              'สถานะ',
+              'ชื่อ LINE',
+              'Access Token'
             ]]
           }
         });

@@ -74,12 +74,26 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
         console.log(`✅ สลิปตรวจสอบแล้ว: ${slipId} (${amount} บาท)`);
 
         try {
+          // Get LINE user profile
+          console.log(`👤 Getting LINE user profile...`);
+          let lineUserName = 'Unknown';
+          let accessToken = registrationBotAccessToken;
+          try {
+            const userProfile = await getLineUserProfile(userId, accessToken);
+            lineUserName = userProfile.displayName || 'Unknown';
+            console.log(`   ✅ User name: ${lineUserName}`);
+          } catch (profileError) {
+            console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
+          }
+
           // บันทึกลงชีท Players
           console.log(`📝 บันทึกลงชีท Players...`);
           const playerResult = await _recordPlayerToSheet(
             googleAuth,
             googleSheetId,
             userId,
+            lineUserName,
+            accessToken,
             amount
           );
 
@@ -89,6 +103,8 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
             googleAuth,
             googleSheetId,
             userId,
+            lineUserName,
+            accessToken,
             amount,
             slipId,
             referenceId,
@@ -139,7 +155,7 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
  * บันทึกข้อมูลผู้เล่นลงชีท Players
  * @private
  */
-async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
+async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, lineUserName, accessToken, amount) {
   try {
     const sheets = google.sheets('v4');
 
@@ -147,7 +163,7 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Players!A:J`,
+      range: `Players!A:K`,
     });
 
     const rows = response.data.values || [];
@@ -186,14 +202,14 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
       const updateResponse = await sheets.spreadsheets.values.get({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+        range: `Players!A${playerRowIndex}:K${playerRowIndex}`,
       });
 
       const currentRow = updateResponse.data.values ? updateResponse.data.values[0] : [];
 
       const newRow = [
         userId,
-        currentRow[1] || 'Unknown',
+        lineUserName,
         currentRow[2] || '',
         currentRow[3] || '',
         newBalance,
@@ -202,12 +218,13 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
         'active',
         currentRow[8] || dateStr,
         dateStr,
+        accessToken,
       ];
 
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${playerRowIndex}:J${playerRowIndex}`,
+        range: `Players!A${playerRowIndex}:K${playerRowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [newRow],
@@ -221,7 +238,7 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
 
       const newRow = [
         userId,
-        'Unknown',
+        lineUserName,
         '',
         '',
         amount,
@@ -230,6 +247,7 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
         'active',
         dateStr,
         dateStr,
+        accessToken,
       ];
 
       const nextRowIndex = rows.length + 1;
@@ -237,7 +255,7 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, amount) {
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: googleSheetId,
-        range: `Players!A${nextRowIndex}:J${nextRowIndex}`,
+        range: `Players!A${nextRowIndex}:K${nextRowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [newRow],
@@ -265,6 +283,8 @@ async function _recordTransactionToSheet(
   googleAuth,
   googleSheetId,
   userId,
+  lineUserName,
+  accessToken,
   amount,
   slipId,
   referenceId,
@@ -273,23 +293,6 @@ async function _recordTransactionToSheet(
 ) {
   try {
     const sheets = google.sheets('v4');
-
-    // ดึงข้อมูลผู้เล่นเพื่อหาชื่อ
-    const playerResponse = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: googleSheetId,
-      range: `Players!A:B`,
-    });
-
-    const playerRows = playerResponse.data.values || [];
-    let playerName = 'Unknown';
-
-    for (let i = 1; i < playerRows.length; i++) {
-      if (playerRows[i] && playerRows[i][0] === userId) {
-        playerName = playerRows[i][1] || 'Unknown';
-        break;
-      }
-    }
 
     // ดึงจำนวนแถวปัจจุบัน
     const transResponse = await sheets.spreadsheets.values.get({
@@ -336,7 +339,7 @@ async function _recordTransactionToSheet(
 
     const transactionRow = [
       dateStr,
-      playerName,
+      lineUserName,
       'deposit',
       amount,
       slipId || referenceId || '',
@@ -346,12 +349,13 @@ async function _recordTransactionToSheet(
       balanceBefore,
       balanceAfter,
       `${dateStr} ${timeStr}`,
+      accessToken,
     ];
 
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Transactions!A${nextRowIndex}:K${nextRowIndex}`,
+      range: `Transactions!A${nextRowIndex}:L${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [transactionRow],
@@ -405,6 +409,41 @@ async function _sendLineMessage(userId, message, accessToken) {
         resolve(false);
       })
       .write(body);
+  });
+}
+
+/**
+ * ดึงข้อมูล LINE user profile
+ */
+async function getLineUserProfile(userId, accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.line.me',
+      port: 443,
+      path: `/v2/bot/profile/${userId}`,
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          const profile = JSON.parse(data);
+          resolve(profile);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    })
+      .on('error', (err) => {
+        reject(err);
+      })
+      .end();
   });
 }
 
