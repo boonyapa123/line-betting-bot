@@ -1032,7 +1032,7 @@ app.post('/webhook', async (req, res) => {
 
           // Verify slip with Slip2Go API
           console.log(`🔍 Verifying slip with Slip2Go API...`);
-          const Slip2GoImageVerificationService = require('../services/betting/slip2GoImageVerificationService');
+          const Slip2GoImageVerificationService = require('./services/betting/slip2GoImageVerificationService');
           const verificationService = new Slip2GoImageVerificationService(process.env.SLIP2GO_SECRET_KEY);
           
           const checkCondition = {
