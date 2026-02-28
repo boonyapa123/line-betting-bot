@@ -873,8 +873,8 @@ async function downloadLineImage(messageId, accessToken) {
     console.log(`   🔑 Access Token (first 30 chars): ${accessToken.substring(0, 30)}...`);
     console.log(`   🔑 Access Token length: ${accessToken.length}`);
     
-    // Try LINE Messaging API endpoint
-    const url = `https://api.line.me/v2/bot/message/${messageId}/content`;
+    // Try LINE Messaging API endpoint (use api-data for content download)
+    const url = `https://api-data.line.me/v2/bot/message/${messageId}/content`;
     
     try {
       console.log(`   📡 Trying: ${url}`);
