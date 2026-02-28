@@ -913,6 +913,25 @@ app.post('/webhook', async (req, res) => {
     console.log(`   Account: ${accountNumber}`);
     
     for (const event of events) {
+      // Handle image messages (slip verification)
+      if (event.type === 'message' && event.message.type === 'image') {
+        console.log(`📸 Image message received`);
+        console.log(`   Message ID: ${event.message.id}`);
+        console.log(`   User ID: ${event.source.userId}`);
+        
+        // Forward to Slip2Go for verification
+        try {
+          console.log(`🔄 Forwarding to Slip2Go...`);
+          
+          // Slip2Go will handle the verification and send webhook back
+          // No need to do anything here, just acknowledge
+          console.log(`✅ Image forwarded to Slip2Go`);
+        } catch (error) {
+          console.error(`❌ Error forwarding to Slip2Go: ${error.message}`);
+        }
+        continue;
+      }
+      
       if (event.type === 'message' && event.message.type === 'text') {
         // Handle text messages
         if (event.source.type !== 'group' && event.source.type !== 'user') {
