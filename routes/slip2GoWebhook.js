@@ -17,6 +17,15 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
   });
 
   /**
+   * GET /slip-verified for testing
+   */
+  router.get('/slip-verified', (req, res) => {
+    console.log('✅ Slip2Go webhook GET request received');
+    console.log(`   Query:`, req.query);
+    res.status(200).json({ status: 'ok', message: 'Slip2Go webhook is running' });
+  });
+
+  /**
    * Webhook endpoint สำหรับ Slip2Go
    * รับข้อมูลการตรวจสอบสลิป และบันทึกลงชีท
    */
@@ -25,7 +34,8 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
       console.log('\n🔔 Slip2Go webhook received');
       console.log(`   Path: ${req.path}`);
       console.log(`   Method: ${req.method}`);
-      console.log(`   Body:`, req.body);
+      console.log(`   Headers:`, req.headers);
+      console.log(`   Body:`, JSON.stringify(req.body, null, 2));
 
       // ตรวจสอบว่าเป็น Slip2Go webhook หรือ LINE webhook
       if (req.body.events && req.body.destination) {
