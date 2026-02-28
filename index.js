@@ -870,6 +870,8 @@ async function downloadLineImage(messageId, accessToken) {
   try {
     const axios = require('axios');
     
+    console.log(`   🔑 Access Token: ${accessToken.substring(0, 20)}...`);
+    
     // Try multiple endpoints
     const endpoints = [
       `https://api.line.me/v2/bot/message/${messageId}/content`,
@@ -892,6 +894,9 @@ async function downloadLineImage(messageId, accessToken) {
         return Buffer.from(response.data);
       } catch (error) {
         console.log(`   ⚠️  Failed: ${error.response?.status || error.message}`);
+        if (error.response?.data) {
+          console.log(`   Response: ${JSON.stringify(error.response.data)}`);
+        }
         continue;
       }
     }
