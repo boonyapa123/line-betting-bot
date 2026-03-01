@@ -1354,11 +1354,12 @@ app.post('/webhook', async (req, res) => {
                 } else {
                   console.log(`✅ Balance sufficient for ${userName}`);
                   
-                  // ถ้ายอดเงินเพียงพอ ให้จับคู่อัตโนมัติกับผู้เล่นอื่นที่เล่นบั้งไฟเดียวกัน
+                  // 🎯 AUTO MATCHING: ตรวจชื่อบั้งไฟต้องตรงกัน ใช้ยอดเงินน้อยกว่าเป็นหลัก
                   const betAmount = extractBetAmount(message.content);
                   const fireworkName = extractFireworkName(message.content);
+                  const betType = extractBetType(message.content);
                   
-                  if (betAmount > 0 && fireworkName) {
+                  if (betAmount > 0 && fireworkName && betType) {
                     console.log(`🔍 Looking for matching players for firework: ${fireworkName}`);
                     
                     // ดึงข้อมูลการเดิมพันทั้งหมดจาก Google Sheets
@@ -1382,21 +1383,39 @@ app.post('/webhook', async (req, res) => {
                         const rowResultB = row[10] || ''; // Column K
                         const rowUserA = row[1] || ''; // Column B
                         const rowUserB = row[11] || ''; // Column L
+                        const rowBetTypeA = row[5] || ''; // Column F
                         
                         // ตรวจสอบว่าเป็นการเดิมพันที่ยังไม่มีผลลัพธ์ และเล่นบั้งไฟเดียวกัน
+                        // ✅ ต้องตรวจชื่อบั้งไฟให้ตรงกันทั้งหมด
                         if (!rowResultA && !rowResultB && 
-                            rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) &&
+                            rowFireworkName === fireworkName &&
                             rowUserA !== message.userId && rowUserB !== message.userId) {
                           
-                          matchingBets.push({
-                            rowIndex: i + 1,
-                            userA: rowUserA,
-                            userB: rowUserB,
-                            amountA: parseFloat(row[6]) || 0,
-                            amountB: parseFloat(row[7]) || 0,
-                            betTypeA: row[5] || '',
-                            betTypeB: row[12] || ''
-                          });
+                          // ตรวจสอบว่าประเภทเดิมพันตรงข้ามกันหรือไม่
+                          const isOpposite = (typeA, typeB) => {
+                            const opposites = {
+                              '✅': '❌',
+                              '❌': '✅',
+                              'ต่ำ/ยั่ง': 'สูง/ไล่',
+                              'สูง/ไล่': 'ต่ำ/ยั่ง',
+                              'ถอย': 'ยั้ง',
+                              'ยั้ง': 'ถอย',
+                              'ล่าง': 'บน',
+                              'บน': 'ล่าง'
+                            };
+                            return opposites[typeA] === typeB;
+                          };
+                          
+                          if (isOpposite(rowBetTypeA, betType)) {
+                            matchingBets.push({
+                              rowIndex: i + 1,
+                              userA: rowUserA,
+                              userB: rowUserB,
+                              amountA: parseFloat(row[6]) || 0,
+                              amountB: parseFloat(row[7]) || 0,
+                              betTypeA: rowBetTypeA
+                            });
+                          }
                         }
                       }
                       
@@ -1407,11 +1426,11 @@ app.post('/webhook', async (req, res) => {
                         const matchedBet = matchingBets[0];
                         const matchedUserBalance = await getPlayerBalance(matchedBet.userA, '');
                         
-                        // ยึดจากคนยอดน้อยกว่า
+                        // ✅ ยึดจากคนยอดน้อยกว่า
                         const finalBetAmount = Math.min(betAmount, matchedBet.amountA, matchedUserBalance, playerBalance);
                         
                         console.log(`🎯 Auto-matching with user: ${matchedBet.userA}`);
-                        console.log(`   Final bet amount: ${finalBetAmount} บาท`);
+                        console.log(`   Final bet amount: ${finalBetAmount} บาท (using minimum)`);
                         
                         // บันทึกการเดิมพันใหม่ (ผู้เล่นที่จับคู่ vs ผู้เล่นปัจจุบัน)
                         const groupName = await getLineGroupName(message.groupId, accessToken);
@@ -1462,19 +1481,6 @@ app.post('/webhook', async (req, res) => {
                 console.log(`   🎯 Bet Details A: firework=${betDetailsA.fireworkName}, type=${betDetailsA.betType}, amount=${betDetailsA.betAmount}`);
                 console.log(`   🎯 Bet Details B: firework=${betDetailsB.fireworkName}, type=${betDetailsB.betType}, amount=${betDetailsB.betAmount}`);
                 
-                // ตรวจสอบว่าชื่อบั้งไฟตรงกันหรือไม่
-                if (!betDetailsA.fireworkName || !betDetailsB.fireworkName) {
-                  console.log(`❌ Missing firework name in one or both messages`);
-                  return;
-                }
-                
-                if (betDetailsA.fireworkName !== betDetailsB.fireworkName) {
-                  console.log(`❌ Firework names don't match: "${betDetailsA.fireworkName}" vs "${betDetailsB.fireworkName}"`);
-                  return;
-                }
-                
-                console.log(`✅ Firework names match: "${betDetailsA.fireworkName}"`);
-                
                 // ตรวจสอบว่าประเภทเดิมพันตรงข้ามกันหรือไม่
                 if (!betDetailsA.betType || !betDetailsB.betType) {
                   console.log(`❌ Missing bet type in one or both messages`);
@@ -1503,9 +1509,9 @@ app.post('/webhook', async (req, res) => {
                 
                 console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${betDetailsB.betType}"`);
                 
-                // Validate betting limits
-                const betAmount = Math.max(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
-                let validationResult = { valid: true, message: 'OK' };
+                // 🎯 REPLY MATCHING: ยึด User A เป็นหลัก ไม่ต้องตรวจชื่อบั้งไฟ
+                // ใช้ยอดเงินของ User A เป็นหลัก
+                const betAmount = betDetailsA.betAmount || 0;
                 
                 // Fetch user names first
                 console.log('👤 Fetching user profiles and group name...');
@@ -1524,7 +1530,7 @@ app.post('/webhook', async (req, res) => {
                 
                 console.log(`   💰 User A Balance: ${userABalance} บาท`);
                 console.log(`   💰 User B Balance: ${userBBalance} บาท`);
-                console.log(`   💰 Bet Amount: ${betAmount} บาท`);
+                console.log(`   💰 Bet Amount (from User A): ${betAmount} บาท`);
                 
                 // Check if both players have sufficient balance
                 if (userABalance < betAmount || userBBalance < betAmount) {
