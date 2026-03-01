@@ -406,8 +406,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       await updatePlayerBalance(userBId, userBName, userBWinnings);
     }
     
-    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
+    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง (เฉพาะที่มีคู่เล่น)
     console.log(`   📤 Sending result messages to players...`);
+    
+    // ตรวจสอบว่ามีคู่เล่น (User B) หรือไม่
+    if (!userBId || !userBName) {
+      console.log(`   ⚠️  No opponent found, skipping message to User B`);
+      return;
+    }
     
     if (resultSymbol === '✅') {
       // User A ชนะ
@@ -968,86 +974,6 @@ function detectPair(currentMessage) {
 }
 
 // ===== GOOGLE SHEETS =====
-async function recordInitialBet(pair, userAName, groupName) {
-  if (!googleAuth) {
-    console.log('⚠️  Google Sheets not initialized');
-    return;
-  }
-  
-  try {
-    console.log('📤 Recording initial bet to Google Sheets...');
-    
-    // Extract bet details
-    const betDetailsA = {
-      fireworkName: extractFireworkName(pair.messageA),
-      betType: extractBetType(pair.messageA),
-      betAmount: extractBetAmount(pair.messageA)
-    };
-    
-    // Create row for initial bet (User B is empty)
-    const date = new Date(pair.timestampA);
-    const timestamp = date.toLocaleString('en-US', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    
-    const row = [
-      timestamp,
-      pair.userA,
-      userAName,
-      pair.messageA,
-      betDetailsA.fireworkName || '',
-      betDetailsA.betType || '',
-      betDetailsA.betAmount || 0,
-      betDetailsA.betAmount || 0,
-      '',
-      '',
-      '',
-      '', // User B Name (empty)
-      '', // Bet Type B (empty)
-      groupName
-    ];
-    
-    console.log(`   📊 Initial bet row data (14 columns):`);
-    row.forEach((val, idx) => {
-      console.log(`      [${idx}]: "${val}"`);
-    });
-    
-    // Get current row count
-    const response = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A:A`,
-    });
-    
-    const rows = response.data.values || [];
-    const nextRowIndex = rows.length + 1;
-    
-    console.log(`   📊 Current rows: ${rows.length}, appending to row ${nextRowIndex}`);
-    
-    // Append row
-    await sheets.spreadsheets.values.update({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:N${nextRowIndex}`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [row],
-      },
-    });
-    
-    console.log(`   ✅ Initial bet appended successfully to row ${nextRowIndex}`);
-  } catch (error) {
-    console.error(`❌ Error recording initial bet: ${error.message}`);
-    throw error;
-  }
-}
-
 async function appendToGoogleSheets(pair, userAName, userBName, groupName, matchType = 'reply') {
   if (!googleAuth) {
     console.log('⚠️  Google Sheets not initialized');
@@ -1716,29 +1642,32 @@ app.post('/webhook', async (req, res) => {
                     console.error(`❌ Failed to record pair: ${recordError.message}`);
                   }
                       } else {
-                        console.log(`⏭️  No matching bets found, recording initial bet for future matching...`);
+                        console.log(`⏭️  No matching bets found, storing in memory for future matching...`);
                         
-                        // 📝 บันทึกการเดิมพันแรกลงชีทเพื่อรอการจับคู่ในอนาคต
-                        try {
-                          const groupName = await getLineGroupName(message.groupId, accessToken);
-                          
-                          // สร้าง pair ชั่วคราวสำหรับบันทึก (User A เป็นผู้เดิมพันแรก)
-                          const tempPair = {
-                            userA: message.userId,
-                            messageA: message.content,
-                            timestampA: message.timestamp,
-                            userB: '', // ยังไม่มี User B
-                            messageB: '',
-                            timestampB: message.timestamp,
-                            groupId: message.groupId
-                          };
-                          
-                          // บันทึกการเดิมพันแรก (ยังไม่มี User B)
-                          await recordInitialBet(tempPair, userName, groupName);
-                          console.log(`✅ Initial bet recorded, waiting for matching player...`);
-                        } catch (recordError) {
-                          console.error(`❌ Failed to record initial bet: ${recordError.message}`);
-                        }
+                        // 📝 เก็บการเดิมพันแรกไว้ในหน่วยความจำ (ไม่บันทึกลงชีท)
+                        const tempPair = {
+                          userA: message.userId,
+                          messageA: message.content,
+                          timestampA: message.timestamp,
+                          userB: '', // ยังไม่มี User B
+                          messageB: '',
+                          timestampB: message.timestamp,
+                          groupId: message.groupId
+                        };
+                        
+                        // เก็บไว้ในตัวแปร messageMap เพื่อรอการจับคู่
+                        messageMap.set(message.messageId, {
+                          userId: message.userId,
+                          content: message.content,
+                          timestamp: message.timestamp,
+                          groupId: message.groupId,
+                          userName: userName,
+                          betAmount: betAmount,
+                          fireworkName: fireworkName,
+                          betType: betType
+                        });
+                        
+                        console.log(`   📦 Stored in memory: ${fireworkName} ${betType} ${betAmount} บาท`);
                       }
                     } catch (matchError) {
                       console.error(`⚠️  Error finding matching bets: ${matchError.message}`);
