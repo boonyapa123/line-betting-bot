@@ -331,7 +331,7 @@ async function findMatchingBets(fireworkName, resultNumber) {
 }
 
 // Update result in Google Sheets
-async function updateBetResult(rowIndex, resultNumber, resultSymbol) {
+async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken) {
   if (!googleAuth) {
     console.log('⚠️  Google Sheets not initialized');
     return;
@@ -345,6 +345,22 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol) {
     // Get opposite result for User B
     const oppositeResult = getOppositeResultSymbol(resultSymbol);
     
+    // ดึงข้อมูลการเดิมพันจากชีท
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:N${rowIndex}`,
+    });
+    
+    const row = response.data.values?.[0] || [];
+    const userAId = row[1] || '';
+    const userAName = row[2] || '';
+    const userBId = row[11] || '';
+    const userBName = row[11] || '';
+    const betAmount = parseFloat(row[6]) || 0;
+    const fireworkName = row[4] || '';
+    
+    // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
@@ -356,8 +372,161 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol) {
     });
     
     console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${resultSymbol} | User B: ${oppositeResult}`);
+    
+    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
+    console.log(`   💰 Calculating winnings and updating balances...`);
+    
+    let userAWinnings = 0;
+    let userBWinnings = 0;
+    
+    if (resultSymbol === '✅') {
+      // User A ชนะ
+      const commission = betAmount * 0.1; // 10% commission
+      userAWinnings = betAmount - commission;
+      userBWinnings = -betAmount;
+    } else if (resultSymbol === '❌') {
+      // User A แพ้
+      userAWinnings = -betAmount;
+      const commission = betAmount * 0.1; // 10% commission
+      userBWinnings = betAmount - commission;
+    } else {
+      // เสมอ
+      const commission = betAmount * 0.05; // 5% commission
+      userAWinnings = -commission;
+      userBWinnings = -commission;
+    }
+    
+    // อัปเดตยอดเงินของ User A
+    if (userAId && userAName) {
+      await updatePlayerBalance(userAId, userAName, userAWinnings);
+    }
+    
+    // อัปเดตยอดเงินของ User B
+    if (userBId && userBName) {
+      await updatePlayerBalance(userBId, userBName, userBWinnings);
+    }
+    
+    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
+    console.log(`   📤 Sending result messages to players...`);
+    
+    if (resultSymbol === '✅') {
+      // User A ชนะ
+      const messageA = `✅ ชนะแล้ว\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `🏆 ได้รับ: ${userAWinnings.toFixed(0)} บาท\n` +
+        `👤 ผู้แพ้: ${userBName}\n\n` +
+        `ยินดีด้วย! 🎉`;
+      
+      const messageB = `❌ แพ้แล้ว\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `💸 เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
+        `👤 ผู้ชนะ: ${userAName}\n\n` +
+        `ลองใหม่นะ 💪`;
+      
+      await sendLineMessageToUser(userAId, messageA, accessToken);
+      await sendLineMessageToUser(userBId, messageB, accessToken);
+    } else if (resultSymbol === '❌') {
+      // User A แพ้
+      const messageA = `❌ แพ้แล้ว\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `💸 เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
+        `👤 ผู้ชนะ: ${userBName}\n\n` +
+        `ลองใหม่นะ 💪`;
+      
+      const messageB = `✅ ชนะแล้ว\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n` +
+        `👤 ผู้แพ้: ${userAName}\n\n` +
+        `ยินดีด้วย! 🎉`;
+      
+      await sendLineMessageToUser(userAId, messageA, accessToken);
+      await sendLineMessageToUser(userBId, messageB, accessToken);
+    } else {
+      // เสมอ
+      const messageA = `⛔️ เสมอ\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
+        `👤 คู่แข่ง: ${userBName}\n\n` +
+        `ผลเสมอ 🤝`;
+      
+      const messageB = `⛔️ เสมอ\n\n` +
+        `🎆 บั้งไฟ: ${fireworkName}\n` +
+        `💰 เดิมพัน: ${betAmount} บาท\n` +
+        `💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
+        `👤 คู่แข่ง: ${userAName}\n\n` +
+        `ผลเสมอ 🤝`;
+      
+      await sendLineMessageToUser(userAId, messageA, accessToken);
+      await sendLineMessageToUser(userBId, messageB, accessToken);
+    }
+    
+    console.log(`   ✅ Result messages sent successfully`);
   } catch (error) {
     console.error('❌ Failed to update result:', error.message);
+  }
+}
+
+async function updatePlayerBalance(userId, userName, winnings) {
+  if (!googleAuth) {
+    console.log('⚠️  Google Sheets not initialized');
+    return;
+  }
+  
+  try {
+    console.log(`   💰 Updating balance for ${userName}: ${winnings > 0 ? '+' : ''}${winnings.toFixed(0)} บาท`);
+    
+    // ดึงข้อมูลผู้เล่นจากชีท Players
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:D`,
+    });
+    
+    const rows = response.data.values || [];
+    let playerRowIndex = -1;
+    let currentBalance = 0;
+    
+    // ค้นหาผู้เล่นตามชื่อหรือ Linked IDs
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      
+      const playerName = row[0] || '';
+      const linkedIds = row[1] ? JSON.parse(row[1]) : [];
+      const balance = parseFloat(row[3]) || 0;
+      
+      if (playerName === userName || linkedIds.includes(userId)) {
+        playerRowIndex = i + 1;
+        currentBalance = balance;
+        break;
+      }
+    }
+    
+    if (playerRowIndex > 0) {
+      const newBalance = currentBalance + winnings;
+      
+      // อัปเดตยอดเงิน
+      await sheets.spreadsheets.values.update({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `Players!D${playerRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[newBalance]],
+        },
+      });
+      
+      console.log(`      ✅ Balance updated: ${currentBalance} → ${newBalance} บาท`);
+    } else {
+      console.log(`      ⚠️  Player not found in Players sheet`);
+    }
+  } catch (error) {
+    console.error(`      ❌ Error updating balance: ${error.message}`);
   }
 }
 
