@@ -799,7 +799,7 @@ function detectPair(currentMessage) {
 }
 
 // ===== GOOGLE SHEETS =====
-async function appendToGoogleSheets(pair, userAName, userBName, groupName) {
+async function appendToGoogleSheets(pair, userAName, userBName, groupName, matchType = 'reply') {
   if (!googleAuth) {
     console.log('⚠️  Google Sheets not initialized');
     return;
@@ -807,6 +807,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName) {
   
   try {
     console.log('📤 Recording to Google Sheets...');
+    console.log(`   Match Type: ${matchType}`);
     
     // Extract bet details
     const betDetailsA = {
@@ -821,8 +822,21 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName) {
       betAmount: extractBetAmount(pair.messageB)
     };
     
-    // Use largest amount
-    const betAmount = Math.max(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
+    // 🎯 ตัดสินใจยอดเงินตามประเภทการจับคู่
+    let betAmount;
+    if (matchType === 'reply') {
+      // Reply matching: ใช้ยอดเงินของ User A เป็นหลัก
+      betAmount = betDetailsA.betAmount || 0;
+      console.log(`   💰 Using User A amount (reply matching): ${betAmount} บาท`);
+    } else if (matchType === 'auto') {
+      // Auto matching: ใช้ยอดเงินน้อยกว่า
+      betAmount = Math.min(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
+      console.log(`   💰 Using minimum amount (auto matching): ${betAmount} บาท`);
+    } else {
+      // Default: ใช้ยอดสูงสุด (legacy)
+      betAmount = Math.max(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
+      console.log(`   💰 Using maximum amount (legacy): ${betAmount} บาท`);
+    }
     
     // Get opposite bet type for User B
     const oppositeBetType = getOppositeBetType(betDetailsA.betType);
@@ -1446,8 +1460,12 @@ app.post('/webhook', async (req, res) => {
                           groupId: message.groupId
                         };
                         
-                        await appendToGoogleSheets(pair, matchedUserName, userName, groupName);
-                        console.log(`✅ Auto-matched pair recorded successfully`);
+                  try {
+                    await appendToGoogleSheets(pair, matchedUserName, userName, groupName, 'auto');
+                    console.log(`✅ Auto-matched pair recorded successfully`);
+                  } catch (recordError) {
+                    console.error(`❌ Failed to record pair: ${recordError.message}`);
+                  }
                       } else {
                         console.log(`⏭️  No matching bets found, waiting for reply`);
                       }
@@ -1481,9 +1499,9 @@ app.post('/webhook', async (req, res) => {
                 console.log(`   🎯 Bet Details A: firework=${betDetailsA.fireworkName}, type=${betDetailsA.betType}, amount=${betDetailsA.betAmount}`);
                 console.log(`   🎯 Bet Details B: firework=${betDetailsB.fireworkName}, type=${betDetailsB.betType}, amount=${betDetailsB.betAmount}`);
                 
-                // ตรวจสอบว่าประเภทเดิมพันตรงข้ามกันหรือไม่
-                if (!betDetailsA.betType || !betDetailsB.betType) {
-                  console.log(`❌ Missing bet type in one or both messages`);
+                // ตรวจสอบว่า User A มีประเภทเดิมพันหรือไม่
+                if (!betDetailsA.betType) {
+                  console.log(`❌ Missing bet type in User A message`);
                   return;
                 }
                 
@@ -1497,17 +1515,38 @@ app.post('/webhook', async (req, res) => {
                     'ถอย': 'ยั้ง',
                     'ยั้ง': 'ถอย',
                     'ล่าง': 'บน',
-                    'บน': 'ล่าง'
+                    'บน': 'ล่าง',
+                    'ชล': 'ชล'
                   };
                   return opposites[typeA] === typeB;
                 };
                 
-                if (!isOpposite(betDetailsA.betType, betDetailsB.betType)) {
-                  console.log(`❌ Bet types are not opposite: "${betDetailsA.betType}" vs "${betDetailsB.betType}"`);
+                // 🎯 REPLY MATCHING: ถ้า User B ไม่ระบุประเภท ให้ถือว่า User B เล่นฝั่งตรงข้าม
+                let userBBetType = betDetailsB.betType;
+                if (!userBBetType) {
+                  // ถ้า User B ไม่ระบุประเภท ให้ใช้ประเภทตรงข้ามกับ User A
+                  const opposites = {
+                    '✅': '❌',
+                    '❌': '✅',
+                    'ต่ำ/ยั่ง': 'สูง/ไล่',
+                    'สูง/ไล่': 'ต่ำ/ยั่ง',
+                    'ถอย': 'ยั้ง',
+                    'ยั้ง': 'ถอย',
+                    'ล่าง': 'บน',
+                    'บน': 'ล่าง',
+                    'ชล': 'ชล'
+                  };
+                  userBBetType = opposites[betDetailsA.betType];
+                  console.log(`   ℹ️  User B didn't specify bet type, assuming opposite: ${userBBetType}`);
+                }
+                
+                // ตรวจสอบว่าประเภทตรงข้ามกันหรือไม่
+                if (!isOpposite(betDetailsA.betType, userBBetType)) {
+                  console.log(`❌ Bet types are not opposite: "${betDetailsA.betType}" vs "${userBBetType}"`);
                   return;
                 }
                 
-                console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${betDetailsB.betType}"`);
+                console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${userBBetType}"`);
                 
                 // 🎯 REPLY MATCHING: ยึด User A เป็นหลัก ไม่ต้องตรวจชื่อบั้งไฟ
                 // ใช้ยอดเงินของ User A เป็นหลัก
@@ -1571,7 +1610,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`   📝 Recording bet to Bets sheet...`);
                   
                   try {
-                    await appendToGoogleSheets(pair, userAName, userBName, groupName);
+                    await appendToGoogleSheets(pair, userAName, userBName, groupName, 'reply');
                     console.log(`✅ Pair recorded successfully`);
                   } catch (recordError) {
                     console.error(`❌ Failed to record pair: ${recordError.message}`);
