@@ -646,6 +646,22 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
   }
   
   try {
+    // ดึงข้อมูล Players เพื่อแมป User ID กับชื่อจริง
+    const playersResponse = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:B`,
+    });
+    
+    const playerRows = playersResponse.data.values || [];
+    const playerMap = {};
+    for (let i = 1; i < playerRows.length; i++) {
+      const row = playerRows[i];
+      if (row && row.length >= 2) {
+        playerMap[row[0]] = row[1]; // Map User ID to Name
+      }
+    }
+    
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
@@ -721,7 +737,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         resultA: resultA,
         resultB: resultB,
         userB: row[11],
-        userBName: row[12],
+        userBName: playerMap[row[11]] || row[12] || 'Unknown',
         betTypeB: row[13],
         groupName: rowGroupName
       });
