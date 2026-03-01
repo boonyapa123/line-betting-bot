@@ -1930,39 +1930,72 @@ async function getPlayerBalance(userId, userName) {
     console.log(`   User ID: ${userId}`);
     console.log(`   User Name: ${userName}`);
     
-    // ดึงข้อมูลจาก Players sheet
-    const response = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `Players!A:K`,
-    });
+    // ลองดึงข้อมูลหลายครั้งเพื่อรอให้ Google Sheets อัปเดตเสร็จ
+    let retries = 3;
+    let balance = 0;
+    let found = false;
     
-    const rows = response.data.values || [];
-    console.log(`   📊 Total rows in Players sheet: ${rows.length}`);
-    
-    // แสดงข้อมูลทั้งหมด (สำหรับ debug)
-    if (rows.length > 1) {
-      console.log(`   📋 Players data:`);
-      for (let i = 1; i < Math.min(rows.length, 6); i++) {
-        if (rows[i]) {
-          console.log(`      Row ${i + 1}: ID=${rows[i][0]}, Name=${rows[i][1]}, Balance=${rows[i][4]}`);
+    while (retries > 0 && !found) {
+      // ดึงข้อมูลจาก Players sheet
+      const response = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `Players!A:K`,
+      });
+      
+      const rows = response.data.values || [];
+      console.log(`   📊 Total rows in Players sheet: ${rows.length} (attempt ${4 - retries})`);
+      
+      // แสดงข้อมูลทั้งหมด (สำหรับ debug)
+      if (rows.length > 1) {
+        console.log(`   📋 Players data:`);
+        for (let i = 1; i < Math.min(rows.length, 10); i++) {
+          if (rows[i]) {
+            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, Balance=${rows[i][4]}`);
+          }
         }
       }
-    }
-    
-    // ค้นหาผู้เล่น
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i] && rows[i][0] === userId) {
-        const balance = parseFloat(rows[i][4]) || 0;
-        console.log(`   ✅ Found player at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
-        console.log(`   📊 === End Getting Player Balance ===\n`);
-        return balance;
+      
+      // ค้นหาผู้เล่นจาก ชื่อ LINE เป็นหลัก
+      console.log(`   🔍 Searching by LINE name: "${userName}"`);
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i] && rows[i][1] === userName) {
+          balance = parseFloat(rows[i][4]) || 0;
+          console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+          found = true;
+          break;
+        }
+      }
+      
+      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID (backup)
+      if (!found) {
+        console.log(`   ℹ️  Not found by LINE name, trying by User ID as backup...`);
+        for (let i = 1; i < rows.length; i++) {
+          if (rows[i] && rows[i][0] === userId) {
+            balance = parseFloat(rows[i][4]) || 0;
+            console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+            found = true;
+            break;
+          }
+        }
+      }
+      
+      // ถ้าไม่พบ ให้รอและลองใหม่
+      if (!found && retries > 1) {
+        console.log(`   ⏳ Player not found, retrying in 1 second...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        retries--;
+      } else {
+        retries = 0;
       }
     }
     
-    console.log(`   ⚠️  Player not found in sheet (will return 0)`);
+    if (!found) {
+      console.log(`   ⚠️  Player not found in sheet after retries (will return 0)`);
+    }
+    
     console.log(`   📊 === End Getting Player Balance ===\n`);
-    return 0;
+    return balance;
   } catch (error) {
     console.error('❌ Error getting player balance:', error.message);
     console.log(`   📊 === End Getting Player Balance (ERROR) ===\n`);
@@ -1970,7 +2003,7 @@ async function getPlayerBalance(userId, userName) {
   }
 }
 
-// Get all player balances
+// Get all player balances (ยึดชื่อ LINE เป็นหลัก)
 async function getPlayerBalances() {
   if (!googleAuth) {
     console.warn(`⚠️  googleAuth not initialized`);
@@ -1988,12 +2021,21 @@ async function getPlayerBalances() {
     const balances = {};
     
     for (let i = 1; i < rows.length; i++) {
-      if (rows[i] && rows[i][0]) {
+      if (rows[i]) {
         const userId = rows[i][0];
         const userName = rows[i][1] || 'Unknown';
         const balance = parseFloat(rows[i][4]) || 0;
-        balances[userId] = balance;
-        console.log(`   📊 Player ${i}: ${userId} (${userName}) - Balance: ${balance}`);
+        
+        // ยึดชื่อ LINE เป็นหลัก
+        if (userName && userName !== 'Unknown') {
+          balances[userName] = balance;
+          console.log(`   📊 Player: ${userName} - Balance: ${balance}`);
+        }
+        
+        // เก็บ User ID เป็น backup
+        if (userId) {
+          balances[userId] = balance;
+        }
       }
     }
     
