@@ -178,7 +178,7 @@ function validateLineSignature(signature, body, channelSecret) {
 
 // LINE API: Get user profile
 async function getLineUserProfile(userId, accessToken) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.line.me',
       path: `/v2/bot/profile/${userId}`,
@@ -188,23 +188,32 @@ async function getLineUserProfile(userId, accessToken) {
       }
     };
 
-    https.request(options, (res) => {
+    const req = https.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
           const profile = JSON.parse(data);
           console.log(`      👤 Profile response:`, profile);
-          resolve(profile.displayName || 'Unknown');
+          if (profile.displayName) {
+            resolve(profile.displayName);
+          } else {
+            console.log(`      ⚠️  No displayName in profile`);
+            resolve('Unknown');
+          }
         } catch (e) {
           console.log(`      ❌ Parse error:`, e.message);
           resolve('Unknown');
         }
       });
-    }).on('error', (err) => {
+    });
+
+    req.on('error', (err) => {
       console.log(`      ❌ API error:`, err.message);
       resolve('Unknown');
-    }).end();
+    });
+
+    req.end();
   });
 }
 
@@ -1110,8 +1119,7 @@ app.post('/webhook', async (req, res) => {
           console.log(`👤 Getting LINE user profile...`);
           let lineUserName = 'Unknown';
           try {
-            const userProfile = await getLineUserProfile(event.source.userId, accessToken);
-            lineUserName = userProfile.displayName || 'Unknown';
+            lineUserName = await getLineUserProfile(event.source.userId, accessToken);
             console.log(`   ✅ User name: ${lineUserName}`);
           } catch (profileError) {
             console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
@@ -1689,6 +1697,19 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
     
     const sheets = google.sheets('v4');
 
+    // ใช้ชื่อที่ส่งเข้ามา ถ้าไม่ใช่ "Unknown" ให้ดึงจาก LINE Profile API
+    let actualUserName = lineUserName;
+    if (!actualUserName || actualUserName === 'Unknown') {
+      try {
+        console.log(`   🔄 ชื่อเป็น Unknown ดึงจาก LINE Profile API...`);
+        actualUserName = await getLineUserProfile(userId, accessToken);
+        console.log(`   📝 ดึงชื่อจาก LINE Profile: ${actualUserName}`);
+      } catch (error) {
+        console.warn(`   ⚠️  ไม่สามารถดึงชื่อจาก LINE Profile: ${error.message}`);
+        actualUserName = lineUserName || 'Unknown';
+      }
+    }
+
     // ตรวจสอบว่าผู้เล่นมีอยู่แล้วหรือไม่
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
@@ -1728,7 +1749,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
     if (playerRowIndex) {
       // อัปเดตผู้เล่นที่มีอยู่แล้ว
-      console.log(`   📝 อัปเดตผู้เล่น: ${userId}`);
+      console.log(`   📝 อัปเดตผู้เล่น: ${userId} (${actualUserName})`);
 
       const updateResponse = await sheets.spreadsheets.values.get({
         auth: googleAuth,
@@ -1740,7 +1761,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
       const newRow = [
         userId,
-        lineUserName,
+        actualUserName,
         currentRow[2] || '',
         currentRow[3] || '',
         newBalance,
@@ -1762,14 +1783,14 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
         },
       });
 
-      console.log(`   ✅ อัปเดตสำเร็จ: ${newBalance} บาท`);
+      console.log(`   ✅ อัปเดตสำเร็จ: ${newBalance} บาท (ชื่อ: ${actualUserName})`);
     } else {
       // สร้างผู้เล่นใหม่
-      console.log(`   📝 สร้างผู้เล่นใหม่: ${userId}`);
+      console.log(`   📝 สร้างผู้เล่นใหม่: ${userId} (${actualUserName})`);
 
       const newRow = [
         userId,
-        lineUserName,
+        actualUserName,
         '',
         '',
         amount,
@@ -1793,7 +1814,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
         },
       });
 
-      console.log(`   ✅ สร้างสำเร็จ: ${amount} บาท`);
+      console.log(`   ✅ สร้างสำเร็จ: ${amount} บาท (ชื่อ: ${actualUserName})`);
     }
 
     return {
@@ -1887,23 +1908,31 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
 
 // Get player balance
 async function getPlayerBalance(userId, userName) {
-  if (!googleAuth) return null;
+  if (!googleAuth) {
+    console.warn(`⚠️  googleAuth not initialized`);
+    return 0;
+  }
   
   try {
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `Players!A:E`,
+      range: `Players!A:K`,
     });
     
     const rows = response.data.values || [];
+    console.log(`   📊 Checking balance for userId: ${userId}`);
+    console.log(`   📊 Total rows in Players sheet: ${rows.length}`);
     
     for (let i = 1; i < rows.length; i++) {
       if (rows[i] && rows[i][0] === userId) {
-        return parseFloat(rows[i][4]) || 0;
+        const balance = parseFloat(rows[i][4]) || 0;
+        console.log(`   ✅ Found player at row ${i + 1}: ${rows[i][1]} (balance: ${balance})`);
+        return balance;
       }
     }
     
+    console.log(`   ⚠️  Player not found in sheet`);
     return 0;
   } catch (error) {
     console.error('❌ Error getting player balance:', error.message);
@@ -1913,13 +1942,16 @@ async function getPlayerBalance(userId, userName) {
 
 // Get all player balances
 async function getPlayerBalances() {
-  if (!googleAuth) return {};
+  if (!googleAuth) {
+    console.warn(`⚠️  googleAuth not initialized`);
+    return {};
+  }
   
   try {
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `Players!A:E`,
+      range: `Players!A:K`,
     });
     
     const rows = response.data.values || [];
@@ -1927,7 +1959,11 @@ async function getPlayerBalances() {
     
     for (let i = 1; i < rows.length; i++) {
       if (rows[i] && rows[i][0]) {
-        balances[rows[i][0]] = parseFloat(rows[i][4]) || 0;
+        const userId = rows[i][0];
+        const userName = rows[i][1] || 'Unknown';
+        const balance = parseFloat(rows[i][4]) || 0;
+        balances[userId] = balance;
+        console.log(`   📊 Player ${i}: ${userId} (${userName}) - Balance: ${balance}`);
       }
     }
     
