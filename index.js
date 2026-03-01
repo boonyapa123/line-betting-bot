@@ -1727,17 +1727,49 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
     let playerRowIndex = null;
     let currentBalance = 0;
     let totalDeposits = 0;
+    let linkedUserIds = [];
 
-    // หาแถวของผู้เล่น
+    // หาแถวของผู้เล่น - ค้นหาจากชื่อ LINE ก่อน (primary)
+    console.log(`   🔍 Searching by LINE name: "${actualUserName}"`);
     for (let i = 1; i < rows.length; i++) {
-      if (rows[i] && rows[i][0] === userId) {
-        playerRowIndex = i + 1;
-        currentBalance = parseFloat(rows[i][4]) || 0;
-        totalDeposits = parseFloat(rows[i][5]) || 0;
-        console.log(`   Found player at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
-        break;
+      if (rows[i] && rows[i][1] === actualUserName) {
+        // เก็บ User ID ทั้งหมดของชื่อ LINE นี้
+        const existingId = rows[i][0];
+        if (existingId && !linkedUserIds.includes(existingId)) {
+          linkedUserIds.push(existingId);
+        }
+        
+        // ใช้แถวแรกที่พบเป็นแถวหลัก
+        if (!playerRowIndex) {
+          playerRowIndex = i + 1;
+          currentBalance = parseFloat(rows[i][4]) || 0;
+          totalDeposits = parseFloat(rows[i][5]) || 0;
+          console.log(`   ✅ Found player by name at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
+        }
       }
     }
+
+    // ถ้าไม่พบจากชื่อ ให้ค้นหาจาก User ID (backup)
+    if (!playerRowIndex) {
+      console.log(`   ℹ️  Not found by name, searching by User ID: "${userId}"`);
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i] && rows[i][0] === userId) {
+          playerRowIndex = i + 1;
+          currentBalance = parseFloat(rows[i][4]) || 0;
+          totalDeposits = parseFloat(rows[i][5]) || 0;
+          linkedUserIds.push(userId);
+          console.log(`   ✅ Found player by ID at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
+          break;
+        }
+      }
+    }
+
+    // เพิ่ม User ID ปัจจุบันถ้ายังไม่มี
+    if (!linkedUserIds.includes(userId)) {
+      linkedUserIds.push(userId);
+    }
+
+    console.log(`   🔗 Linked User IDs: ${linkedUserIds.join(', ')}`);
 
     const now = new Date();
     const dateStr = now.toLocaleString('th-TH', {
@@ -1755,7 +1787,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
     if (playerRowIndex) {
       // อัปเดตผู้เล่นที่มีอยู่แล้ว
-      console.log(`   📝 อัปเดตผู้เล่น: ${userId} (${actualUserName})`);
+      console.log(`   📝 อัปเดตผู้เล่น: ${actualUserName} (row ${playerRowIndex})`);
 
       const updateResponse = await sheets.spreadsheets.values.get({
         auth: googleAuth,
@@ -1765,10 +1797,13 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
       const currentRow = updateResponse.data.values ? updateResponse.data.values[0] : [];
 
+      // เก็บ User ID ทั้งหมดในคอลัมน์ C (Phone) เป็น JSON
+      const linkedIdsJson = JSON.stringify(linkedUserIds);
+
       const newRow = [
-        userId,
+        userId, // ใช้ User ID ปัจจุบัน
         actualUserName,
-        currentRow[2] || '',
+        linkedIdsJson, // เก็บ User ID ทั้งหมดในรูป JSON
         currentRow[3] || '',
         newBalance,
         newTotalDeposits,
@@ -1792,12 +1827,15 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
       console.log(`   ✅ อัปเดตสำเร็จ: ${newBalance} บาท (ชื่อ: ${actualUserName})`);
     } else {
       // สร้างผู้เล่นใหม่
-      console.log(`   📝 สร้างผู้เล่นใหม่: ${userId} (${actualUserName})`);
+      console.log(`   📝 สร้างผู้เล่นใหม่: ${actualUserName}`);
+
+      // เก็บ User ID ทั้งหมดในคอลัมน์ C (Phone) เป็น JSON
+      const linkedIdsJson = JSON.stringify(linkedUserIds);
 
       const newRow = [
         userId,
         actualUserName,
-        '',
+        linkedIdsJson, // เก็บ User ID ทั้งหมดในรูป JSON
         '',
         amount,
         amount,
@@ -1951,7 +1989,7 @@ async function getPlayerBalance(userId, userName) {
         console.log(`   📋 Players data:`);
         for (let i = 1; i < Math.min(rows.length, 10); i++) {
           if (rows[i]) {
-            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, Balance=${rows[i][4]}`);
+            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, LinkedIDs=${rows[i][2]}, Balance=${rows[i][4]}`);
           }
         }
       }
@@ -1967,9 +2005,29 @@ async function getPlayerBalance(userId, userName) {
         }
       }
       
-      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID (backup)
+      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID ในรายการ Linked IDs
       if (!found) {
-        console.log(`   ℹ️  Not found by LINE name, trying by User ID as backup...`);
+        console.log(`   ℹ️  Not found by LINE name, searching in Linked IDs...`);
+        for (let i = 1; i < rows.length; i++) {
+          if (rows[i] && rows[i][2]) {
+            try {
+              const linkedIds = JSON.parse(rows[i][2]);
+              if (Array.isArray(linkedIds) && linkedIds.includes(userId)) {
+                balance = parseFloat(rows[i][4]) || 0;
+                console.log(`   ✅ Found player by Linked ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+                found = true;
+                break;
+              }
+            } catch (e) {
+              // ถ้า parse JSON ไม่ได้ ให้ข้ามไป
+            }
+          }
+        }
+      }
+      
+      // ถ้าไม่พบ ให้ลองค้นหาจาก User ID ตรง (backup)
+      if (!found) {
+        console.log(`   ℹ️  Not found in Linked IDs, trying by User ID directly...`);
         for (let i = 1; i < rows.length; i++) {
           if (rows[i] && rows[i][0] === userId) {
             balance = parseFloat(rows[i][4]) || 0;
