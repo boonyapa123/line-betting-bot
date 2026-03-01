@@ -632,7 +632,17 @@ async function sendLineMessage(groupId, message, accessToken) {
 function extractBetAmount(message) {
   if (!message) return null;
   
-  // Get all numbers
+  // รูปแบบใหม่: ต1000, ย1000, ส1000, ล1000
+  const newFormatMatch = message.match(/[ตยสล](\d+)/);
+  if (newFormatMatch) {
+    const amount = parseInt(newFormatMatch[1]);
+    if (amount >= 10) {
+      console.log(`      ✅ Bet amount (new format): ${amount}`);
+      return amount;
+    }
+  }
+  
+  // รูปแบบเดิม: Get all numbers
   const numbers = message.match(/\d+(?:\.\d+)?/g);
   if (!numbers || numbers.length === 0) return null;
   
@@ -649,6 +659,22 @@ function extractBetAmount(message) {
 }
 
 function extractBetType(message) {
+  // รูปแบบใหม่: ต1000, ย1000, ส1000, ล1000
+  const newFormatMatch = message.match(/([ตยสล])(\d+)/);
+  if (newFormatMatch) {
+    const typeChar = newFormatMatch[1];
+    const typeMap = {
+      'ต': 'ต่ำ/ยั่ง',
+      'ย': 'ต่ำ/ยั่ง',
+      'ส': 'สูง/ไล่',
+      'ล': 'สูง/ไล่'
+    };
+    const betType = typeMap[typeChar];
+    console.log(`      ✅ Bet type (new format): ${betType}`);
+    return betType;
+  }
+  
+  // รูปแบบเดิม
   const betTypes = {
     'ถอย': 'ถอย',
     'ยั้ง': 'ยั้ง',
@@ -1161,49 +1187,10 @@ app.post('/webhook', async (req, res) => {
           await sendLineMessage(message.groupId, summary, accessToken);
           console.log(`✅ Summary sent`);
         } else {
-          // Check if this is a slip verification message from LINE OA
-          const LineSlipParserService = require('./services/betting/lineSlipParserService');
-          const slipParser = new LineSlipParserService();
+          // Check if this is a result announcement
+          const resultData = parseResultMessage(message.content);
           
-          if (slipParser.isValidSlip(message.content)) {
-            console.log(`📸 Slip verification message detected`);
-            const slipData = slipParser.parseSlipMessage(message.content);
-            
-            if (slipData && slipData.amount) {
-              console.log(`✅ Valid slip found: ${slipData.amount} บาท`);
-              
-              // Record to Players sheet
-              console.log(`📝 Recording to Players sheet...`);
-              const playerResult = await _recordPlayerToSheetFromSlip(
-                googleAuth,
-                GOOGLE_SHEET_ID,
-                message.userId,
-                slipData.amount
-              );
-              
-              // Record to Transactions sheet
-              console.log(`📝 Recording to Transactions sheet...`);
-              await _recordTransactionToSheetFromSlip(
-                googleAuth,
-                GOOGLE_SHEET_ID,
-                message.userId,
-                slipData
-              );
-              
-              // Send confirmation message
-              const confirmMessage = `✅ ตรวจสอบสลิปสำเร็จ\n\n` +
-                `💰 เติมเงิน: ${slipData.amount} บาท\n` +
-                `💳 ยอดเงินใหม่: ${playerResult.newBalance} บาท\n\n` +
-                `🎉 พร้อมเล่นแล้ว!`;
-              
-              await sendLineMessageToUser(message.userId, confirmMessage, accessToken);
-              console.log(`✅ Confirmation sent`);
-            }
-          } else {
-            // Check if this is a result announcement
-            const resultData = parseResultMessage(message.content);
-            
-            if (resultData) {
+          if (resultData) {
               console.log(`📊 Result announcement detected`);
               console.log(`   Firework: ${resultData.fireworkName}`);
               console.log(`   Number: ${resultData.resultNumber}`);
@@ -1259,6 +1246,126 @@ app.post('/webhook', async (req, res) => {
                 console.log(`✅ Results updated successfully`);
               }
             } else {
+              // ตรวจสอบว่าเป็นข้อความแทงหรือไม่
+              const betAmount = extractBetAmount(message.content);
+              
+              if (betAmount > 0) {
+                // นี่คือข้อความแทง ตรวจสอบยอดเงินทันที
+                console.log(`💰 Betting message detected: ${betAmount} บาท`);
+                
+                // ดึงชื่อผู้เล่น
+                const userName = await getLineUserProfile(message.userId, accessToken);
+                console.log(`   Player: ${userName}`);
+                
+                // ตรวจสอบยอดเงินของผู้เล่น
+                const playerBalance = await getPlayerBalance(message.userId, userName);
+                console.log(`   Current balance: ${playerBalance} บาท`);
+                console.log(`   Bet amount: ${betAmount} บาท`);
+                
+                // ถ้ายอดเงินไม่พอ ให้แจ้งเลย
+                if (playerBalance < betAmount) {
+                  console.log(`❌ Insufficient balance for ${userName}`);
+                  
+                  // ส่งข้อความส่วนตัวให้ผู้เล่นเท่านั้น
+                  const personalMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
+                    `ชื่อ: ${userName}\n` +
+                    `ข้อความแทง: "${message.content}"\n` +
+                    `ยอดเงินปัจจุบัน: ${playerBalance} บาท\n` +
+                    `ต้องการ: ${betAmount} บาท\n` +
+                    `ขาดอีก: ${(betAmount - playerBalance).toFixed(0)} บาท\n\n` +
+                    `💳 ช่องทางเติมเงิน:\n` +
+                    `• เพิ่มเพื่อน @774pojob\n` +
+                    `• https://line.me/ti/p/2009197430\n\n` +
+                    `📞 ติดต่อสอบถาม: @774pojob`;
+                  
+                  await sendLineMessageToUser(message.userId, personalMessage, accessToken);
+                  console.log(`   📤 Personal message sent to ${userName}`);
+                } else {
+                  console.log(`✅ Balance sufficient for ${userName}`);
+                  
+                  // ถ้ายอดเงินเพียงพอ ให้จับคู่อัตโนมัติกับผู้เล่นอื่นที่เล่นบั้งไฟเดียวกัน
+                  const betAmount = extractBetAmount(message.content);
+                  const fireworkName = extractFireworkName(message.content);
+                  
+                  if (betAmount > 0) {
+                    console.log(`🔍 Looking for matching players for firework: ${fireworkName}`);
+                    
+                    // ดึงข้อมูลการเดิมพันทั้งหมดจาก Google Sheets
+                    try {
+                      const response = await sheets.spreadsheets.values.get({
+                        auth: googleAuth,
+                        spreadsheetId: GOOGLE_SHEET_ID,
+                        range: `${GOOGLE_WORKSHEET_NAME}!A:O`,
+                      });
+                      
+                      const rows = response.data.values || [];
+                      const matchingBets = [];
+                      
+                      // ค้นหาการเดิมพันที่ยังไม่มีผลลัพธ์ และเล่นบั้งไฟเดียวกัน
+                      for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row) continue;
+                        
+                        const rowFireworkName = row[4] || ''; // Column E
+                        const rowResultA = row[9] || ''; // Column J
+                        const rowResultB = row[10] || ''; // Column K
+                        const rowUserA = row[1] || ''; // Column B
+                        const rowUserB = row[11] || ''; // Column L
+                        
+                        // ตรวจสอบว่าเป็นการเดิมพันที่ยังไม่มีผลลัพธ์ และเล่นบั้งไฟเดียวกัน
+                        if (!rowResultA && !rowResultB && 
+                            rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) &&
+                            rowUserA !== message.userId && rowUserB !== message.userId) {
+                          
+                          matchingBets.push({
+                            rowIndex: i + 1,
+                            userA: rowUserA,
+                            userB: rowUserB,
+                            amountA: parseFloat(row[6]) || 0,
+                            amountB: parseFloat(row[7]) || 0,
+                            betTypeA: row[5] || '',
+                            betTypeB: row[12] || ''
+                          });
+                        }
+                      }
+                      
+                      if (matchingBets.length > 0) {
+                        console.log(`✅ Found ${matchingBets.length} matching bet(s)`);
+                        
+                        // จับคู่กับการเดิมพันแรกที่พบ
+                        const matchedBet = matchingBets[0];
+                        const matchedUserBalance = await getPlayerBalance(matchedBet.userA, '');
+                        
+                        // ยึดจากคนยอดน้อยกว่า
+                        const finalBetAmount = Math.min(betAmount, matchedBet.amountA, matchedUserBalance, playerBalance);
+                        
+                        console.log(`🎯 Auto-matching with user: ${matchedBet.userA}`);
+                        console.log(`   Final bet amount: ${finalBetAmount} บาท`);
+                        
+                        // บันทึกการเดิมพันใหม่ (ผู้เล่นปัจจุบัน vs ผู้เล่นที่จับคู่)
+                        const groupName = await getLineGroupName(message.groupId, accessToken);
+                        const matchedUserName = await getLineUserProfile(matchedBet.userA, accessToken);
+                        
+                        const pair = {
+                          userA: matchedBet.userA,
+                          messageA: `${fireworkName} ${matchedBet.betTypeA} ${matchedBet.amountA}`,
+                          userB: message.userId,
+                          messageB: message.content,
+                          groupId: message.groupId
+                        };
+                        
+                        await appendToGoogleSheets(pair, matchedUserName, userName, groupName);
+                        console.log(`✅ Auto-matched pair recorded successfully`);
+                      } else {
+                        console.log(`⏭️  No matching bets found, waiting for reply`);
+                      }
+                    } catch (matchError) {
+                      console.error(`⚠️  Error finding matching bets: ${matchError.message}`);
+                    }
+                  }
+                }
+              }
+              
               // Detect pair
               const pair = detectPair(message);
               
@@ -1298,51 +1405,55 @@ app.post('/webhook', async (req, res) => {
                 const userABalance = await getPlayerBalance(pair.userA, userAName);
                 const userBBalance = await getPlayerBalance(pair.userB, userBName);
                 
-                if (bettingLimitValidator) {
+                console.log(`   💰 User A Balance: ${userABalance} บาท`);
+                console.log(`   💰 User B Balance: ${userBBalance} บาท`);
+                console.log(`   💰 Bet Amount: ${betAmount} บาท`);
+                
+                // Check if both players have sufficient balance
+                if (userABalance < betAmount || userBBalance < betAmount) {
+                  console.log(`❌ Insufficient balance detected`);
+                  
+                  // Send detailed message to User A if balance is insufficient
+                  if (userABalance < betAmount) {
+                    const userADetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
+                      `ชื่อ: ${userAName}\n` +
+                      `ข้อความ: ${pair.messageA}\n` +
+                      `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
+                      `ต้องการ: ${betAmount} บาท\n` +
+                      `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท\n\n` +
+                      `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
+                      `https://line.me/ti/p/2009197430`;
+                    console.log(`   📤 Sending insufficient balance message to ${userAName}`);
+                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
+                  }
+                  
+                  // Send detailed message to User B if balance is insufficient
+                  if (userBBalance < betAmount) {
+                    const userBDetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
+                      `ชื่อ: ${userBName}\n` +
+                      `ข้อความ: ${pair.messageB}\n` +
+                      `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
+                      `ต้องการ: ${betAmount} บาท\n` +
+                      `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท\n\n` +
+                      `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
+                      `https://line.me/ti/p/2009197430`;
+                    console.log(`   📤 Sending insufficient balance message to ${userBName}`);
+                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
+                  }
+                } else if (bettingLimitValidator) {
                   validationResult = bettingLimitValidator.validateBet({
                     amount: betAmount,
                     bettingType: betDetailsA.betType,
                     playerBalance: userABalance || 999999,
                     totalAmount: 0
                   });
-                }
-                
-                if (!validationResult.valid) {
-                  console.log(`❌ Betting limit validation failed: ${validationResult.message}`);
-                  console.log(`   📱 Sending error via LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
-                  const errorMessage = `❌ ${validationResult.message}`;
-                  await sendLineMessage(message.groupId, errorMessage, accessToken);
                   
-                  // Check if it's insufficient balance error
-                  if (validationResult.message.includes('ยอดเงินไม่เพียงพอ')) {
-                    // Send detailed message to User A if balance is insufficient
-                    if (userABalance !== null && userABalance < betAmount) {
-                      const userADetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
-                        `ชื่อ: ${userAName}\n` +
-                        `ข้อความ: ${pair.messageA}\n` +
-                        `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
-                        `ต้องการ: ${betAmount} บาท\n` +
-                        `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท\n\n` +
-                        `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
-                        `https://line.me/ti/p/2009197430`;
-                      console.log(`   📤 Sending insufficient balance message to ${userAName}`);
-                      await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
-                    }
+                  if (!validationResult.valid) {
+                    console.log(`❌ Betting limit validation failed: ${validationResult.message}`);
+                    console.log(`   📱 Sending error via LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
+                    const errorMessage = `❌ ${validationResult.message}`;
+                    await sendLineMessage(message.groupId, errorMessage, accessToken);
                     
-                    // Send detailed message to User B if balance is insufficient
-                    if (userBBalance !== null && userBBalance < betAmount) {
-                      const userBDetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
-                        `ชื่อ: ${userBName}\n` +
-                        `ข้อความ: ${pair.messageB}\n` +
-                        `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
-                        `ต้องการ: ${betAmount} บาท\n` +
-                        `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท\n\n` +
-                        `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
-                        `https://line.me/ti/p/2009197430`;
-                      console.log(`   📤 Sending insufficient balance message to ${userBName}`);
-                      await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
-                    }
-                  } else {
                     // Send generic error to both users
                     const userADetailMessage = `❌ ข้อผิดพลาด\n\n` +
                       `ชื่อ: ${userAName}\n` +
@@ -1354,11 +1465,15 @@ app.post('/webhook', async (req, res) => {
                       `${validationResult.message}`;
                     
                     console.log(`   📤 Sending error message to ${userAName} and ${userBName}`);
-                    await sendLineMessageToUser(pair.userA, userADetailMessage, registrationBotToken);
-                    await sendLineMessageToUser(pair.userB, userBDetailMessage, registrationBotToken);
+                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
+                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
+                  } else {
+                    // Record to Google Sheets
+                    await appendToGoogleSheets(pair, userAName, userBName, groupName);
+                    console.log(`✅ Pair recorded successfully`);
                   }
                 } else {
-                  // Record to Google Sheets
+                  // Record to Google Sheets (no validator)
                   await appendToGoogleSheets(pair, userAName, userBName, groupName);
                   console.log(`✅ Pair recorded successfully`);
                 }
@@ -1367,8 +1482,7 @@ app.post('/webhook', async (req, res) => {
               }
             }
           }
-        }
-      } else if (event.type === 'join') {
+        } else if (event.type === 'join') {
         // Handle join event (bot joined a new group)
         console.log(`\n✅ Bot joined a new group`);
         
