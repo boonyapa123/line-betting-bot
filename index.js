@@ -1144,7 +1144,24 @@ app.post('/webhook', async (req, res) => {
             console.log(`\n💾 Recording slip data:`, slipData);
             
             try {
-              // Record to Players sheet
+              // ดึงยอดเงินก่อนหน้าก่อน (ก่อนบันทึก)
+              console.log(`📝 Getting current balance before recording...`);
+              const currentBalance = await getPlayerBalance(event.source.userId, lineUserName);
+              console.log(`   Current balance: ${currentBalance} บาท`);
+
+              // Record to Transactions sheet FIRST (ก่อนอัปเดต Players)
+              console.log(`📝 Recording to Transactions sheet...`);
+              await _recordTransactionToSheetFromSlip(
+                googleAuth,
+                GOOGLE_SHEET_ID,
+                event.source.userId,
+                lineUserName,
+                accessToken,
+                slipData,
+                currentBalance
+              );
+
+              // Record to Players sheet AFTER (หลังบันทึก Transactions)
               console.log(`📝 Recording to Players sheet...`);
               await _recordPlayerToSheetFromSlip(
                 googleAuth,
@@ -1153,17 +1170,6 @@ app.post('/webhook', async (req, res) => {
                 lineUserName,
                 accessToken,
                 verificationResult.data.amount
-              );
-
-              // Record to Transactions sheet
-              console.log(`📝 Recording to Transactions sheet...`);
-              await _recordTransactionToSheetFromSlip(
-                googleAuth,
-                GOOGLE_SHEET_ID,
-                event.source.userId,
-                lineUserName,
-                accessToken,
-                slipData
               );
 
               console.log(`   ✅ Recorded to Google Sheets`);
@@ -1827,7 +1833,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
   }
 }
 
-async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, slipData) {
+async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, slipData, balanceBefore = 0) {
   try {
     const sheets = google.sheets('v4');
 
@@ -1855,24 +1861,30 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
       hour12: false,
     });
 
-    // ดึงยอดเงินก่อนหน้า
-    const playerData = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: googleSheetId,
-      range: `Players!A:E`,
-    });
+    // ถ้าไม่ได้ส่ง balanceBefore มา ให้ดึงจาก Players sheet
+    if (balanceBefore === 0) {
+      console.log(`   📊 Fetching balance from Players sheet...`);
+      const playerData = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: googleSheetId,
+        range: `Players!A:K`,
+      });
 
-    const playerDataRows = playerData.data.values || [];
-    let balanceBefore = 0;
-
-    for (let i = 1; i < playerDataRows.length; i++) {
-      if (playerDataRows[i] && playerDataRows[i][0] === userId) {
-        balanceBefore = parseFloat(playerDataRows[i][4]) || 0;
-        break;
+      const playerDataRows = playerData.data.values || [];
+      for (let i = 1; i < playerDataRows.length; i++) {
+        if (playerDataRows[i] && playerDataRows[i][0] === userId) {
+          balanceBefore = parseFloat(playerDataRows[i][4]) || 0;
+          console.log(`   Found balance: ${balanceBefore}`);
+          break;
+        }
       }
     }
 
     const balanceAfter = balanceBefore + slipData.amount;
+
+    console.log(`   💰 Balance Before: ${balanceBefore}`);
+    console.log(`   💰 Amount: ${slipData.amount}`);
+    console.log(`   💰 Balance After: ${balanceAfter}`);
 
     const transactionRow = [
       dateStr,
@@ -1914,6 +1926,11 @@ async function getPlayerBalance(userId, userName) {
   }
   
   try {
+    console.log(`\n📊 === Getting Player Balance ===`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   User Name: ${userName}`);
+    
+    // ดึงข้อมูลจาก Players sheet
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
@@ -1921,21 +1938,34 @@ async function getPlayerBalance(userId, userName) {
     });
     
     const rows = response.data.values || [];
-    console.log(`   📊 Checking balance for userId: ${userId}`);
     console.log(`   📊 Total rows in Players sheet: ${rows.length}`);
     
+    // แสดงข้อมูลทั้งหมด (สำหรับ debug)
+    if (rows.length > 1) {
+      console.log(`   📋 Players data:`);
+      for (let i = 1; i < Math.min(rows.length, 6); i++) {
+        if (rows[i]) {
+          console.log(`      Row ${i + 1}: ID=${rows[i][0]}, Name=${rows[i][1]}, Balance=${rows[i][4]}`);
+        }
+      }
+    }
+    
+    // ค้นหาผู้เล่น
     for (let i = 1; i < rows.length; i++) {
       if (rows[i] && rows[i][0] === userId) {
         const balance = parseFloat(rows[i][4]) || 0;
-        console.log(`   ✅ Found player at row ${i + 1}: ${rows[i][1]} (balance: ${balance})`);
+        console.log(`   ✅ Found player at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+        console.log(`   📊 === End Getting Player Balance ===\n`);
         return balance;
       }
     }
     
-    console.log(`   ⚠️  Player not found in sheet`);
+    console.log(`   ⚠️  Player not found in sheet (will return 0)`);
+    console.log(`   📊 === End Getting Player Balance ===\n`);
     return 0;
   } catch (error) {
     console.error('❌ Error getting player balance:', error.message);
+    console.log(`   📊 === End Getting Player Balance (ERROR) ===\n`);
     return 0;
   }
 }
