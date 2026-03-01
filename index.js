@@ -692,6 +692,7 @@ function extractBetType(message) {
     'ชล': 'ชล',
     'ชถ': 'ชล',
     'สกัด': 'สกัด',
+    'ติด': 'ยั้ง', // "ติด" = ยั้ง
     'ถ': 'ถอย',
     'ย': 'ยั้ง',
     'ล': 'ล่าง',
@@ -710,11 +711,35 @@ function extractBetType(message) {
 }
 
 function extractFireworkName(message) {
-  // Look for numbers with separators
+  // ลองค้นหาตัวเลขที่มีตัวคั่นก่อน (เช่น 310, 310.5, 310/5)
   const withSeparator = message.match(/\d+[.\/*\-]\d+(?:[.\/*\-]\d+)*/);
   if (withSeparator) {
-    console.log(`      ✅ Firework name: ${withSeparator[0]}`);
+    console.log(`      ✅ Firework name (with separator): ${withSeparator[0]}`);
     return withSeparator[0];
+  }
+  
+  // ถ้าไม่พบ ให้ค้นหาชื่อบั้งไฟที่เป็นข้อความ (เช่น "ลูกชายภูน้อย", "ชล", "ชถ")
+  // ค้นหาคำแรกที่ไม่ใช่ตัวเลขและไม่ใช่ประเภทเดิมพัน
+  const betTypes = ['ถอย', 'ยั้ง', 'ล่าง', 'บน', 'ชล', 'ชถ', 'สกัด', 'ต่ำ', 'สูง', 'ไล่', '✅', '❌', 'ต', 'ย', 'ส', 'ล'];
+  
+  // แยกข้อความเป็นคำ
+  const words = message.split(/\s+/);
+  
+  for (const word of words) {
+    // ข้ามคำที่เป็นตัวเลข
+    if (/^\d+$/.test(word)) continue;
+    
+    // ข้ามคำที่เป็นประเภทเดิมพัน
+    if (betTypes.includes(word)) continue;
+    
+    // ข้ามคำที่เป็นสัญลักษณ์
+    if (['✅', '❌', 'ต', 'ย', 'ส', 'ล'].includes(word)) continue;
+    
+    // ถ้าเหลือคำ ให้ใช้เป็นชื่อบั้งไฟ
+    if (word.length > 0) {
+      console.log(`      ✅ Firework name (text): ${word}`);
+      return word;
+    }
   }
   
   console.log(`      ❌ No firework name found`);
