@@ -1275,7 +1275,7 @@ app.post('/webhook', async (req, res) => {
                     `ขาดอีก: ${(betAmount - playerBalance).toFixed(0)} บาท\n\n` +
                     `💳 ช่องทางเติมเงิน:\n` +
                     `• เพิ่มเพื่อน @774pojob\n` +
-                    `• https://line.me/ti/p/2009197430\n\n` +
+                    `• https://lin.ee/JO6X7FE\n\n` +
                     `📞 ติดต่อสอบถาม: @774pojob`;
                   
                   await sendLineMessageToUser(message.userId, personalMessage, accessToken);
@@ -1421,8 +1421,9 @@ app.post('/webhook', async (req, res) => {
                       `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
                       `ต้องการ: ${betAmount} บาท\n` +
                       `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท\n\n` +
-                      `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
-                      `https://line.me/ti/p/2009197430`;
+                      `💳 ช่องทางเติมเงิน:\n` +
+                      `• เพิ่มเพื่อน @774pojob\n` +
+                      `• https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                   }
@@ -1435,8 +1436,9 @@ app.post('/webhook', async (req, res) => {
                       `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
                       `ต้องการ: ${betAmount} บาท\n` +
                       `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท\n\n` +
-                      `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
-                      `https://line.me/ti/p/2009197430`;
+                      `💳 ช่องทางเติมเงิน:\n` +
+                      `• เพิ่มเพื่อน @774pojob\n` +
+                      `• https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                   }
