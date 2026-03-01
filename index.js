@@ -667,25 +667,31 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     // Get groups for this account
     const accountGroups = getGroupsForAccount(accountNumber);
     const accountGroupNames = accountGroups.map(g => g.name);
-    console.log(`   📍 Groups for Account ${accountNumber}: ${accountGroupNames.join(', ')}`);
+    console.log(`   📍 Groups for Account ${accountNumber}: ${accountGroupNames.join(', ') || 'ไม่มีกลุ่มที่ลงทะเบียน'}`);
+    
+    // If no groups registered, show all bets (fallback)
+    const useAllBets = accountGroupNames.length === 0;
+    if (useAllBets) {
+      console.log(`   ⚠️  ไม่มีกลุ่มที่ลงทะเบียน จะแสดงเบตทั้งหมด`);
+    }
     
     // Parse all bets (skip header)
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
-      // Column N (index 13) = ชื่อกลุ่มแชท
+      // Column O (index 14) = ชื่อกลุ่มแชท
       let rowGroupName = '';
-      if (row.length > 13) {
-        rowGroupName = row[13] || '';
+      if (row.length > 14) {
+        rowGroupName = row[14] || '';
       }
       
       if (i <= 3) {
-        console.log(`   Row ${i}: length=${row.length}, col13="${rowGroupName}"`);
+        console.log(`   Row ${i}: length=${row.length}, col14="${rowGroupName}"`);
       }
       
-      // Only include bets from groups in this account
-      if (!accountGroupNames.includes(rowGroupName)) {
+      // Only include bets from groups in this account (or all if no groups registered)
+      if (!useAllBets && !accountGroupNames.includes(rowGroupName)) {
         continue;
       }
       
@@ -715,8 +721,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         resultA: resultA,
         resultB: resultB,
         userB: row[11],
-        userBName: row[11],
-        betTypeB: row[12],
+        userBName: row[12],
+        betTypeB: row[13],
         groupName: rowGroupName
       });
     }
@@ -1499,7 +1505,31 @@ app.post('/webhook', async (req, res) => {
         if (message.content.toLowerCase().includes('สรุปยอดแทง')) {
           console.log(`📋 Summary command detected`);
           const summary = await generateBettingSummary(message.groupId, message.sourceType, accountNumber);
-          await sendLineMessage(message.groupId, summary, accessToken);
+          
+          // LINE has a 5000 character limit per message, so split if needed
+          const maxLength = 4000;
+          if (summary.length > maxLength) {
+            const parts = [];
+            let currentPart = '';
+            const lines = summary.split('\n');
+            
+            for (const line of lines) {
+              if ((currentPart + line + '\n').length > maxLength) {
+                if (currentPart) parts.push(currentPart);
+                currentPart = line + '\n';
+              } else {
+                currentPart += line + '\n';
+              }
+            }
+            if (currentPart) parts.push(currentPart);
+            
+            console.log(`   📤 Sending ${parts.length} message parts`);
+            for (const part of parts) {
+              await sendLineMessage(message.groupId, part, accessToken);
+            }
+          } else {
+            await sendLineMessage(message.groupId, summary, accessToken);
+          }
           console.log(`✅ Summary sent`);
         } else {
           // Check if this is a result announcement
@@ -1523,6 +1553,11 @@ app.post('/webhook', async (req, res) => {
               console.log(`   ✅ จับคู่สำเร็จ ${matchedPairs.length} คู่`);
               
               // คำนวนแพ้ชนะและส่งข้อความให้ผู้เล่น
+              const groupSummaryParts = [];
+              let groupSummary = `📊 ประกาศผลแพ้ชนะ: ${resultData.fireworkName}\n`;
+              groupSummary += `ผลที่ออก: ${resultData.resultNumber} ${resultData.result}\n`;
+              groupSummary += `═══════════════════════════════════\n\n`;
+              
               for (const pair of matchedPairs) {
                 try {
                   // คำนวนแพ้ชนะ
@@ -1548,10 +1583,36 @@ app.post('/webhook', async (req, res) => {
                   console.log(`   📤 ส่งข้อความให้ ${pair.playerB.userAName}`);
                   await sendLineMessageToUser(pair.playerB.userA, resultMessages.messageB, accessToken);
                   
+                  // เพิ่มสรุปรายการเล่นเข้าไปในกลุ่ม
+                  const betAmount = pair.betAmount;
+                  let resultLine = '';
+                  
+                  if (winLoss.resultA === '✅') {
+                    resultLine = `✅ ${pair.playerA.userAName} ชนะ vs ${pair.playerB.userAName}\n`;
+                    resultLine += `   เดิมพัน: ${betAmount} บาท | ได้รับ: ${winLoss.winningsA.toFixed(0)} บาท\n`;
+                  } else if (winLoss.resultA === '❌') {
+                    resultLine = `❌ ${pair.playerB.userAName} ชนะ vs ${pair.playerA.userAName}\n`;
+                    resultLine += `   เดิมพัน: ${betAmount} บาท | ได้รับ: ${winLoss.winningsB.toFixed(0)} บาท\n`;
+                  } else {
+                    resultLine = `🤝 ${pair.playerA.userAName} vs ${pair.playerB.userAName} เสมอ\n`;
+                    resultLine += `   เดิมพัน: ${betAmount} บาท | ค่าธรรมเนียม: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n`;
+                  }
+                  
+                  groupSummary += resultLine;
+                  
                   console.log(`   ✅ ส่งข้อความสำเร็จ`);
                 } catch (pairError) {
                   console.error(`   ❌ ข้อผิดพลาด: ${pairError.message}`);
                 }
+              }
+              
+              // ส่งสรุปรายการเล่นเข้าไปในกลุ่มแชท
+              if (matchedPairs.length > 0) {
+                groupSummary += `═══════════════════════════════════\n`;
+                groupSummary += `📝 รวมทั้งสิ้น: ${matchedPairs.length} รายการ`;
+                
+                console.log(`   📤 ส่งสรุปรายการเล่นเข้าไปในกลุ่ม`);
+                await sendLineMessage(message.groupId, groupSummary, accessToken);
               }
               
               // Find matching bets (legacy)
