@@ -855,6 +855,38 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName) {
     });
     
     console.log(`   ✅ Row appended successfully to row ${nextRowIndex}`);
+    
+    // บันทึกข้อมูลผู้เล่น User A ถ้ายังไม่มี
+    console.log(`📝 Recording Player A to Players sheet...`);
+    try {
+      await _recordPlayerToSheetFromSlip(
+        googleAuth,
+        GOOGLE_SHEET_ID,
+        pair.userA,
+        userAName,
+        accessToken,
+        0 // ไม่เพิ่มยอดเงิน เพราะเป็นการเดิมพัน
+      );
+      console.log(`   ✅ Player A recorded`);
+    } catch (playerAError) {
+      console.error(`   ⚠️  Failed to record Player A: ${playerAError.message}`);
+    }
+    
+    // บันทึกข้อมูลผู้เล่น User B ถ้ายังไม่มี
+    console.log(`📝 Recording Player B to Players sheet...`);
+    try {
+      await _recordPlayerToSheetFromSlip(
+        googleAuth,
+        GOOGLE_SHEET_ID,
+        pair.userB,
+        userBName,
+        accessToken,
+        0 // ไม่เพิ่มยอดเงิน เพราะเป็นการเดิมพัน
+      );
+      console.log(`   ✅ Player B recorded`);
+    } catch (playerBError) {
+      console.error(`   ⚠️  Failed to record Player B: ${playerBError.message}`);
+    }
   } catch (error) {
     console.error('❌ Failed to append to Google Sheets:', error.message);
   }
@@ -1287,7 +1319,7 @@ app.post('/webhook', async (req, res) => {
                   const betAmount = extractBetAmount(message.content);
                   const fireworkName = extractFireworkName(message.content);
                   
-                  if (betAmount > 0) {
+                  if (betAmount > 0 && fireworkName) {
                     console.log(`🔍 Looking for matching players for firework: ${fireworkName}`);
                     
                     // ดึงข้อมูลการเดิมพันทั้งหมดจาก Google Sheets
@@ -1342,15 +1374,17 @@ app.post('/webhook', async (req, res) => {
                         console.log(`🎯 Auto-matching with user: ${matchedBet.userA}`);
                         console.log(`   Final bet amount: ${finalBetAmount} บาท`);
                         
-                        // บันทึกการเดิมพันใหม่ (ผู้เล่นปัจจุบัน vs ผู้เล่นที่จับคู่)
+                        // บันทึกการเดิมพันใหม่ (ผู้เล่นที่จับคู่ vs ผู้เล่นปัจจุบัน)
                         const groupName = await getLineGroupName(message.groupId, accessToken);
                         const matchedUserName = await getLineUserProfile(matchedBet.userA, accessToken);
                         
                         const pair = {
                           userA: matchedBet.userA,
                           messageA: `${fireworkName} ${matchedBet.betTypeA} ${matchedBet.amountA}`,
+                          timestampA: Date.now(),
                           userB: message.userId,
                           messageB: message.content,
+                          timestampB: message.timestamp,
                           groupId: message.groupId
                         };
                         
@@ -1648,6 +1682,11 @@ async function initializeSheets() {
 
 async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, amount) {
   try {
+    console.log(`📝 _recordPlayerToSheetFromSlip called:`);
+    console.log(`   userId: ${userId}`);
+    console.log(`   lineUserName: ${lineUserName}`);
+    console.log(`   amount: ${amount}`);
+    
     const sheets = google.sheets('v4');
 
     // ตรวจสอบว่าผู้เล่นมีอยู่แล้วหรือไม่
@@ -1668,6 +1707,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
         playerRowIndex = i + 1;
         currentBalance = parseFloat(rows[i][4]) || 0;
         totalDeposits = parseFloat(rows[i][5]) || 0;
+        console.log(`   Found player at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
         break;
       }
     }

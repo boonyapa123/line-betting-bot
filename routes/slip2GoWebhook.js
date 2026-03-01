@@ -112,6 +112,23 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
             dateTime
           );
 
+          // บันทึกลงชีท Slip Verification
+          console.log(`📝 บันทึกลงชีท Slip Verification...`);
+          await _recordSlipVerificationToSheet(
+            googleAuth,
+            googleSheetId,
+            userId,
+            lineUserName,
+            accessToken,
+            amount,
+            slipId,
+            referenceId,
+            transRef,
+            dateTime,
+            receiver,
+            sender
+          );
+
           // ส่ง automessage ไปที่ LINE OA
           console.log(`📤 ส่ง automessage ไปที่ LINE OA...`);
           const automessage = `✅ ตรวจสอบสลิปสำเร็จ\n\n` +
@@ -157,6 +174,11 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
  */
 async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, lineUserName, accessToken, amount) {
   try {
+    console.log(`📝 _recordPlayerToSheet called:`);
+    console.log(`   userId: ${userId}`);
+    console.log(`   lineUserName: ${lineUserName}`);
+    console.log(`   amount: ${amount}`);
+    
     const sheets = google.sheets('v4');
 
     // ตรวจสอบว่าผู้เล่นมีอยู่แล้วหรือไม่
@@ -177,6 +199,7 @@ async function _recordPlayerToSheet(googleAuth, googleSheetId, userId, lineUserN
         playerRowIndex = i + 1;
         currentBalance = parseFloat(rows[i][4]) || 0;
         totalDeposits = parseFloat(rows[i][5]) || 0;
+        console.log(`   Found player at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
         break;
       }
     }
@@ -445,6 +468,85 @@ async function getLineUserProfile(userId, accessToken) {
       })
       .end();
   });
+}
+
+/**
+ * บันทึกข้อมูลสลิปลงชีท Slip Verification
+ * @private
+ */
+async function _recordSlipVerificationToSheet(
+  googleAuth,
+  googleSheetId,
+  userId,
+  lineUserName,
+  accessToken,
+  amount,
+  slipId,
+  referenceId,
+  transRef,
+  dateTime,
+  receiver,
+  sender
+) {
+  try {
+    const sheets = google.sheets('v4');
+
+    // ดึงจำนวนแถวปัจจุบัน
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `'Slip Verification'!A:A`,
+    });
+
+    const rows = response.data.values || [];
+    const nextRowIndex = rows.length + 1;
+
+    const now = new Date();
+    const dateStr = now.toLocaleString('th-TH', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    const timeStr = now.toLocaleString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const slipVerificationRow = [
+      `${dateStr} ${timeStr}`,           // A: วันที่บันทึก
+      referenceId || slipId || '',       // B: Reference ID
+      transRef || '',                    // C: Transaction Ref
+      amount,                            // D: จำนวนเงิน
+      dateTime || dateStr,               // E: วันที่โอน
+      sender?.name || '',                // F: ชื่อผู้ส่ง
+      sender?.accountNumber || '',       // G: บัญชีผู้ส่ง
+      sender?.bank?.name || '',          // H: ธนาคารผู้ส่ง
+      receiver?.name || '',              // I: ชื่อผู้รับ
+      receiver?.accountNumber || '',     // J: บัญชีผู้รับ
+      receiver?.bank?.name || '',        // K: ธนาคารผู้รับ
+      'verified',                        // L: สถานะ
+      lineUserName,                      // M: ชื่อ LINE
+      accessToken,                       // N: Access Token
+    ];
+
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth,
+      spreadsheetId: googleSheetId,
+      range: `'Slip Verification'!A${nextRowIndex}:N${nextRowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [slipVerificationRow],
+      },
+    });
+
+    console.log(`   ✅ บันทึก Slip Verification สำเร็จ`);
+  } catch (error) {
+    console.error(`   ❌ ข้อผิดพลาด: ${error.message}`);
+    throw error;
+  }
 }
 
 module.exports = createSlip2GoWebhookRouter;
