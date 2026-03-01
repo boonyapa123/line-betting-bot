@@ -1434,6 +1434,50 @@ app.post('/webhook', async (req, res) => {
                   betAmount: extractBetAmount(pair.messageB)
                 };
                 
+                console.log(`   🎯 Bet Details A: firework=${betDetailsA.fireworkName}, type=${betDetailsA.betType}, amount=${betDetailsA.betAmount}`);
+                console.log(`   🎯 Bet Details B: firework=${betDetailsB.fireworkName}, type=${betDetailsB.betType}, amount=${betDetailsB.betAmount}`);
+                
+                // ตรวจสอบว่าชื่อบั้งไฟตรงกันหรือไม่
+                if (!betDetailsA.fireworkName || !betDetailsB.fireworkName) {
+                  console.log(`❌ Missing firework name in one or both messages`);
+                  return;
+                }
+                
+                if (betDetailsA.fireworkName !== betDetailsB.fireworkName) {
+                  console.log(`❌ Firework names don't match: "${betDetailsA.fireworkName}" vs "${betDetailsB.fireworkName}"`);
+                  return;
+                }
+                
+                console.log(`✅ Firework names match: "${betDetailsA.fireworkName}"`);
+                
+                // ตรวจสอบว่าประเภทเดิมพันตรงข้ามกันหรือไม่
+                if (!betDetailsA.betType || !betDetailsB.betType) {
+                  console.log(`❌ Missing bet type in one or both messages`);
+                  return;
+                }
+                
+                // ตรวจสอบว่าประเภทตรงข้ามกัน (✅ vs ❌ หรือ ต่ำ vs สูง)
+                const isOpposite = (typeA, typeB) => {
+                  const opposites = {
+                    '✅': '❌',
+                    '❌': '✅',
+                    'ต่ำ/ยั่ง': 'สูง/ไล่',
+                    'สูง/ไล่': 'ต่ำ/ยั่ง',
+                    'ถอย': 'ยั้ง',
+                    'ยั้ง': 'ถอย',
+                    'ล่าง': 'บน',
+                    'บน': 'ล่าง'
+                  };
+                  return opposites[typeA] === typeB;
+                };
+                
+                if (!isOpposite(betDetailsA.betType, betDetailsB.betType)) {
+                  console.log(`❌ Bet types are not opposite: "${betDetailsA.betType}" vs "${betDetailsB.betType}"`);
+                  return;
+                }
+                
+                console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${betDetailsB.betType}"`);
+                
                 // Validate betting limits
                 const betAmount = Math.max(betDetailsA.betAmount || 0, betDetailsB.betAmount || 0);
                 let validationResult = { valid: true, message: 'OK' };
@@ -1490,42 +1534,17 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending insufficient balance message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                   }
-                } else if (bettingLimitValidator) {
-                  validationResult = bettingLimitValidator.validateBet({
-                    amount: betAmount,
-                    bettingType: betDetailsA.betType,
-                    playerBalance: userABalance || 999999,
-                    totalAmount: 0
-                  });
+                } else {
+                  // ยอดเงินเพียงพอ บันทึกการเดิมพัน
+                  console.log(`✅ Balance sufficient for both players`);
+                  console.log(`   📝 Recording bet to Bets sheet...`);
                   
-                  if (!validationResult.valid) {
-                    console.log(`❌ Betting limit validation failed: ${validationResult.message}`);
-                    console.log(`   📱 Sending error via LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
-                    const errorMessage = `❌ ${validationResult.message}`;
-                    await sendLineMessage(message.groupId, errorMessage, accessToken);
-                    
-                    // Send generic error to both users
-                    const userADetailMessage = `❌ ข้อผิดพลาด\n\n` +
-                      `ชื่อ: ${userAName}\n` +
-                      `ข้อความ: ${pair.messageA}\n\n` +
-                      `${validationResult.message}`;
-                    const userBDetailMessage = `❌ ข้อผิดพลาด\n\n` +
-                      `ชื่อ: ${userBName}\n` +
-                      `ข้อความ: ${pair.messageB}\n\n` +
-                      `${validationResult.message}`;
-                    
-                    console.log(`   📤 Sending error message to ${userAName} and ${userBName}`);
-                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
-                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
-                  } else {
-                    // Record to Google Sheets
+                  try {
                     await appendToGoogleSheets(pair, userAName, userBName, groupName);
                     console.log(`✅ Pair recorded successfully`);
+                  } catch (recordError) {
+                    console.error(`❌ Failed to record pair: ${recordError.message}`);
                   }
-                } else {
-                  // Record to Google Sheets (no validator)
-                  await appendToGoogleSheets(pair, userAName, userBName, groupName);
-                  console.log(`✅ Pair recorded successfully`);
                 }
               } else {
                 console.log(`⏭️  No pair detected (waiting for reply)`);
