@@ -49,7 +49,7 @@ class AutoMatchingService {
             betTypeA: row[5],
             amountA: parseFloat(row[6]) || 0,
             userB: row[11],
-            userBName: row[12],
+            userBName: row[11],
             betTypeB: row[13],
             amountB: parseFloat(row[7]) || 0,
           });
