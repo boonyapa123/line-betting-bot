@@ -1313,9 +1313,6 @@ app.post('/webhook', async (req, res) => {
                   const errorMessage = `❌ ${validationResult.message}`;
                   await sendLineMessage(message.groupId, errorMessage, accessToken);
                   
-                  // Use Registration Bot (Secondary Account) for insufficient balance notifications
-                  const registrationBotToken = LINE_CHANNEL_ACCESS_TOKEN_2;
-                  
                   // Check if it's insufficient balance error
                   if (validationResult.message.includes('ยอดเงินไม่เพียงพอ')) {
                     // Send detailed message to User A if balance is insufficient
@@ -1325,9 +1322,11 @@ app.post('/webhook', async (req, res) => {
                         `ข้อความ: ${pair.messageA}\n` +
                         `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
                         `ต้องการ: ${betAmount} บาท\n` +
-                        `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท`;
-                      console.log(`   📤 Sending insufficient balance message to ${userAName} via Registration Bot`);
-                      await sendLineMessageToUser(pair.userA, userADetailMessage, registrationBotToken);
+                        `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท\n\n` +
+                        `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
+                        `https://line.me/ti/p/2009197430`;
+                      console.log(`   📤 Sending insufficient balance message to ${userAName}`);
+                      await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                     }
                     
                     // Send detailed message to User B if balance is insufficient
@@ -1337,9 +1336,11 @@ app.post('/webhook', async (req, res) => {
                         `ข้อความ: ${pair.messageB}\n` +
                         `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
                         `ต้องการ: ${betAmount} บาท\n` +
-                        `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท`;
-                      console.log(`   📤 Sending insufficient balance message to ${userBName} via Registration Bot`);
-                      await sendLineMessageToUser(pair.userB, userBDetailMessage, registrationBotToken);
+                        `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท\n\n` +
+                        `💳 เพิ่มเพื่อน @774pojob เพื่อฝากเงิน\n` +
+                        `https://line.me/ti/p/2009197430`;
+                      console.log(`   📤 Sending insufficient balance message to ${userBName}`);
+                      await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                     }
                   } else {
                     // Send generic error to both users
