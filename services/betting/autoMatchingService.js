@@ -209,64 +209,81 @@ class AutoMatchingService {
    * @param {Object} winLoss - ผลการคำนวนแพ้ชนะ
    * @returns {Object} ข้อความสำหรับผู้เล่นทั้งสอง
    */
-  createResultMessage(pair, winLoss) {
-    const betAmount = pair.betAmount;
-    const fireworkName = pair.playerA.messageA.split(' ')[0] || 'บั้งไฟ';
+  /**
+     * สร้างข้อความแจ้งผลแพ้ชนะ
+     * @param {Object} pair - ข้อมูลคู่เล่น
+     * @param {Object} winLoss - ผลการคำนวนแพ้ชนะ
+     * @param {Object} balances - ยอดเงินหลังการเล่น {userA: balance, userB: balance}
+     * @returns {Object} ข้อความสำหรับผู้เล่นทั้งสอง
+     */
+    createResultMessage(pair, winLoss, balances = {}) {
+      const betAmount = pair.betAmount;
+      const fireworkName = pair.playerA.messageA.split(' ')[0] || 'บั้งไฟ';
 
-    let messageA, messageB;
+      // ใช้ยอดเงินที่ส่งมา หรือคำนวนจากยอดเดิม
+      const balanceA = balances.userA !== undefined ? balances.userA : (pair.balanceA + winLoss.winningsA);
+      const balanceB = balances.userB !== undefined ? balances.userB : (pair.balanceB + winLoss.winningsB);
 
-    if (winLoss.resultA === '✅') {
-      // User A ชนะ
-      messageA = `✅ ชนะแล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `🏆 ได้รับ: ${winLoss.winningsA.toFixed(0)} บาท\n` +
-        `👤 ผู้แพ้: ${pair.playerB.userAName}\n\n` +
-        `ยินดีด้วย! 🎉`;
+      let messageA, messageB;
 
-      messageB = `❌ แพ้แล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 เสีย: ${Math.abs(winLoss.winningsB).toFixed(0)} บาท\n` +
-        `👤 ผู้ชนะ: ${pair.playerA.userAName}\n\n` +
-        `ลองใหม่นะ 💪`;
-    } else if (winLoss.resultA === '❌') {
-      // User A แพ้
-      messageA = `❌ แพ้แล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 เสีย: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n` +
-        `👤 ผู้ชนะ: ${pair.playerB.userAName}\n\n` +
-        `ลองใหม่นะ 💪`;
+      if (winLoss.resultA === '✅') {
+        // User A ชนะ
+        messageA = `✅ ชนะแล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `🏆 ได้รับ: ${winLoss.winningsA.toFixed(0)} บาท\n` +
+          `👤 ผู้แพ้: ${pair.playerB.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceA.toFixed(0)} บาท\n\n` +
+          `ยินดีด้วย! 🎉`;
 
-      messageB = `✅ ชนะแล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `🏆 ได้รับ: ${winLoss.winningsB.toFixed(0)} บาท\n` +
-        `👤 ผู้แพ้: ${pair.playerA.userAName}\n\n` +
-        `ยินดีด้วย! 🎉`;
-    } else {
-      // เสมอ
-      messageA = `⛔️ เสมอ\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n` +
-        `👤 คู่แข่ง: ${pair.playerB.userAName}\n\n` +
-        `ผลเสมอ 🤝`;
+        messageB = `❌ แพ้แล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 เสีย: ${Math.abs(winLoss.winningsB).toFixed(0)} บาท\n` +
+          `👤 ผู้ชนะ: ${pair.playerA.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceB.toFixed(0)} บาท\n\n` +
+          `ลองใหม่นะ 💪`;
+      } else if (winLoss.resultA === '❌') {
+        // User A แพ้
+        messageA = `❌ แพ้แล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 เสีย: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n` +
+          `👤 ผู้ชนะ: ${pair.playerB.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceA.toFixed(0)} บาท\n\n` +
+          `ลองใหม่นะ 💪`;
 
-      messageB = `⛔️ เสมอ\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsB).toFixed(0)} บาท\n` +
-        `👤 คู่แข่ง: ${pair.playerA.userAName}\n\n` +
-        `ผลเสมอ 🤝`;
+        messageB = `✅ ชนะแล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `🏆 ได้รับ: ${winLoss.winningsB.toFixed(0)} บาท\n` +
+          `👤 ผู้แพ้: ${pair.playerA.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceB.toFixed(0)} บาท\n\n` +
+          `ยินดีด้วย! 🎉`;
+      } else {
+        // เสมอ
+        messageA = `⛔️ เสมอ\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n` +
+          `👤 คู่แข่ง: ${pair.playerB.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceA.toFixed(0)} บาท\n\n` +
+          `ผลเสมอ 🤝`;
+
+        messageB = `⛔️ เสมอ\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsB).toFixed(0)} บาท\n` +
+          `👤 คู่แข่ง: ${pair.playerA.userAName}\n` +
+          `💳 ยอดเงินคงเหลือ: ${balanceB.toFixed(0)} บาท\n\n` +
+          `ผลเสมอ 🤝`;
+      }
+
+      return {
+        messageA,
+        messageB,
+      };
     }
-
-    return {
-      messageA,
-      messageB,
-    };
-  }
 
   /**
    * สร้างข้อความแจ้งยอดเงินไม่เพียงพอ

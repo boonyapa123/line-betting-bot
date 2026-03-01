@@ -406,13 +406,19 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       await updatePlayerBalance(userBId, userBName, userBWinnings);
     }
     
-    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง (เฉพาะที่มีคู่เล่น)
+    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
     
-    // ตรวจสอบว่ามีคู่เล่น (User B) หรือไม่
-    if (!userBId || !userBName) {
-      console.log(`   ⚠️  No opponent found, skipping message to User B`);
-      return;
+    // ดึงยอดเงินคงเหลือใหม่ของผู้เล่น
+    let userANewBalance = 0;
+    let userBNewBalance = 0;
+    
+    if (userAId && userAName) {
+      userANewBalance = await getPlayerBalance(userAId, userAName);
+    }
+    
+    if (userBId && userBName) {
+      userBNewBalance = await getPlayerBalance(userBId, userBName);
     }
     
     if (resultSymbol === '✅') {
@@ -421,54 +427,78 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         `🎆 บั้งไฟ: ${fireworkName}\n` +
         `💰 เดิมพัน: ${betAmount} บาท\n` +
         `🏆 ได้รับ: ${userAWinnings.toFixed(0)} บาท\n` +
-        `👤 ผู้แพ้: ${userBName}\n\n` +
+        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
+        `${userBName ? `👤 ผู้แพ้: ${userBName}\n\n` : ''}\n` +
         `ยินดีด้วย! 🎉`;
       
-      const messageB = `❌ แพ้แล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
-        `👤 ผู้ชนะ: ${userAName}\n\n` +
-        `ลองใหม่นะ 💪`;
+      if (userAId && userAName) {
+        await sendLineMessageToUser(userAId, messageA, accessToken);
+      }
       
-      await sendLineMessageToUser(userAId, messageA, accessToken);
-      await sendLineMessageToUser(userBId, messageB, accessToken);
+      // ส่งข้อความให้ User B ถ้ามี
+      if (userBId && userBName) {
+        const messageB = `❌ แพ้แล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
+          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
+          `👤 ผู้ชนะ: ${userAName}\n\n` +
+          `ลองใหม่นะ 💪`;
+        
+        await sendLineMessageToUser(userBId, messageB, accessToken);
+      }
     } else if (resultSymbol === '❌') {
       // User A แพ้
       const messageA = `❌ แพ้แล้ว\n\n` +
         `🎆 บั้งไฟ: ${fireworkName}\n` +
         `💰 เดิมพัน: ${betAmount} บาท\n` +
         `💸 เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
-        `👤 ผู้ชนะ: ${userBName}\n\n` +
+        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
+        `${userBName ? `👤 ผู้ชนะ: ${userBName}\n\n` : ''}\n` +
         `ลองใหม่นะ 💪`;
       
-      const messageB = `✅ ชนะแล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n` +
-        `👤 ผู้แพ้: ${userAName}\n\n` +
-        `ยินดีด้วย! 🎉`;
+      if (userAId && userAName) {
+        await sendLineMessageToUser(userAId, messageA, accessToken);
+      }
       
-      await sendLineMessageToUser(userAId, messageA, accessToken);
-      await sendLineMessageToUser(userBId, messageB, accessToken);
+      // ส่งข้อความให้ User B ถ้ามี
+      if (userBId && userBName) {
+        const messageB = `✅ ชนะแล้ว\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n` +
+          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
+          `👤 ผู้แพ้: ${userAName}\n\n` +
+          `ยินดีด้วย! 🎉`;
+        
+        await sendLineMessageToUser(userBId, messageB, accessToken);
+      }
     } else {
       // เสมอ
       const messageA = `⛔️ เสมอ\n\n` +
         `🎆 บั้งไฟ: ${fireworkName}\n` +
         `💰 เดิมพัน: ${betAmount} บาท\n` +
         `💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
-        `👤 คู่แข่ง: ${userBName}\n\n` +
+        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
+        `${userBName ? `👤 คู่แข่ง: ${userBName}\n\n` : ''}\n` +
         `ผลเสมอ 🤝`;
       
-      const messageB = `⛔️ เสมอ\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
-        `👤 คู่แข่ง: ${userAName}\n\n` +
-        `ผลเสมอ 🤝`;
+      if (userAId && userAName) {
+        await sendLineMessageToUser(userAId, messageA, accessToken);
+      }
       
-      await sendLineMessageToUser(userAId, messageA, accessToken);
-      await sendLineMessageToUser(userBId, messageB, accessToken);
+      // ส่งข้อความให้ User B ถ้ามี
+      if (userBId && userBName) {
+        const messageB = `⛔️ เสมอ\n\n` +
+          `🎆 บั้งไฟ: ${fireworkName}\n` +
+          `💰 เดิมพัน: ${betAmount} บาท\n` +
+          `💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
+          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
+          `👤 คู่แข่ง: ${userAName}\n\n` +
+          `ผลเสมอ 🤝`;
+        
+        await sendLineMessageToUser(userBId, messageB, accessToken);
+      }
     }
     
     console.log(`   ✅ Result messages sent successfully`);
@@ -497,24 +527,49 @@ async function updatePlayerBalance(userId, userName, winnings) {
     let playerRowIndex = -1;
     let currentBalance = 0;
     
-    // ค้นหาผู้เล่นตามชื่อหรือ Linked IDs
+    // 🎯 ค้นหาตามชื่อ LINE เป็นหลัก
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
       
       const playerName = row[0] || '';
-      const linkedIds = row[1] ? JSON.parse(row[1]) : [];
       const balance = parseFloat(row[3]) || 0;
       
-      if (playerName === userName || linkedIds.includes(userId)) {
+      // ตรวจสอบชื่อ LINE ก่อน
+      if (playerName === userName) {
         playerRowIndex = i + 1;
         currentBalance = balance;
+        console.log(`      🔍 Found player by LINE name: ${playerName}`);
         break;
       }
     }
     
+    // ถ้าไม่พบตามชื่อ ค่อยค้นหาจาก Linked IDs
+    if (playerRowIndex === -1) {
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row) continue;
+        
+        const playerName = row[0] || '';
+        const linkedIdsStr = row[1] || '';
+        const balance = parseFloat(row[3]) || 0;
+        
+        try {
+          const linkedIds = JSON.parse(linkedIdsStr);
+          if (Array.isArray(linkedIds) && linkedIds.includes(userId)) {
+            playerRowIndex = i + 1;
+            currentBalance = balance;
+            console.log(`      🔍 Found player by Linked ID: ${playerName}`);
+            break;
+          }
+        } catch (e) {
+          // ถ้า parse ไม่ได้ ให้ข้ามไป
+        }
+      }
+    }
+    
     if (playerRowIndex > 0) {
-      const newBalance = currentBalance + winnings;
+      const newBalance = Math.max(0, currentBalance + winnings); // ไม่ให้ยอดเงินติดลบ
       
       // อัปเดตยอดเงิน
       await sheets.spreadsheets.values.update({
@@ -529,7 +584,7 @@ async function updatePlayerBalance(userId, userName, winnings) {
       
       console.log(`      ✅ Balance updated: ${currentBalance} → ${newBalance} บาท`);
     } else {
-      console.log(`      ⚠️  Player not found in Players sheet`);
+      console.log(`      ⚠️  Player not found in Players sheet (name: ${userName}, userId: ${userId})`);
     }
   } catch (error) {
     console.error(`      ❌ Error updating balance: ${error.message}`);
@@ -1476,8 +1531,14 @@ app.post('/webhook', async (req, res) => {
                   // อัปเดตผลลัพธ์
                   await matchingService.updateResultAndBalance(pair, winLoss);
                   
-                  // สร้างข้อความแจ้งผล
-                  const resultMessages = matchingService.createResultMessage(pair, winLoss);
+                  // คำนวนยอดเงินหลังการเล่น
+                  const updatedBalances = {
+                    userA: pair.balanceA + winLoss.winningsA,
+                    userB: pair.balanceB + winLoss.winningsB
+                  };
+                  
+                  // สร้างข้อความแจ้งผล พร้อมยอดเงินคงเหลือ
+                  const resultMessages = matchingService.createResultMessage(pair, winLoss, updatedBalances);
                   
                   // ส่งข้อความให้ผู้เล่น A
                   console.log(`   📤 ส่งข้อความให้ ${pair.playerA.userAName}`);
