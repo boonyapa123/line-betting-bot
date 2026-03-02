@@ -134,11 +134,15 @@ class BettingPairingService {
         // ตรวจสอบว่าเป็นคู่หรือไม่
         let isValid = false;
 
-        // Reply Method: ตรวจสอบ 2 เงื่อนไข
-        if (bet1.method === 'REPLY' && bet2.method === 'REPLY') {
-          isValid = this.isValidReplyPair(bet1, bet2);
+        // วิธีที่ 1: Direct + Reply Method
+        if (bet1.method !== 'REPLY' && bet2.method === 'REPLY') {
+          isValid = this.isValidDirectReplyPair(bet1, bet2);
         }
-        // Direct Method: ตรวจสอบ 4 เงื่อนไข
+        // วิธีที่ 1 (สลับ): Reply + Direct Method
+        else if (bet1.method === 'REPLY' && bet2.method !== 'REPLY') {
+          isValid = this.isValidDirectReplyPair(bet2, bet1);
+        }
+        // วิธีที่ 2: Direct + Direct Method
         else if (bet1.method !== 'REPLY' && bet2.method !== 'REPLY') {
           isValid = this.isValidDirectPair(bet1, bet2);
         }
@@ -162,6 +166,41 @@ class BettingPairingService {
    * ตรวจสอบว่าเป็นคู่ Reply ที่ถูกต้องหรือไม่
    * @private
    */
+  /**
+   * ตรวจสอบคู่ Direct + Reply Method
+   * Direct bet ต้องจับคู่กับ Reply bet ที่ฝั่งตรงข้าม
+   * @private
+   */
+  static isValidDirectReplyPair(directBet, replyBet) {
+    // 1. ชื่อบั้งไฟต้องเดียวกัน
+    if (directBet.slipName !== replyBet.slipName) return false;
+
+    // 2. จำนวนเงินต้องเดียวกัน
+    if (directBet.amount !== replyBet.amount) return false;
+
+    // 3. ฝั่ง Reply ต้องเป็นฝั่งตรงข้าม
+    // directBet มีฝั่งที่ชัดเจน (ชล/ชถ/ล/ย)
+    // replyBet (ต) ต้องแปลงเป็นฝั่งตรงข้าม
+    const oppositeMap = {
+      'ชล': 'ชถ',
+      'ชถ': 'ชล',
+      'ล': 'ย',
+      'ย': 'ล',
+    };
+
+    // ถ้า directBet เป็น ชล แล้ว replyBet ต้องเป็น ชถ
+    const expectedReplyBetSide = oppositeMap[directBet.side];
+    
+    // replyBet.side จะเป็น 'ต' (ตอบ) ต้องแปลงเป็นฝั่งตรงข้าม
+    if (replyBet.side !== 'ต') return false;
+
+    // ตั้งค่า replyBet.side เป็นฝั่งตรงข้าม
+    replyBet.side = expectedReplyBetSide;
+    replyBet.sideCode = expectedReplyBetSide;
+
+    return true;
+  }
+
   static isValidReplyPair(bet1, bet2) {
     // ต้องเป็นบั้งไฟเดียวกัน
     if (bet1.slipName !== bet2.slipName) return false;
@@ -177,13 +216,10 @@ class BettingPairingService {
    * @private
    */
   static isValidDirectPair(bet1, bet2) {
-    // ต้องเป็นบั้งไฟเดียวกัน
+    // 1. ต้องเป็นบั้งไฟเดียวกัน
     if (bet1.slipName !== bet2.slipName) return false;
 
-    // ต้องเป็นจำนวนเงินเดียวกัน
-    if (bet1.amount !== bet2.amount) return false;
-
-    // ต้องเป็นฝั่งตรงข้าม
+    // 2. ต้องเป็นฝั่งตรงข้าม
     const oppositeMap = {
       'ชล': 'ชถ',
       'ชถ': 'ชล',
@@ -193,10 +229,13 @@ class BettingPairingService {
 
     if (oppositeMap[bet1.side] !== bet2.side) return false;
 
-    // วิธีที่ 2 ต้องมีราคาเดียวกัน
+    // 3. วิธีที่ 2 ต้องมีราคาเดียวกัน
     if (bet1.method === 2 && bet2.method === 2) {
       if (bet1.price !== bet2.price) return false;
     }
+
+    // 4. จำนวนเงินสามารถต่างกันได้ (ใช้ยอดน้อยกว่า)
+    // ไม่ต้องตรวจสอบว่าเท่ากัน เพราะจะคำนวณจากยอดน้อยกว่า
 
     return true;
   }
@@ -234,11 +273,14 @@ class BettingPairingService {
     // Direct Method
     let winner = null;
     let loser = null;
+    let betAmount = 0; // ใช้ยอดน้อยกว่า
 
     if (bet1.method === 1) {
       // วิธีที่ 1: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
       winner = bet1.side === 'ชล' ? bet1 : bet2;
       loser = bet1.side === 'ชล' ? bet2 : bet1;
+      // ใช้ยอดน้อยกว่า
+      betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
     } else if (bet1.method === 2) {
       // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
       const priceRange = this.parsePriceRange(bet1.price);
@@ -253,19 +295,21 @@ class BettingPairingService {
         winner = bet1.side === 'ยั้ง' ? bet1 : bet2;
         loser = bet1.side === 'ยั้ง' ? bet2 : bet1;
       }
+      // ใช้ยอดน้อยกว่า
+      betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
     }
 
     return {
       winner: {
         userId: winner.userId,
         displayName: winner.displayName,
-        amount: winner.amount || 0,
+        amount: betAmount,
         result: 'WIN',
       },
       loser: {
         userId: loser.userId,
         displayName: loser.displayName,
-        amount: loser.amount || 0,
+        amount: betAmount,
         result: 'LOSE',
       },
     };

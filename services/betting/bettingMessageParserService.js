@@ -8,17 +8,25 @@
 class BettingMessageParserService {
   /**
    * Regex Pattern สำหรับวิธีที่ 1 (ราคาช่าง)
-   * รูปแบบ: [ชื่อบั้งไฟ] [ชล./ชถ.] [ยอดเงิน]
+   * รูปแบบเดิม: [ชื่อบั้งไฟ] [ชล./ชถ.] [ยอดเงิน]
    * ตัวอย่าง: "ฟ้าหลังฝน ชล. 500"
+   * 
+   * รูปแบบใหม่: [ชล/ชถ/ชย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "ชล 500 ฟ้าหลังฝน" หรือ "ชย 500 ฟ้าหลังฝน"
    */
   static METHOD1_PATTERN = /^(.+?)\s+(ชล\.|ชถ\.)\s+(\d+)$/;
+  static METHOD1_ALT_PATTERN = /^(ชล|ชถ|ชย)\s+(\d+)\s+(.+)$/;
 
   /**
    * Regex Pattern สำหรับวิธีที่ 2 (ราคาคะแนน)
-   * รูปแบบ: [ราคา] [ล./ย.] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * รูปแบบเดิม: [ราคา] [ล./ย.] [ยอดเงิน] [ชื่อบั้งไฟ]
    * ตัวอย่าง: "0/3(300-330) ล. 500 ฟ้าหลังฝน"
+   * 
+   * รูปแบบใหม่: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "0/3(300-330) ล 500 ฟ้าหลังฝน"
    */
   static METHOD2_PATTERN = /^(.+?)\s+([ลย]\.)\s+(\d+)\s+(.+)$/;
+  static METHOD2_ALT_PATTERN = /^(.+?)\s+([ลย])\s+(\d+)\s+(.+)$/;
 
   /**
    * Parse ข้อความเล่น
@@ -28,16 +36,28 @@ class BettingMessageParserService {
   static parseMessage(message) {
     const trimmedMessage = message.trim();
 
-    // ตรวจสอบวิธีที่ 1 (ราคาช่าง)
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบเดิม
     const method1Match = trimmedMessage.match(this.METHOD1_PATTERN);
     if (method1Match) {
       return this.parseMethod1(method1Match);
     }
 
-    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน)
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบใหม่
+    const method1AltMatch = trimmedMessage.match(this.METHOD1_ALT_PATTERN);
+    if (method1AltMatch) {
+      return this.parseMethod1Alt(method1AltMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบเดิม
     const method2Match = trimmedMessage.match(this.METHOD2_PATTERN);
     if (method2Match) {
       return this.parseMethod2(method2Match);
+    }
+
+    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบใหม่
+    const method2AltMatch = trimmedMessage.match(this.METHOD2_ALT_PATTERN);
+    if (method2AltMatch) {
+      return this.parseMethod2Alt(method2AltMatch);
     }
 
     // ไม่ตรงรูปแบบ
@@ -50,7 +70,7 @@ class BettingMessageParserService {
   }
 
   /**
-   * Parse วิธีที่ 1 (ราคาช่าง)
+   * Parse วิธีที่ 1 (ราคาช่าง) - รูปแบบเดิม
    * @private
    */
   static parseMethod1(match) {
@@ -69,7 +89,34 @@ class BettingMessageParserService {
   }
 
   /**
-   * Parse วิธีที่ 2 (ราคาคะแนน)
+   * Parse วิธีที่ 1 (ราคาช่าง) - รูปแบบใหม่
+   * รูปแบบ: [ชล/ชถ/ชย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "ชล 500 ฟ้าหลังฝน"
+   * @private
+   */
+  static parseMethod1Alt(match) {
+    const [, side, amount, slipName] = match;
+
+    const sideMap = {
+      'ชล': 'ไล่',
+      'ชถ': 'ถอย',
+      'ชย': 'ยั้ง',
+    };
+
+    return {
+      success: true,
+      method: 1,
+      slipName: slipName.trim(),
+      side: sideMap[side] || side,
+      sideCode: side,
+      amount: parseInt(amount),
+      price: null, // วิธีที่ 1 ไม่มีราคา
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Parse วิธีที่ 2 (ราคาคะแนน) - รูปแบบเดิม
    * @private
    */
   static parseMethod2(match) {
@@ -81,6 +128,32 @@ class BettingMessageParserService {
       price: price.trim(),
       side: side === 'ล.' ? 'ไล่' : 'ยั้ง', // ล. = ไล่, ย. = ยั้ง
       sideCode: side === 'ล.' ? 'ล' : 'ย',
+      amount: parseInt(amount),
+      slipName: slipName.trim(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Parse วิธีที่ 2 (ราคาคะแนน) - รูปแบบใหม่
+   * รูปแบบ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "0/3(300-330) ล 500 ฟ้าหลังฝน"
+   * @private
+   */
+  static parseMethod2Alt(match) {
+    const [, price, side, amount, slipName] = match;
+
+    const sideMap = {
+      'ล': 'ไล่',
+      'ย': 'ยั้ง',
+    };
+
+    return {
+      success: true,
+      method: 2,
+      price: price.trim(),
+      side: sideMap[side] || side,
+      sideCode: side,
       amount: parseInt(amount),
       slipName: slipName.trim(),
       timestamp: new Date().toISOString(),
@@ -183,6 +256,7 @@ class BettingMessageParserService {
 
   /**
    * ตรวจสอบว่าเป็น Reply Method หรือไม่
+   * Reply 'ต' จะแปลงเป็นฝั่งตรงข้ามตามบริบท
    * @param {string} message
    * @returns {object}
    */
@@ -194,7 +268,9 @@ class BettingMessageParserService {
       return {
         success: true,
         type: 'REPLY',
-        side: 'ต',
+        method: 'REPLY',
+        side: 'ต', // ฝั่ง reply (จะแปลงเป็นฝั่งตรงข้ามเมื่อจับคู่)
+        sideCode: 'ต',
         timestamp: new Date().toISOString(),
       };
     }
