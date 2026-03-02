@@ -1011,6 +1011,75 @@ const messageMap = new Map(); // messageId -> message data
 const recordedPairs = new Set();
 const unsendLog = new Map(); // messageId -> unsend details
 
+/**
+ * Re-process stored messages for a user after balance is updated
+ * Called when slip verification is successful
+ */
+async function reprocessStoredMessages(userId, userName, accessToken) {
+  console.log(`\n🔄 Re-processing stored messages for ${userName}...`);
+  
+  let reprocessedCount = 0;
+  
+  // Iterate through all stored messages
+  for (const [messageId, messageData] of messageMap.entries()) {
+    // Only process messages from this user
+    if (messageData.userId !== userId) {
+      continue;
+    }
+    
+    console.log(`   📨 Processing message: ${messageId}`);
+    console.log(`      Content: "${messageData.content}"`);
+    
+    try {
+      // Extract bet details
+      const betAmount = extractBetAmount(messageData.content);
+      
+      if (!betAmount || betAmount <= 0) {
+        console.log(`      ⏭️  Not a betting message (no amount)`);
+        continue;
+      }
+      
+      console.log(`      💰 Bet amount: ${betAmount} บาท`);
+      
+      // Check balance again
+      const playerBalanceData = await getPlayerBalance(userId, userName);
+      const playerBalance = playerBalanceData.balance;
+      const playerFound = playerBalanceData.found;
+      
+      console.log(`      ✅ Balance check: ${playerBalance} บาท (Found: ${playerFound})`);
+      
+      if (!playerFound) {
+        console.log(`      ⏭️  Player still not registered`);
+        continue;
+      }
+      
+      if (playerBalance < betAmount) {
+        console.log(`      ⏭️  Balance still insufficient`);
+        continue;
+      }
+      
+      // Balance is now sufficient! Send success message
+      console.log(`      ✅ Balance is now sufficient! Sending confirmation...`);
+      
+      const successMessage = `✅ ยอดเงินเพียงพอแล้ว\n\n` +
+        `ข้อความแทง: "${messageData.content}"\n` +
+        `ยอดเงินปัจจุบัน: ${playerBalance} บาท\n` +
+        `ต้องการ: ${betAmount} บาท\n\n` +
+        `🎉 พร้อมเล่นแล้ว!`;
+      
+      await sendLineMessageToUser(userId, successMessage, accessToken);
+      console.log(`      📤 Confirmation message sent`);
+      
+      reprocessedCount++;
+    } catch (error) {
+      console.error(`      ❌ Error processing message: ${error.message}`);
+    }
+  }
+  
+  console.log(`   ✅ Re-processing complete (${reprocessedCount} messages processed)\n`);
+  return reprocessedCount;
+}
+
 function detectPair(currentMessage) {
   const { userId, messageId, content, timestamp, groupId, quotedMessageId } = currentMessage;
   
@@ -1796,12 +1865,30 @@ app.post('/webhook', async (req, res) => {
                 console.log(`   Player: ${userName}`);
                 
                 // ตรวจสอบยอดเงินของผู้เล่น
-                const playerBalance = await getPlayerBalance(message.userId, userName);
-                console.log(`   Current balance: ${playerBalance} บาท`);
+                const playerBalanceData = await getPlayerBalance(message.userId, userName);
+                const playerBalance = playerBalanceData.balance;
+                const playerFound = playerBalanceData.found;
+                
+                console.log(`   Current balance: ${playerBalance} บาท (Found: ${playerFound})`);
                 console.log(`   Bet amount: ${betAmount} บาท`);
                 
-                // ถ้ายอดเงินไม่พอ ให้แจ้งเลย
-                if (playerBalance < betAmount) {
+                // ถ้าผู้เล่นไม่ลงทะเบียน ให้แจ้งเลย
+                if (!playerFound) {
+                  console.log(`❌ Player not registered: ${userName}`);
+                  
+                  // ส่งข้อความส่วนตัวให้ผู้เล่นเท่านั้น
+                  const personalMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
+                    `ชื่อ: ${userName}\n` +
+                    `ข้อความแทง: "${message.content}"\n\n` +
+                    `💡 วิธีแก้ไข:\n` +
+                    `1️⃣  ติดต่อแอดมิน\n` +
+                    `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
+                    `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+                    `📞 ติดต่อสอบถาม: @774pojob`;
+                  
+                  await sendLineMessageToUser(message.userId, personalMessage, accessToken);
+                  console.log(`   📤 Personal message sent to ${userName}`);
+                } else if (playerBalance < betAmount) {
                   console.log(`❌ Insufficient balance for ${userName}`);
                   
                   // ส่งข้อความส่วนตัวให้ผู้เล่นเท่านั้น
@@ -1818,6 +1905,20 @@ app.post('/webhook', async (req, res) => {
                   
                   await sendLineMessageToUser(message.userId, personalMessage, accessToken);
                   console.log(`   📤 Personal message sent to ${userName}`);
+                  
+                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย
+                  const groupWarningMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
+                    `👤 ${userName} ยอดเงินไม่พอ (ขาด ${(betAmount - playerBalance).toFixed(0)} บาท)\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `💡 วิธีแก้ไข:\n` +
+                    `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
+                    `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
+                    `3️⃣  รอการยืนยันจากระบบ\n` +
+                    `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+                    `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                  
+                  await sendLineMessageToGroup(message.groupId, groupWarningMessage, accessToken);
+                  console.log(`   📢 Group warning message sent`);
                 } else {
                   console.log(`✅ Balance sufficient for ${userName}`);
                   
@@ -2042,15 +2143,65 @@ app.post('/webhook', async (req, res) => {
                 console.log(`   📱 Using LINE Account: ${accountNumber === 1 ? 'Primary' : 'Secondary'}`);
                 
                 // Get player balances
-                const userABalance = await getPlayerBalance(pair.userA, userAName);
-                const userBBalance = await getPlayerBalance(pair.userB, userBName);
+                const userABalanceData = await getPlayerBalance(pair.userA, userAName);
+                const userBBalanceData = await getPlayerBalance(pair.userB, userBName);
                 
-                console.log(`   💰 User A Balance: ${userABalance} บาท`);
-                console.log(`   💰 User B Balance: ${userBBalance} บาท`);
+                const userABalance = userABalanceData.balance;
+                const userBBalance = userBBalanceData.balance;
+                const userAFound = userABalanceData.found;
+                const userBFound = userBBalanceData.found;
+                
+                console.log(`   💰 User A Balance: ${userABalance} บาท (Found: ${userAFound})`);
+                console.log(`   💰 User B Balance: ${userBBalance} บาท (Found: ${userBFound})`);
                 console.log(`   💰 Bet Amount (from User A): ${betAmount} บาท`);
                 
-                // Check if both players have sufficient balance
-                if (userABalance < betAmount || userBBalance < betAmount) {
+                // Check if players are registered
+                if (!userAFound || !userBFound) {
+                  console.log(`❌ Player not registered`);
+                  
+                  // สร้างข้อความแจ้งเตือนในกลุ่ม
+                  let groupWarningMessage = `⚠️ ⚠️ ⚠️ ผู้เล่นยังไม่ลงทะเบียน ⚠️ ⚠️ ⚠️\n\n`;
+                  
+                  // Send message to User A if not registered
+                  if (!userAFound) {
+                    const userADetailMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
+                      `ชื่อ: ${userAName}\n` +
+                      `ข้อความ: ${pair.messageA}\n\n` +
+                      `💡 วิธีแก้ไข:\n` +
+                      `1️⃣  ติดต่อแอดมิน\n` +
+                      `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
+                      `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+                      `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                    console.log(`   📤 Sending not registered message to ${userAName}`);
+                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
+                    groupWarningMessage += `👤 ${userAName} ยังไม่ลงทะเบียน\n`;
+                  }
+                  
+                  // Send message to User B if not registered
+                  if (!userBFound) {
+                    const userBDetailMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
+                      `ชื่อ: ${userBName}\n` +
+                      `ข้อความ: ${pair.messageB}\n\n` +
+                      `💡 วิธีแก้ไข:\n` +
+                      `1️⃣  ติดต่อแอดมิน\n` +
+                      `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
+                      `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+                      `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                    console.log(`   📤 Sending not registered message to ${userBName}`);
+                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
+                    groupWarningMessage += `👤 ${userBName} ยังไม่ลงทะเบียน\n`;
+                  }
+                  
+                  // แจ้งในกลุ่มด้วย
+                  groupWarningMessage += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                  groupWarningMessage += `💡 วิธีแก้ไข:\n`;
+                  groupWarningMessage += `1️⃣  ติดต่อแอดมิน\n`;
+                  groupWarningMessage += `2️⃣  ให้แอดมินเพิ่มชื่อในระบบ\n`;
+                  groupWarningMessage += `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
+                  groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                  console.log(`   📢 Sending group warning message`);
+                  await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
+                } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
                   
                   // สร้างข้อความแจ้งเตือนในกลุ่ม
@@ -2523,7 +2674,7 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
 async function getPlayerBalance(userId, userName) {
   if (!googleAuth) {
     console.warn(`⚠️  googleAuth not initialized`);
-    return 0;
+    return { balance: 0, found: false };
   }
   
   try {
@@ -2616,11 +2767,11 @@ async function getPlayerBalance(userId, userName) {
     }
     
     console.log(`   📊 === End Getting Player Balance ===\n`);
-    return balance;
+    return { balance, found };
   } catch (error) {
     console.error('❌ Error getting player balance:', error.message);
     console.log(`   📊 === End Getting Player Balance (ERROR) ===\n`);
-    return 0;
+    return { balance: 0, found: false };
   }
 }
 
@@ -2683,7 +2834,8 @@ async function start() {
       googleAuth,
       GOOGLE_SHEET_ID,
       LINE_CHANNEL_ACCESS_TOKEN_3,
-      process.env.SLIP2GO_SECRET_KEY
+      process.env.SLIP2GO_SECRET_KEY,
+      reprocessStoredMessages  // Pass the re-processing function
     );
     app.use('/slip2go', slip2GoRouter);
 

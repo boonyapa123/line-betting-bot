@@ -5,7 +5,7 @@ const https = require('https');
 /**
  * สร้าง webhook route สำหรับ Slip2Go
  */
-function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAccessToken, slip2GoSecretKey) {
+function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAccessToken, slip2GoSecretKey, reprocessStoredMessagesCallback) {
   const router = express.Router();
 
   /**
@@ -141,6 +141,16 @@ function createSlip2GoWebhookRouter(googleAuth, googleSheetId, registrationBotAc
           await _sendLineMessage(userId, automessage, registrationBotAccessToken);
 
           console.log(`✅ บันทึกและส่งข้อความสำเร็จ`);
+          
+          // Re-process stored messages for this user
+          if (reprocessStoredMessagesCallback && typeof reprocessStoredMessagesCallback === 'function') {
+            console.log(`🔄 Re-processing stored messages...`);
+            try {
+              await reprocessStoredMessagesCallback(userId, lineUserName, registrationBotAccessToken);
+            } catch (reprocessError) {
+              console.error(`⚠️  Error re-processing messages: ${reprocessError.message}`);
+            }
+          }
         } catch (error) {
           console.error(`❌ ข้อผิดพลาดในการประมวลผล: ${error.message}`);
         }
