@@ -1653,7 +1653,8 @@ app.post('/webhook', async (req, res) => {
               
               // ดึงยอดเงินก่อนหน้าก่อน (ก่อนบันทึก)
               console.log(`📝 Getting current balance before recording...`);
-              const currentBalance = await getPlayerBalance(event.source.userId, lineUserName);
+              const balanceData = await getPlayerBalance(event.source.userId, lineUserName);
+              const currentBalance = balanceData.balance || 0;
               console.log(`   Current balance: ${currentBalance} บาท`);
 
               // Record to Transactions sheet FIRST (ก่อนอัปเดต Players)
