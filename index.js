@@ -1359,6 +1359,52 @@ async function sendLineMessageToUser(userId, message, accessToken) {
   });
 }
 
+/**
+ * ส่งข้อความไปยังกลุ่ม LINE
+ */
+async function sendLineMessageToGroup(groupId, message, accessToken) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      to: groupId,
+      messages: [
+        {
+          type: 'text',
+          text: message,
+        },
+      ],
+    });
+
+    const options = {
+      hostname: 'api.line.me',
+      path: '/v2/bot/message/push',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+
+    https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log(`   ✅ Group message sent successfully`);
+        } else {
+          console.log(`   ⚠️  Group message send status: ${res.statusCode}`);
+        }
+        resolve(true);
+      });
+    })
+      .on('error', (err) => {
+        console.log(`   ❌ Error sending group message: ${err.message}`);
+        resolve(false);
+      })
+      .write(body);
+  });
+}
+
 // ===== WEBHOOK HANDLER =====
 app.post('/webhook', async (req, res) => {
   try {
