@@ -19,11 +19,11 @@ class Slip2GoImageVerificationService {
   async verifySlipFromImage(imageBuffer, checkCondition = {}) {
     try {
       const axios = require('axios');
-      
+
       console.log(`🔍 Verifying slip with Slip2Go API...`);
-      
+
       const form = new FormData();
-      
+
       // Add image file
       form.append('file', imageBuffer, {
         filename: 'slip.jpg',
@@ -80,7 +80,102 @@ class Slip2GoImageVerificationService {
    * @returns {boolean}
    */
   isVerified(response) {
+    // Code 200000 = สลิปถูกต้อง (ไม่ได้ตรวจสอบเงื่อนไข)
+    // Code 200200 = สลิปถูกต้อง + บัญชีตรงกัน
+    // Code 200100 = สลิปซ้ำ
+    // Code 200300 = บัญชีไม่ตรงกัน
+    // Code 200400 = จำนวนเงินไม่ตรงกัน
+    
     return response?.code === '200000' || response?.code === '200200' || response?.success === true;
+  }
+
+  /**
+   * ตรวจสอบว่าสลิปซ้ำหรือไม่
+   * @param {Object} response - Response จาก Slip2Go API
+   * @returns {boolean}
+   */
+  isDuplicate(response) {
+    // Code 200100 = สลิปซ้ำ
+    if (response?.code === '200100') {
+      console.log(`⚠️  Duplicate slip detected (Code: 200100)`);
+      return true;
+    }
+
+    // ตรวจสอบจาก error message
+    if (response?.message && response.message.toLowerCase().includes('duplicate')) {
+      console.log(`⚠️  Duplicate slip detected`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * ตรวจสอบว่าบัญชีตรงกันหรือไม่
+   * @param {Object} response - Response จาก Slip2Go API
+   * @returns {boolean}
+   */
+  isReceiverMatched(response) {
+    // Code 200200 = สลิปถูกต้อง + บัญชีตรงกัน
+    if (response?.code === '200200') {
+      console.log(`✅ Receiver account matched (Code: 200200)`);
+      return true;
+    }
+
+    // Code 200300 = บัญชีไม่ตรงกัน
+    if (response?.code === '200300') {
+      console.log(`❌ Receiver account not matched (Code: 200300)`);
+      return false;
+    }
+
+    // Code 200000 = สลิปถูกต้อง แต่ไม่ได้ตรวจสอบบัญชี
+    if (response?.code === '200000') {
+      console.log(`⚠️  Receiver account not checked (Code: 200000)`);
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * ตรวจสอบว่าชื่อผู้รับตรงกันหรือไม่
+   * @param {Object} response - Response จาก Slip2Go API
+   * @returns {boolean}
+   */
+  isReceiverNameMatched(response) {
+    // ตรวจสอบว่ามีข้อมูลชื่อผู้รับ
+    if (!response?.data?.receiver?.account?.name) {
+      console.log(`⚠️  Receiver name not found`);
+      return false;
+    }
+
+    console.log(`✅ Receiver name found: ${response.data.receiver.account.name}`);
+    return true;
+  }
+
+  /**
+   * ดึงข้อความแสดงเหตุผลการตรวจสอบ
+   * @param {Object} response - Response จาก Slip2Go API
+   * @returns {string}
+   */
+  getValidationMessage(response) {
+    const code = response?.code;
+    const message = response?.message || 'ไม่ทราบเหตุผล';
+
+    switch (code) {
+      case '200000':
+        return '✅ สลิปถูกต้อง (ไม่ได้ตรวจสอบเงื่อนไข)';
+      case '200200':
+        return '✅ สลิปถูกต้อง + บัญชีตรงกัน';
+      case '200100':
+        return '❌ สลิปซ้ำ';
+      case '200300':
+        return '❌ บัญชีไม่ตรงกัน';
+      case '200400':
+        return '❌ จำนวนเงินไม่ตรงกัน';
+      default:
+        return `❌ ${message}`;
+    }
   }
 
   /**
@@ -115,7 +210,10 @@ class Slip2GoImageVerificationService {
    * @returns {string} ข้อความตอบกลับ
    */
   createLineMessage(response) {
-    if (this.isVerified(response)) {
+    const code = response?.code;
+
+    // ✅ สลิปถูกต้อง
+    if (code === '200000' || code === '200200') {
       const data = response.data;
       return `✅ ได้รับยอดเงินแล้ว\n\n` +
         `📊 รายละเอียดสลิป:\n` +
@@ -127,12 +225,27 @@ class Slip2GoImageVerificationService {
         `🔖 เลขอ้างอิง: ${data.transRef}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `ขอบคุณที่ใช้บริการ 🙏`;
-    } else {
-      const message = response?.message || 'ไม่ทราบเหตุผล';
+    }
+
+    // ❌ สลิปซ้ำ
+    if (code === '200100') {
       return `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-        `เหตุผล: ${message}\n\n` +
+        `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n\n` +
         `📸 กรุณาส่งสลิปใหม่`;
     }
+
+    // ❌ บัญชีไม่ตรงกัน
+    if (code === '200300') {
+      return `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+        `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n\n` +
+        `📸 กรุณาส่งสลิปใหม่`;
+    }
+
+    // ❌ ข้อผิดพลาดอื่น ๆ
+    const message = response?.message || 'ไม่ทราบเหตุผล';
+    return `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+      `🚫 เหตุผล: ${message}\n\n` +
+      `📸 กรุณาส่งสลิปใหม่`;
   }
 }
 

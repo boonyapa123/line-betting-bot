@@ -62,6 +62,11 @@ const LINE_CHANNEL_SECRET_3 = process.env.LINE_CHANNEL_SECRET_3;
 const LINE_CHANNEL_ACCESS_TOKEN_3 = process.env.LINE_CHANNEL_ACCESS_TOKEN_3;
 const LINE_CHANNEL_ID_3 = process.env.LINE_CHANNEL_ID_3;
 
+// Slip Verification Bank Accounts (ตั้งค่าบัญชีที่ต้องการตรวจสอบ)
+const SLIP_RECEIVER_ACCOUNT_1 = process.env.SLIP_RECEIVER_ACCOUNT_1 || '';  // Account 1
+const SLIP_RECEIVER_ACCOUNT_2 = process.env.SLIP_RECEIVER_ACCOUNT_2 || '';  // Account 2
+const SLIP_RECEIVER_ACCOUNT_3 = process.env.SLIP_RECEIVER_ACCOUNT_3 || '';  // Account 3
+
 // Google Sheets
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_WORKSHEET_NAME = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
@@ -132,6 +137,18 @@ function getAccountNumber(channelId) {
   if (channelId === LINE_CHANNEL_ID_2) return 2;
   if (channelId === LINE_CHANNEL_ID_3) return 3;
   return null;
+}
+
+// Get receiver account number based on channel ID
+function getReceiverAccount(channelId) {
+  if (channelId === LINE_CHANNEL_ID) {
+    return SLIP_RECEIVER_ACCOUNT_1;
+  } else if (channelId === LINE_CHANNEL_ID_2) {
+    return SLIP_RECEIVER_ACCOUNT_2;
+  } else if (channelId === LINE_CHANNEL_ID_3) {
+    return SLIP_RECEIVER_ACCOUNT_3;
+  }
+  return '';
 }
 
 // Get groups for specific account
@@ -1407,14 +1424,33 @@ app.post('/webhook', async (req, res) => {
           // Verify slip with Slip2Go API
           console.log(`🔍 Verifying slip with Slip2Go API...`);
           const Slip2GoImageVerificationService = require('./services/betting/slip2GoImageVerificationService');
+          const Slip2GoAccountService = require('./services/betting/slip2GoAccountService');
           const verificationService = new Slip2GoImageVerificationService(process.env.SLIP2GO_SECRET_KEY, process.env.SLIP2GO_API_URL);
+          const accountService = new Slip2GoAccountService(process.env.SLIP2GO_SECRET_KEY, process.env.SLIP2GO_API_URL);
+          
+          // ดึงข้อมูลบัญชีจาก Slip2Go API
+          let receiverAccount = '';
+          try {
+            console.log(`📋 Fetching receiver accounts from Slip2Go...`);
+            const accountsData = await accountService.getAccounts();
+            
+            if (accountsData && accountsData.length > 0) {
+              // ใช้บัญชีแรก (หรือสามารถเลือกตามเงื่อนไขอื่น)
+              receiverAccount = accountsData[0].accountNumber;
+              console.log(`   ✅ Using receiver account: ${receiverAccount}`);
+            } else {
+              console.log(`   ⚠️  No accounts found in Slip2Go`);
+            }
+          } catch (accountError) {
+            console.error(`   ⚠️  Failed to fetch accounts: ${accountError.message}`);
+          }
           
           const checkCondition = {
-            checkDuplicate: process.env.SLIP_CHECK_DUPLICATE === 'true',
-            checkReceiver: process.env.SLIP_CHECK_RECEIVER === 'true' ? [
+            checkDuplicate: true,  // ตรวจสอบสลิปซ้ำ
+            checkReceiver: receiverAccount ? [
               {
                 accountType: '01004',
-                accountNumber: accountNumber
+                accountNumber: receiverAccount
               }
             ] : []
           };
@@ -1451,6 +1487,42 @@ app.post('/webhook', async (req, res) => {
             console.log(`\n💾 Recording slip data:`, slipData);
             
             try {
+              // ตรวจสอบผลการตรวจสอบจาก Slip2Go API
+              const code = verificationResult?.code;
+              console.log(`\n🔐 Slip2Go API Response Code: ${code}`);
+              console.log(`   Message: ${verificationService.getValidationMessage(verificationResult)}`);
+
+              // ตรวจสอบสลิปซ้ำ
+              if (verificationService.isDuplicate(verificationResult)) {
+                console.log(`\n❌ Duplicate slip detected`);
+                const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+                  `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n\n` +
+                  `📸 กรุณาส่งสลิปใหม่`;
+                try {
+                  await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+                } catch (sendError) {
+                  console.error(`❌ Failed to send error message: ${sendError.message}`);
+                }
+                continue;
+              }
+
+              // ตรวจสอบบัญชีตรงกันหรือไม่
+              if (!verificationService.isReceiverMatched(verificationResult)) {
+                console.log(`\n❌ Receiver account not matched`);
+                const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+                  `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n\n` +
+                  `📸 กรุณาส่งสลิปใหม่`;
+                try {
+                  await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+                } catch (sendError) {
+                  console.error(`❌ Failed to send error message: ${sendError.message}`);
+                }
+                continue;
+              }
+
+              // ✅ ทั้งหมดตรวจสอบสำเร็จ บันทึกข้อมูล
+              console.log(`\n✅ All validations passed`);
+              
               // ดึงยอดเงินก่อนหน้าก่อน (ก่อนบันทึก)
               console.log(`📝 Getting current balance before recording...`);
               const currentBalance = await getPlayerBalance(event.source.userId, lineUserName);
@@ -2170,49 +2242,35 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
     let playerRowIndex = null;
     let currentBalance = 0;
     let totalDeposits = 0;
-    let linkedUserIds = [];
 
-    // หาแถวของผู้เล่น - ค้นหาจากชื่อ LINE ก่อน (primary)
-    console.log(`   🔍 Searching by LINE name: "${actualUserName}"`);
+    // ✅ ค้นหาจากชื่อ LINE เป็นหลัก (PRIMARY)
+    console.log(`   🔍 PRIMARY: Searching by LINE name: "${actualUserName}"`);
     for (let i = 1; i < rows.length; i++) {
       if (rows[i] && rows[i][1] === actualUserName) {
-        // เก็บ User ID ทั้งหมดของชื่อ LINE นี้
-        const existingId = rows[i][0];
-        if (existingId && !linkedUserIds.includes(existingId)) {
-          linkedUserIds.push(existingId);
-        }
-        
-        // ใช้แถวแรกที่พบเป็นแถวหลัก
-        if (!playerRowIndex) {
-          playerRowIndex = i + 1;
-          currentBalance = parseFloat(rows[i][4]) || 0;
-          totalDeposits = parseFloat(rows[i][5]) || 0;
-          console.log(`   ✅ Found player by name at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
-        }
+        playerRowIndex = i + 1;
+        currentBalance = parseFloat(rows[i][4]) || 0;
+        totalDeposits = parseFloat(rows[i][5]) || 0;
+        console.log(`   ✅ FOUND by LINE name at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
+        break;
       }
     }
 
-    // ถ้าไม่พบจากชื่อ ให้ค้นหาจาก User ID (backup)
+    // ถ้าไม่พบจากชื่อ LINE ให้ค้นหาจาก User ID (BACKUP)
     if (!playerRowIndex) {
-      console.log(`   ℹ️  Not found by name, searching by User ID: "${userId}"`);
+      console.log(`   ℹ️  BACKUP: Not found by LINE name, searching by User ID: "${userId}"`);
       for (let i = 1; i < rows.length; i++) {
         if (rows[i] && rows[i][0] === userId) {
           playerRowIndex = i + 1;
           currentBalance = parseFloat(rows[i][4]) || 0;
           totalDeposits = parseFloat(rows[i][5]) || 0;
-          linkedUserIds.push(userId);
-          console.log(`   ✅ Found player by ID at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
+          console.log(`   ✅ FOUND by User ID at row ${playerRowIndex}: balance=${currentBalance}, deposits=${totalDeposits}`);
           break;
         }
       }
     }
 
-    // เพิ่ม User ID ปัจจุบันถ้ายังไม่มี
-    if (!linkedUserIds.includes(userId)) {
-      linkedUserIds.push(userId);
-    }
-
-    console.log(`   🔗 Linked User IDs: ${linkedUserIds.join(', ')}`);
+    console.log(`   📊 Current Balance: ${currentBalance} บาท`);
+    console.log(`   📊 Total Deposits: ${totalDeposits} บาท`);
 
     const now = new Date();
     const dateStr = now.toLocaleString('th-TH', {
@@ -2230,7 +2288,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
     if (playerRowIndex) {
       // อัปเดตผู้เล่นที่มีอยู่แล้ว
-      console.log(`   📝 อัปเดตผู้เล่น: ${actualUserName} (row ${playerRowIndex})`);
+      console.log(`   📝 UPDATE: Updating player: ${actualUserName} (row ${playerRowIndex})`);
 
       const updateResponse = await sheets.spreadsheets.values.get({
         auth: googleAuth,
@@ -2240,13 +2298,10 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
 
       const currentRow = updateResponse.data.values ? updateResponse.data.values[0] : [];
 
-      // เก็บ User ID ทั้งหมดในคอลัมน์ C (Phone) เป็น JSON
-      const linkedIdsJson = JSON.stringify(linkedUserIds);
-
       const newRow = [
-        userId, // ใช้ User ID ปัจจุบัน
-        actualUserName,
-        linkedIdsJson, // เก็บ User ID ทั้งหมดในรูป JSON
+        userId,
+        actualUserName,  // ✅ ใช้ชื่อ LINE เป็นหลัก
+        currentRow[2] || '',
         currentRow[3] || '',
         newBalance,
         newTotalDeposits,
@@ -2267,18 +2322,15 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
         },
       });
 
-      console.log(`   ✅ อัปเดตสำเร็จ: ${newBalance} บาท (ชื่อ: ${actualUserName})`);
+      console.log(`   ✅ UPDATE SUCCESS: ${actualUserName} | Balance: ${currentBalance} → ${newBalance} บาท`);
     } else {
       // สร้างผู้เล่นใหม่
-      console.log(`   📝 สร้างผู้เล่นใหม่: ${actualUserName}`);
-
-      // เก็บ User ID ทั้งหมดในคอลัมน์ C (Phone) เป็น JSON
-      const linkedIdsJson = JSON.stringify(linkedUserIds);
+      console.log(`   📝 CREATE: Creating new player: ${actualUserName}`);
 
       const newRow = [
         userId,
-        actualUserName,
-        linkedIdsJson, // เก็บ User ID ทั้งหมดในรูป JSON
+        actualUserName,  // ✅ ใช้ชื่อ LINE เป็นหลัก
+        '',
         '',
         amount,
         amount,
@@ -2301,7 +2353,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
         },
       });
 
-      console.log(`   ✅ สร้างสำเร็จ: ${amount} บาท (ชื่อ: ${actualUserName})`);
+      console.log(`   ✅ CREATE SUCCESS: ${actualUserName} | Balance: ${amount} บาท`);
     }
 
     return {
