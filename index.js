@@ -374,13 +374,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[11] || '';
-    const userBName = row[12] || '';  // ✅ Column M (index 12) = User B Name
+    const userBId = row[11] || '';  // L = User B ID (index 11)
+    const userBName = row[12] || '';  // M = ชื่อ User B (index 12)
     const betAmount = parseFloat(row[6]) || 0;
     const fireworkName = row[4] || '';
-    const userAToken = row[15] || '';  // ✅ Column P (index 15) = User A Token
-    const userBToken = row[16] || '';  // ✅ Column Q (index 16) = User B Token
-    const groupId = row[14] || '';     // ✅ Column O (index 14) = Group ID
+    const userAToken = row[15] || '';  // P = User A Token (index 15)
+    const userBToken = row[17] || '';  // R = User B Token (index 17)
+    const groupId = row[16] || '';     // Q = Group ID (index 16)
     
     // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
@@ -506,7 +506,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         `ผลเสมอ 🤝`;
       
       if (userAId && userAName) {
-        await sendLineMessageToUser(userAId, messageA, accessToken);
+        await sendLineMessageToUser(userAId, messageA, userAToken);
       }
       
       // ส่งข้อความให้ User B ถ้ามี
@@ -519,7 +519,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
           `👤 คู่แข่ง: ${userAName}\n\n` +
           `ผลเสมอ 🤝`;
         
-        await sendLineMessageToUser(userBId, messageB, accessToken);
+        await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     }
     
@@ -1155,12 +1155,13 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       '',                  // [8] = I: ผลที่ออก (ว่าง - อัปเดตเมื่อประกาศผล)
       '',                  // [9] = J: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
       '',                  // [10] = K: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
-      pair.userB,          // [11] = L: User B ID
-      userBName,           // [12] = M: ชื่อ User B
-      oppositeBetType,     // [13] = N: รายการแทง
-      groupName,           // [14] = O: ชื่อกลุ่มแชท
-      userBToken,          // [15] = P: User B Token
-      pair.groupId || ''   // [16] = Q: Group ID
+      pair.userB,          // [11] = L: User B ID (ตำแหน่ง K)
+      userBName,           // [12] = M: ชื่อ User B (ตำแหน่ง L)
+      oppositeBetType,     // [13] = N: รายการแทง (ตำแหน่ง M)
+      groupName,           // [14] = O: ชื่อกลุ่มแชท (ตำแหน่ง N)
+      userAToken,          // [15] = P: User A Token (ตำแหน่ง O)
+      pair.groupId || '',  // [16] = Q: Group ID (ตำแหน่ง P)
+      userBToken           // [17] = R: User B Token (ตำแหน่ง Q)
     ];
     
     console.log(`   📊 Row data (17 columns):`);
