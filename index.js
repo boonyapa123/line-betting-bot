@@ -1883,31 +1883,21 @@ app.post('/webhook', async (req, res) => {
                 if (!playerFound) {
                   console.log(`❌ Player not registered: ${userName}`);
                   
-                  // ส่งข้อความส่วนตัวให้ผู้เล่นเท่านั้น
-                  const personalMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
-                    `ชื่อ: ${userName}\n` +
-                    `ข้อความแทง: "${message.content}"\n\n` +
-                    `💡 วิธีแก้ไข:\n` +
-                    `1️⃣  ติดต่อแอดมิน\n` +
-                    `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
-                    `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                    `📞 ติดต่อสอบถาม: @774pojob`;
+                  // ใช้ balanceCheckService เพื่อส่งข้อความแจ้งเตือนผ่าน Account ที่ถูกต้อง
+                  const balanceCheckService = require('./services/betting/balanceCheckService');
                   
-                  await sendLineMessageToUser(message.userId, personalMessage, accessToken);
-                  console.log(`   📤 Personal message sent to ${userName}`);
+                  // ส่งข้อความแจ้งเตือนส่วนตัวและในกลุ่มผ่าน balanceCheckService
+                  await balanceCheckService.notifyPlayerNotRegistered(
+                    userName,
+                    message.userId,
+                    accountNumber,
+                    message.groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
+                  );
+                  console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
+                  console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
                   
-                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย
-                  const groupWarningMessage = `⚠️ ⚠️ ⚠️ ผู้เล่นยังไม่ลงทะเบียน ⚠️ ⚠️ ⚠️\n\n` +
-                    `👤 ${userName} ยังไม่ลงทะเบียน\n\n` +
-                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                    `💡 วิธีแก้ไข:\n` +
-                    `1️⃣  ติดต่อแอดมิน\n` +
-                    `2️⃣  ให้แอดมินเพิ่มชื่อในระบบ\n` +
-                    `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                    `📱 ติดต่อแอดมิน หากมีปัญหา`;
-                  
-                  await sendLineMessageToGroup(message.groupId, groupWarningMessage, accessToken);
-                  console.log(`   📢 Group warning message sent`);
+                  // ❌ หยุดการประมวลผลทันที ไม่บันทึกการเล่น
+                  continue;
 
                 } else if (playerBalance < betAmount) {
                   console.log(`❌ Insufficient balance for ${userName}`);
@@ -1927,6 +1917,9 @@ app.post('/webhook', async (req, res) => {
                   );
                   console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
                   console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
+                  
+                  // ❌ หยุดการประมวลผลทันที ไม่บันทึกการเล่น
+                  continue;
                 } else {
                   console.log(`✅ Balance sufficient for ${userName}`);
                   
