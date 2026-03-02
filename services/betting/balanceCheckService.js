@@ -210,7 +210,8 @@ class BalanceCheckService {
         `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
         `3️⃣  รอการยืนยันจากระบบ\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📱 ติดต่อแอดมิน หากมีปัญหา`;
+        `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+        `🔗 เข้าร่วมกลุ่ม: https://line.me/ti/g/a8bzxxPQLH`;
 
       console.log(`\n📤 === Player Not Registered Notification ===`);
       console.log(`   Player: ${lineName}`);
@@ -240,7 +241,8 @@ class BalanceCheckService {
           `1️⃣  โอนเงินเข้าระบบ\n` +
           `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
           `3️⃣  รอการยืนยันจากระบบ\n\n` +
-          `📱 ติดต่อแอดมิน หากมีปัญหา`;
+          `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+          `🔗 เข้าร่วมกลุ่ม: https://line.me/ti/g/a8bzxxPQLH`;
 
         console.log(`\n   📢 Sending group message...`);
         const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
