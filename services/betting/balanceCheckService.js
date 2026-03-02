@@ -26,12 +26,22 @@ class BalanceCheckService {
    */
   async initialize() {
     try {
-      const credentialsPath = path.join(
-        __dirname,
-        '../../',
-        process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json'
-      );
-      const credentials = JSON.parse(fs.readFileSync(credentialsPath));
+      let credentials;
+
+      // Try to load from environment variable first (for production)
+      if (process.env.GOOGLE_CREDENTIALS_JSON) {
+        credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+        console.log('✅ Google Sheets credentials loaded from environment');
+      } else {
+        // Fall back to file (for local development)
+        const credentialsPath = path.join(
+          __dirname,
+          '../../',
+          process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json'
+        );
+        credentials = JSON.parse(fs.readFileSync(credentialsPath));
+        console.log('✅ Google Sheets credentials loaded from file');
+      }
 
       const auth = new google.auth.GoogleAuth({
         credentials,
