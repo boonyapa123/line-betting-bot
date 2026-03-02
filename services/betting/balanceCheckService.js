@@ -56,13 +56,68 @@ class BalanceCheckService {
   }
 
   /**
+   * ตรวจสอบว่าผู้เล่นมีชื่อในระบบหรือไม่
+   * @param {string} lineName - ชื่อ LINE
+   * @returns {boolean} true ถ้าพบผู้เล่น, false ถ้าไม่พบ
+   */
+  async isPlayerRegistered(lineName) {
+    try {
+      // ลองดึงจากชีท UsersBalance ก่อน
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.usersBalanceSheetName}!A:C`,
+      });
+
+      const values = response.data.values || [];
+
+      for (let i = 1; i < values.length; i++) {
+        if (values[i] && values[i][1] === lineName) {
+          return true;
+        }
+      }
+
+      // ถ้าไม่พบในชีท UsersBalance ให้ดึงจากชีท Players
+      const playersResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.playersSheetName}!B:E`,
+      });
+
+      const playerValues = playersResponse.data.values || [];
+
+      for (let i = 1; i < playerValues.length; i++) {
+        if (playerValues[i] && playerValues[i][0] === lineName) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking if player is registered:', error);
+      return false;
+    }
+  }
+
+  /**
    * ตรวจสอบยอดเงินคงเหลือ
    * @param {string} lineName - ชื่อ LINE
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
-   * @returns {object} ผลลัพธ์ {sufficient: boolean, currentBalance: number, shortfall: number}
+   * @returns {object} ผลลัพธ์ {sufficient: boolean, currentBalance: number, shortfall: number, registered: boolean}
    */
   async checkBalance(lineName, requiredAmount) {
     try {
+      // ตรวจสอบว่าผู้เล่นมีชื่อในระบบหรือไม่ (อันดับแรก)
+      const isRegistered = await this.isPlayerRegistered(lineName);
+      
+      if (!isRegistered) {
+        return {
+          sufficient: false,
+          currentBalance: 0,
+          shortfall: requiredAmount,
+          registered: false,
+          message: `ผู้เล่นไม่พบในระบบ`,
+        };
+      }
+
       const currentBalance = await this.getUserBalance(lineName);
 
       if (currentBalance >= requiredAmount) {
@@ -70,6 +125,7 @@ class BalanceCheckService {
           sufficient: true,
           currentBalance,
           shortfall: 0,
+          registered: true,
           message: `ยอดเงินเพียงพอ (${currentBalance} บาท)`,
         };
       }
@@ -79,6 +135,7 @@ class BalanceCheckService {
         sufficient: false,
         currentBalance,
         shortfall,
+        registered: true,
         message: `ยอดเงินไม่พอ ขาด ${shortfall} บาท`,
       };
     } catch (error) {
@@ -87,6 +144,7 @@ class BalanceCheckService {
         sufficient: false,
         currentBalance: 0,
         shortfall: requiredAmount,
+        registered: false,
         error: error.message,
       };
     }
@@ -131,6 +189,75 @@ class BalanceCheckService {
     } catch (error) {
       console.error('Error getting user balance:', error);
       return 0;
+    }
+  }
+
+  /**
+   * แจ้งเตือนเมื่อผู้เล่นไม่พบในระบบ
+   * @param {string} lineName - ชื่อ LINE
+   * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
+   * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
+   * @param {string} groupId - LINE Group ID (สำหรับส่งข้อความในกลุ่ม)
+   */
+  async notifyPlayerNotRegistered(lineName, userId, accountNumber = 1, groupId = null) {
+    try {
+      const message = `❌ ❌ ❌ ยังไม่ได้ลงทะเบียนในระบบ ❌ ❌ ❌\n\n` +
+        `👤 ชื่อ: ${lineName}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `⚠️  คุณยังไม่ได้ลงทะเบียนในระบบ\n\n` +
+        `💡 วิธีแก้ไข (เติมเงินเพื่อลงทะเบียน):\n` +
+        `1️⃣  โอนเงินเข้าระบบ (ขั้นต่ำตามที่แอดมินกำหนด)\n` +
+        `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
+        `3️⃣  รอการยืนยันจากระบบ\n` +
+        `4️⃣  ระบบจะลงทะเบียนให้อัตโนมัติ\n` +
+        `5️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `📱 ติดต่อแอดมิน หากมีปัญหา`;
+
+      console.log(`\n📤 === Player Not Registered Notification ===`);
+      console.log(`   Player: ${lineName}`);
+      console.log(`   User ID: ${userId}`);
+      console.log(`   Account: ${accountNumber}`);
+      console.log(`   Group ID: ${groupId || 'N/A'}`);
+
+      // เลือก notification service ตามหมายเลข Account
+      const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
+
+      // ส่งข้อความส่วนตัว
+      console.log(`\n   📤 Sending private message...`);
+      const result = await notificationService.sendPrivateMessage(userId, message);
+
+      if (result.success) {
+        console.log(`   ✅ Private message sent successfully`);
+      } else {
+        console.error(`   ❌ Failed to send private message: ${result.error}`);
+      }
+
+      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
+      if (groupId) {
+        const groupMessage = `❌ ❌ ❌ ยังไม่ได้ลงทะเบียนในระบบ ❌ ❌ ❌\n\n` +
+          `👤 ${lineName} ยังไม่ได้ลงทะเบียน\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 วิธีแก้ไข (เติมเงินเพื่อลงทะเบียน):\n` +
+          `1️⃣  โอนเงินเข้าระบบ\n` +
+          `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
+          `3️⃣  รอการยืนยันจากระบบ\n\n` +
+          `📱 ติดต่อแอดมิน หากมีปัญหา`;
+
+        console.log(`\n   📢 Sending group message...`);
+        const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
+        if (groupResult.success) {
+          console.log(`   ✅ Group message sent successfully`);
+        } else {
+          console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+        }
+      }
+
+      console.log(`\n   === End Notification ===\n`);
+      return { success: result.success };
+    } catch (error) {
+      console.error('Error notifying player not registered:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -180,11 +307,12 @@ class BalanceCheckService {
         const groupMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
           `👤 ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `💡 วิธีแก้ไข:\n` +
+          `💡 วิธีแก้ไข (เติมเงิน):\n` +
           `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
           `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
           `3️⃣  รอการยืนยันจากระบบ\n` +
-          `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+          `4️⃣  ยอดเงินจะเพิ่มขึ้นอัตโนมัติ\n` +
+          `5️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
           `📱 ติดต่อแอดมิน หากมีปัญหา`;
 
         console.log(`\n   📢 Sending group message...`);
@@ -215,11 +343,12 @@ class BalanceCheckService {
     message += `🎰 จำนวนเงินที่ต้องการเดิมพัน: ${requiredAmount} บาท\n`;
     message += `❌ ขาด: ${shortfall} บาท\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `💡 วิธีแก้ไข:\n`;
+    message += `💡 วิธีแก้ไข (เติมเงิน):\n`;
     message += `1️⃣  โอนเงินเพิ่มอย่างน้อย ${shortfall} บาท\n`;
     message += `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n`;
     message += `3️⃣  รอการยืนยันจากระบบ\n`;
-    message += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
+    message += `4️⃣  ยอดเงินจะเพิ่มขึ้นอัตโนมัติ\n`;
+    message += `5️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `📱 ติดต่อแอดมิน หากมีปัญหา`;
 
@@ -239,8 +368,19 @@ class BalanceCheckService {
     try {
       const checkResult = await this.checkBalance(lineName, requiredAmount);
 
+      // ถ้าผู้เล่นไม่พบในระบบ ให้แจ้งเตือนทันที
+      if (!checkResult.registered) {
+        await this.notifyPlayerNotRegistered(
+          lineName,
+          userId,
+          accountNumber,
+          groupId
+        );
+        return checkResult;
+      }
+
+      // ถ้ายอดเงินไม่พอ ให้แจ้งเตือน
       if (!checkResult.sufficient) {
-        // แจ้งเตือนเมื่อยอดเงินไม่พอ
         await this.notifyInsufficientBalance(
           lineName,
           checkResult.currentBalance,
@@ -257,6 +397,7 @@ class BalanceCheckService {
       console.error('Error in checkAndNotify:', error);
       return {
         sufficient: false,
+        registered: false,
         error: error.message,
       };
     }

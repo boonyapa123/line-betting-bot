@@ -125,7 +125,7 @@ class BettingRoundController {
       };
     }
 
-    // ตรวจสอบยอดเงินคงเหลือ
+    // ตรวจสอบยอดเงินคงเหลือและชื่อผู้เล่น (อันดับแรก)
     const groupId = source.groupId || null; // ดึง groupId จาก source
     const balanceCheck = await balanceCheckService.checkAndNotify(
       lineName,
@@ -135,6 +135,15 @@ class BettingRoundController {
       groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
     );
 
+    // ถ้าผู้เล่นไม่พบในระบบ ให้หยุดทันที
+    if (!balanceCheck.registered) {
+      return {
+        type: 'text',
+        text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+      };
+    }
+
+    // ถ้ายอดเงินไม่พอ ให้หยุดทันที
     if (!balanceCheck.sufficient) {
       // ไม่ต้องส่งข้อความแจ้งเตือนเพิ่มเติม เพราะ checkAndNotify ได้ส่งไปแล้ว
       return {
