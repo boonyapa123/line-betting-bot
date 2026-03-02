@@ -126,20 +126,20 @@ class BettingRoundController {
     }
 
     // ตรวจสอบยอดเงินคงเหลือ
+    const groupId = source.groupId || null; // ดึง groupId จาก source
     const balanceCheck = await balanceCheckService.checkAndNotify(
       lineName,
       parsedBet.amount,
       userId,
-      1 // Account 1
+      1, // Account 1
+      groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
     );
 
     if (!balanceCheck.sufficient) {
-      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย
-      const groupMessage = `❌ ${displayName} ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`;
-      
+      // ไม่ต้องส่งข้อความแจ้งเตือนเพิ่มเติม เพราะ checkAndNotify ได้ส่งไปแล้ว
       return {
         type: 'text',
-        text: groupMessage,
+        text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
       };
     }
 

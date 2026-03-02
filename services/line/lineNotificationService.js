@@ -28,6 +28,10 @@ class LineNotificationService {
    */
   async sendPrivateMessage(userId, message) {
     try {
+      console.log(`📤 Sending private message to ${userId} via Account ${this.accountNumber}`);
+      console.log(`   Message length: ${message.length} characters`);
+      console.log(`   Has access token: ${!!this.accessToken}`);
+      
       const response = await axios.post(
         `${this.apiUrl}/push`,
         {
@@ -47,10 +51,16 @@ class LineNotificationService {
         }
       );
 
-      console.log(`✅ ส่งข้อความส่วนตัวไปยัง ${userId} สำเร็จ`);
+      console.log(`✅ ส่งข้อความส่วนตัวไปยัง ${userId} สำเร็จ (Status: ${response.status})`);
       return { success: true };
     } catch (error) {
-      console.error(`❌ เกิดข้อผิดพลาดในการส่งข้อความส่วนตัว:`, error.message);
+      console.error(`❌ เกิดข้อผิดพลาดในการส่งข้อความส่วนตัว:`);
+      console.error(`   User ID: ${userId}`);
+      console.error(`   Error: ${error.message}`);
+      if (error.response) {
+        console.error(`   Response status: ${error.response.status}`);
+        console.error(`   Response data:`, error.response.data);
+      }
       return { success: false, error: error.message };
     }
   }
@@ -62,6 +72,10 @@ class LineNotificationService {
    */
   async sendGroupMessage(groupId, message) {
     try {
+      console.log(`📢 Sending group message to ${groupId} via Account ${this.accountNumber}`);
+      console.log(`   Message length: ${message.length} characters`);
+      console.log(`   Has access token: ${!!this.accessToken}`);
+      
       const response = await axios.post(
         `${this.apiUrl}/push`,
         {
@@ -81,10 +95,16 @@ class LineNotificationService {
         }
       );
 
-      console.log(`✅ ส่งข้อความไปยังกลุ่ม ${groupId} สำเร็จ`);
+      console.log(`✅ ส่งข้อความไปยังกลุ่ม ${groupId} สำเร็จ (Status: ${response.status})`);
       return { success: true };
     } catch (error) {
-      console.error(`❌ เกิดข้อผิดพลาดในการส่งข้อความกลุ่ม:`, error.message);
+      console.error(`❌ เกิดข้อผิดพลาดในการส่งข้อความกลุ่ม:`);
+      console.error(`   Group ID: ${groupId}`);
+      console.error(`   Error: ${error.message}`);
+      if (error.response) {
+        console.error(`   Response status: ${error.response.status}`);
+        console.error(`   Response data:`, error.response.data);
+      }
       return { success: false, error: error.message };
     }
   }

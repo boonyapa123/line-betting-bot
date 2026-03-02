@@ -142,8 +142,9 @@ class BalanceCheckService {
    * @param {number} shortfall - ยอดเงินที่ขาด
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
    * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
+   * @param {string} groupId - LINE Group ID (สำหรับส่งข้อความในกลุ่ม)
    */
-  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1) {
+  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1, groupId = null) {
     try {
       const message = this.buildInsufficientBalanceMessage(
         lineName,
@@ -152,24 +153,51 @@ class BalanceCheckService {
         shortfall
       );
 
-      console.log(`📤 Sending insufficient balance notification to ${userId} (${lineName}) via Account ${accountNumber}`);
+      console.log(`\n📤 === Insufficient Balance Notification ===`);
+      console.log(`   Player: ${lineName}`);
+      console.log(`   User ID: ${userId}`);
       console.log(`   Current balance: ${currentBalance} บาท`);
       console.log(`   Required amount: ${requiredAmount} บาท`);
       console.log(`   Shortfall: ${shortfall} บาท`);
+      console.log(`   Account: ${accountNumber}`);
+      console.log(`   Group ID: ${groupId || 'N/A'}`);
 
       // เลือก notification service ตามหมายเลข Account
       const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
 
       // ส่งข้อความส่วนตัว
+      console.log(`\n   📤 Sending private message...`);
       const result = await notificationService.sendPrivateMessage(userId, message);
 
       if (result.success) {
-        console.log(`✅ แจ้งเตือนยอดเงินไม่พอไปยัง ${lineName} สำเร็จ (Account ${accountNumber})`);
-        return { success: true };
+        console.log(`   ✅ Private message sent successfully`);
       } else {
-        console.error(`❌ ไม่สามารถส่งแจ้งเตือนไปยัง ${lineName}: ${result.error}`);
-        return { success: false, error: result.error };
+        console.error(`   ❌ Failed to send private message: ${result.error}`);
       }
+
+      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
+      if (groupId) {
+        const groupMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
+          `👤 ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 วิธีแก้ไข:\n` +
+          `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
+          `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
+          `3️⃣  รอการยืนยันจากระบบ\n` +
+          `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+          `📱 ติดต่อแอดมิน หากมีปัญหา`;
+
+        console.log(`\n   📢 Sending group message...`);
+        const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
+        if (groupResult.success) {
+          console.log(`   ✅ Group message sent successfully`);
+        } else {
+          console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+        }
+      }
+
+      console.log(`\n   === End Notification ===\n`);
+      return { success: result.success };
     } catch (error) {
       console.error('Error notifying insufficient balance:', error);
       return { success: false, error: error.message };
@@ -204,9 +232,10 @@ class BalanceCheckService {
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
    * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
+   * @param {string} groupId - LINE Group ID (สำหรับส่งข้อความในกลุ่ม)
    * @returns {object} ผลลัพธ์
    */
-  async checkAndNotify(lineName, requiredAmount, userId, accountNumber = 1) {
+  async checkAndNotify(lineName, requiredAmount, userId, accountNumber = 1, groupId = null) {
     try {
       const checkResult = await this.checkBalance(lineName, requiredAmount);
 
@@ -218,7 +247,8 @@ class BalanceCheckService {
           requiredAmount,
           checkResult.shortfall,
           userId,
-          accountNumber
+          accountNumber,
+          groupId
         );
       }
 

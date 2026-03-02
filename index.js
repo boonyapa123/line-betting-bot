@@ -1915,29 +1915,17 @@ app.post('/webhook', async (req, res) => {
                   // ใช้ balanceCheckService เพื่อส่งข้อความแจ้งเตือนผ่าน Account ที่ถูกต้อง
                   const balanceCheckService = require('./services/betting/balanceCheckService');
                   
-                  // ส่งข้อความแจ้งเตือนส่วนตัวผ่าน balanceCheckService
+                  // ส่งข้อความแจ้งเตือนส่วนตัวและในกลุ่มผ่าน balanceCheckService
                   await balanceCheckService.notifyInsufficientBalance(
                     userName,
                     playerBalance,
                     betAmount,
                     betAmount - playerBalance,
                     message.userId,
-                    accountNumber
+                    accountNumber,
+                    message.groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
                   );
                   console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
-                  
-                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ใช้ Account ที่ถูกต้อง)
-                  const groupWarningMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
-                    `👤 ${userName} ยอดเงินไม่พอ (ขาด ${(betAmount - playerBalance).toFixed(0)} บาท)\n\n` +
-                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                    `💡 วิธีแก้ไข:\n` +
-                    `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
-                    `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
-                    `3️⃣  รอการยืนยันจากระบบ\n` +
-                    `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                    `📱 ติดต่อแอดมิน หากมีปัญหา`;
-                  
-                  await sendLineMessageToGroup(message.groupId, groupWarningMessage, accessToken);
                   console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
                 } else {
                   console.log(`✅ Balance sufficient for ${userName}`);
