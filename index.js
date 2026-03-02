@@ -2008,7 +2008,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`❌ Insufficient balance detected`);
                   
                   // สร้างข้อความแจ้งเตือนในกลุ่ม
-                  let groupWarningMessage = `❌ ยอดเงินไม่เพียงพอ\n\n`;
+                  let groupWarningMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n`;
                   
                   // Send detailed message to User A if balance is insufficient
                   if (userABalance < betAmount) {
@@ -2043,7 +2043,13 @@ app.post('/webhook', async (req, res) => {
                   }
                   
                   // แจ้งในกลุ่มด้วย
-                  groupWarningMessage += `\n💡 โปรดเติมเงินและส่งสลิปให้ระบบตรวจสอบ`;
+                  groupWarningMessage += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                  groupWarningMessage += `💡 วิธีแก้ไข:\n`;
+                  groupWarningMessage += `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n`;
+                  groupWarningMessage += `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n`;
+                  groupWarningMessage += `3️⃣  รอการยืนยันจากระบบ\n`;
+                  groupWarningMessage += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
+                  groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
                 } else {
