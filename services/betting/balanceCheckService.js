@@ -14,8 +14,11 @@ class BalanceCheckService {
     this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
     this.playersSheetName = 'Players';
     this.usersBalanceSheetName = 'UsersBalance';
-    // ใช้ Account 1 สำหรับส่งแจ้งเตือน
-    this.lineNotificationService = new LineNotificationService(1);
+    // สร้าง notification service สำหรับแต่ละ Account (Account 1 & 2 เท่านั้น)
+    this.lineNotificationServices = {
+      1: new LineNotificationService(1),
+      2: new LineNotificationService(2),
+    };
   }
 
   /**
@@ -128,8 +131,9 @@ class BalanceCheckService {
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
    * @param {number} shortfall - ยอดเงินที่ขาด
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
+   * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
    */
-  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId) {
+  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1) {
     try {
       const message = this.buildInsufficientBalanceMessage(
         lineName,
@@ -138,16 +142,19 @@ class BalanceCheckService {
         shortfall
       );
 
-      console.log(`📤 Sending insufficient balance notification to ${userId} (${lineName})`);
+      console.log(`📤 Sending insufficient balance notification to ${userId} (${lineName}) via Account ${accountNumber}`);
       console.log(`   Current balance: ${currentBalance} บาท`);
       console.log(`   Required amount: ${requiredAmount} บาท`);
       console.log(`   Shortfall: ${shortfall} บาท`);
 
+      // เลือก notification service ตามหมายเลข Account
+      const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
+
       // ส่งข้อความส่วนตัว
-      const result = await this.lineNotificationService.sendPrivateMessage(userId, message);
+      const result = await notificationService.sendPrivateMessage(userId, message);
 
       if (result.success) {
-        console.log(`✅ แจ้งเตือนยอดเงินไม่พอไปยัง ${lineName} สำเร็จ`);
+        console.log(`✅ แจ้งเตือนยอดเงินไม่พอไปยัง ${lineName} สำเร็จ (Account ${accountNumber})`);
         return { success: true };
       } else {
         console.error(`❌ ไม่สามารถส่งแจ้งเตือนไปยัง ${lineName}: ${result.error}`);
@@ -186,9 +193,10 @@ class BalanceCheckService {
    * @param {string} lineName - ชื่อ LINE
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
+   * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
    * @returns {object} ผลลัพธ์
    */
-  async checkAndNotify(lineName, requiredAmount, userId) {
+  async checkAndNotify(lineName, requiredAmount, userId, accountNumber = 1) {
     try {
       const checkResult = await this.checkBalance(lineName, requiredAmount);
 
@@ -199,7 +207,8 @@ class BalanceCheckService {
           checkResult.currentBalance,
           requiredAmount,
           checkResult.shortfall,
-          userId
+          userId,
+          accountNumber
         );
       }
 

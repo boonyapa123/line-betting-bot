@@ -8,7 +8,11 @@ const bettingPairingService = require('./bettingPairingService');
 
 class BettingResultService {
   constructor() {
-    this.lineNotificationService = new LineNotificationService();
+    // สร้าง notification service สำหรับแต่ละ Account (Account 1 & 2)
+    this.lineNotificationServices = {
+      1: new LineNotificationService(1),
+      2: new LineNotificationService(2),
+    };
     this.FEE_PERCENTAGE = 0.10; // 10% ค่าธรรมเนียมจากยอดเล่น
     this.DRAW_FEE_PERCENTAGE = 0.05; // 5% ค่าธรรมเนียมออกกลาง
   }
@@ -168,10 +172,14 @@ class BettingResultService {
    * @param {string} slipName - ชื่อบั้งไฟ
    * @param {number} score - คะแนนที่ออก
    * @param {string} groupId - ID ของกลุ่ม LINE
+   * @param {number} accountNumber - LINE OA Account Number (1 หรือ 2)
    */
-  async notifyLineResult(result, slipName, score, groupId) {
+  async notifyLineResult(result, slipName, score, groupId, accountNumber = 1) {
     try {
       const { winner, loser, isDraw } = result;
+
+      // เลือก notification service ตามหมายเลข Account
+      const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
 
       // สร้างข้อความแจ้งเตือน
       const resultMessage = this.buildResultMessage(
@@ -183,14 +191,14 @@ class BettingResultService {
 
       // แจ้งเตือนส่วนตัวผู้เล่น
       if (winner.userId) {
-        await this.lineNotificationService.sendPrivateMessage(
+        await notificationService.sendPrivateMessage(
           winner.userId,
           this.buildWinnerMessage(winner, slipName, score, isDraw)
         );
       }
 
       if (loser.userId) {
-        await this.lineNotificationService.sendPrivateMessage(
+        await notificationService.sendPrivateMessage(
           loser.userId,
           this.buildLoserMessage(loser, slipName, score, isDraw)
         );
@@ -198,7 +206,7 @@ class BettingResultService {
 
       // แจ้งเตือนในกลุ่ม
       if (groupId) {
-        await this.lineNotificationService.sendGroupMessage(
+        await notificationService.sendGroupMessage(
           groupId,
           resultMessage
         );

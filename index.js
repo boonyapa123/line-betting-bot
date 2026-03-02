@@ -1477,6 +1477,13 @@ async function sendLineMessageToGroup(groupId, message, accessToken) {
 // ===== WEBHOOK HANDLER =====
 app.post('/webhook', async (req, res) => {
   try {
+    // Initialize balanceCheckService if not already initialized
+    const balanceCheckService = require('./services/betting/balanceCheckService');
+    if (!balanceCheckService.sheets) {
+      await balanceCheckService.initialize();
+      console.log('✅ BalanceCheckService initialized');
+    }
+    
     const signature = req.headers['x-line-signature'];
     const body = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
     
@@ -1888,25 +1895,38 @@ app.post('/webhook', async (req, res) => {
                   
                   await sendLineMessageToUser(message.userId, personalMessage, accessToken);
                   console.log(`   📤 Personal message sent to ${userName}`);
+                  
+                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย
+                  const groupWarningMessage = `⚠️ ⚠️ ⚠️ ผู้เล่นยังไม่ลงทะเบียน ⚠️ ⚠️ ⚠️\n\n` +
+                    `👤 ${userName} ยังไม่ลงทะเบียน\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `💡 วิธีแก้ไข:\n` +
+                    `1️⃣  ติดต่อแอดมิน\n` +
+                    `2️⃣  ให้แอดมินเพิ่มชื่อในระบบ\n` +
+                    `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
+                    `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                  
+                  await sendLineMessageToGroup(message.groupId, groupWarningMessage, accessToken);
+                  console.log(`   📢 Group warning message sent`);
+
                 } else if (playerBalance < betAmount) {
                   console.log(`❌ Insufficient balance for ${userName}`);
                   
-                  // ส่งข้อความส่วนตัวให้ผู้เล่นเท่านั้น
-                  const personalMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
-                    `ชื่อ: ${userName}\n` +
-                    `ข้อความแทง: "${message.content}"\n` +
-                    `ยอดเงินปัจจุบัน: ${playerBalance} บาท\n` +
-                    `ต้องการ: ${betAmount} บาท\n` +
-                    `ขาดอีก: ${(betAmount - playerBalance).toFixed(0)} บาท\n\n` +
-                    `💳 ช่องทางเติมเงิน:\n` +
-                    `• เพิ่มเพื่อน @774pojob\n` +
-                    `• https://lin.ee/JO6X7FE\n\n` +
-                    `📞 ติดต่อสอบถาม: @774pojob`;
+                  // ใช้ balanceCheckService เพื่อส่งข้อความแจ้งเตือนผ่าน Account ที่ถูกต้อง
+                  const balanceCheckService = require('./services/betting/balanceCheckService');
                   
-                  await sendLineMessageToUser(message.userId, personalMessage, accessToken);
-                  console.log(`   📤 Personal message sent to ${userName}`);
+                  // ส่งข้อความแจ้งเตือนส่วนตัวผ่าน balanceCheckService
+                  await balanceCheckService.notifyInsufficientBalance(
+                    userName,
+                    playerBalance,
+                    betAmount,
+                    betAmount - playerBalance,
+                    message.userId,
+                    accountNumber
+                  );
+                  console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
                   
-                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย
+                  // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ใช้ Account ที่ถูกต้อง)
                   const groupWarningMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
                     `👤 ${userName} ยอดเงินไม่พอ (ขาด ${(betAmount - playerBalance).toFixed(0)} บาท)\n\n` +
                     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -1918,7 +1938,7 @@ app.post('/webhook', async (req, res) => {
                     `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   
                   await sendLineMessageToGroup(message.groupId, groupWarningMessage, accessToken);
-                  console.log(`   📢 Group warning message sent`);
+                  console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
                 } else {
                   console.log(`✅ Balance sufficient for ${userName}`);
                   

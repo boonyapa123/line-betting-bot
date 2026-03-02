@@ -129,7 +129,8 @@ class BettingRoundController {
     const balanceCheck = await balanceCheckService.checkAndNotify(
       lineName,
       parsedBet.amount,
-      userId
+      userId,
+      1 // Account 1
     );
 
     if (!balanceCheck.sufficient) {
@@ -287,7 +288,8 @@ class BettingRoundController {
           result,
           slipName,
           score,
-          null // groupId - ต้องส่งมาจากที่อื่น
+          null, // groupId - ต้องส่งมาจากที่อื่น
+          1 // Account 1
         );
 
         results.push(result);

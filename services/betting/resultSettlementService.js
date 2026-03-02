@@ -15,9 +15,10 @@ class ResultSettlementService {
    * @param {string} announcementText - ข้อความประกาศผล เช่น "499คะแนน แอดเทวดา✅️"
    * @param {array} allBets - รายการการเล่นทั้งหมด
    * @param {string} groupId - ID ของกลุ่ม LINE
+   * @param {number} accountNumber - LINE OA Account Number (1 หรือ 2)
    * @returns {object} ผลการสรุป
    */
-  async settleResult(announcementText, allBets, groupId) {
+  async settleResult(announcementText, allBets, groupId, accountNumber = 1) {
     const settlement = {
       success: false,
       steps: [],
@@ -95,7 +96,8 @@ class ResultSettlementService {
         calculateStep.data.results,
         slipName,
         score,
-        groupId
+        groupId,
+        accountNumber
       );
       settlement.steps.push(notifyStep);
 
@@ -307,10 +309,10 @@ class ResultSettlementService {
    * Step 7: แจ้งเตือน LINE
    * @private
    */
-  async notifyResults(results, slipName, score, groupId) {
+  async notifyResults(results, slipName, score, groupId, accountNumber = 1) {
     try {
       const notifyPromises = results.map((result) =>
-        bettingResultService.notifyLineResult(result, slipName, score, groupId)
+        bettingResultService.notifyLineResult(result, slipName, score, groupId, accountNumber)
       );
 
       const notifyResults = await Promise.all(notifyPromises);
