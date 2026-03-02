@@ -2007,6 +2007,9 @@ app.post('/webhook', async (req, res) => {
                 if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
                   
+                  // สร้างข้อความแจ้งเตือนในกลุ่ม
+                  let groupWarningMessage = `❌ ยอดเงินไม่เพียงพอ\n\n`;
+                  
                   // Send detailed message to User A if balance is insufficient
                   if (userABalance < betAmount) {
                     const userADetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
@@ -2020,6 +2023,7 @@ app.post('/webhook', async (req, res) => {
                       `• https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
+                    groupWarningMessage += `👤 ${userAName} ยอดเงินไม่พอ (ขาด ${(betAmount - userABalance).toFixed(0)} บาท)\n`;
                   }
                   
                   // Send detailed message to User B if balance is insufficient
@@ -2035,7 +2039,13 @@ app.post('/webhook', async (req, res) => {
                       `• https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
+                    groupWarningMessage += `👤 ${userBName} ยอดเงินไม่พอ (ขาด ${(betAmount - userBBalance).toFixed(0)} บาท)\n`;
                   }
+                  
+                  // แจ้งในกลุ่มด้วย
+                  groupWarningMessage += `\n💡 โปรดเติมเงินและส่งสลิปให้ระบบตรวจสอบ`;
+                  console.log(`   📢 Sending group warning message`);
+                  await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
                 } else {
                   // ยอดเงินเพียงพอ บันทึกการเดิมพัน
                   console.log(`✅ Balance sufficient for both players`);
