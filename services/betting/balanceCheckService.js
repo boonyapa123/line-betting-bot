@@ -14,7 +14,8 @@ class BalanceCheckService {
     this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
     this.playersSheetName = 'Players';
     this.usersBalanceSheetName = 'UsersBalance';
-    this.lineNotificationService = new LineNotificationService();
+    // ใช้ Account 1 สำหรับส่งแจ้งเตือน
+    this.lineNotificationService = new LineNotificationService(1);
   }
 
   /**
@@ -137,11 +138,21 @@ class BalanceCheckService {
         shortfall
       );
 
-      // ส่งข้อความส่วนตัว
-      await this.lineNotificationService.sendPrivateMessage(userId, message);
+      console.log(`📤 Sending insufficient balance notification to ${userId} (${lineName})`);
+      console.log(`   Current balance: ${currentBalance} บาท`);
+      console.log(`   Required amount: ${requiredAmount} บาท`);
+      console.log(`   Shortfall: ${shortfall} บาท`);
 
-      console.log(`✅ แจ้งเตือนยอดเงินไม่พอไปยัง ${lineName} สำเร็จ`);
-      return { success: true };
+      // ส่งข้อความส่วนตัว
+      const result = await this.lineNotificationService.sendPrivateMessage(userId, message);
+
+      if (result.success) {
+        console.log(`✅ แจ้งเตือนยอดเงินไม่พอไปยัง ${lineName} สำเร็จ`);
+        return { success: true };
+      } else {
+        console.error(`❌ ไม่สามารถส่งแจ้งเตือนไปยัง ${lineName}: ${result.error}`);
+        return { success: false, error: result.error };
+      }
     } catch (error) {
       console.error('Error notifying insufficient balance:', error);
       return { success: false, error: error.message };
@@ -153,16 +164,18 @@ class BalanceCheckService {
    * @private
    */
   buildInsufficientBalanceMessage(lineName, currentBalance, requiredAmount, shortfall) {
-    let message = `⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน\n\n`;
-    message += `ชื่อ: ${lineName}\n`;
-    message += `ยอดเงินปัจจุบัน: ${currentBalance} บาท\n`;
-    message += `จำนวนเงินที่ต้องการเดิมพัน: ${requiredAmount} บาท\n`;
-    message += `ขาด: ${shortfall} บาท\n\n`;
+    let message = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n\n`;
+    message += `👤 ชื่อ: ${lineName}\n`;
+    message += `💰 ยอดเงินปัจจุบัน: ${currentBalance} บาท\n`;
+    message += `🎰 จำนวนเงินที่ต้องการเดิมพัน: ${requiredAmount} บาท\n`;
+    message += `❌ ขาด: ${shortfall} บาท\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `💡 วิธีแก้ไข:\n`;
-    message += `1. โอนเงินเพิ่มอย่างน้อย ${shortfall} บาท\n`;
-    message += `2. ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n`;
-    message += `3. รอการยืนยันจากระบบ\n`;
-    message += `4. ลองเดิมพันใหม่อีกครั้ง\n\n`;
+    message += `1️⃣  โอนเงินเพิ่มอย่างน้อย ${shortfall} บาท\n`;
+    message += `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n`;
+    message += `3️⃣  รอการยืนยันจากระบบ\n`;
+    message += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `📱 ติดต่อแอดมิน หากมีปัญหา`;
 
     return message;

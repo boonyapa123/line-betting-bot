@@ -6,9 +6,19 @@
 const axios = require('axios');
 
 class LineNotificationService {
-  constructor() {
-    this.accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  constructor(accountNumber = 1) {
+    // ใช้ Account ที่ระบุ (default = Account 1)
+    const tokenKey = accountNumber === 1 
+      ? 'LINE_CHANNEL_ACCESS_TOKEN'
+      : `LINE_CHANNEL_ACCESS_TOKEN_${accountNumber}`;
+    
+    this.accessToken = process.env[tokenKey];
+    this.accountNumber = accountNumber;
     this.apiUrl = 'https://api.line.biz/v2/bot/message';
+    
+    if (!this.accessToken) {
+      console.warn(`⚠️  Warning: ${tokenKey} not found in environment variables`);
+    }
   }
 
   /**
