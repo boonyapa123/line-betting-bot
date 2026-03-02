@@ -24,9 +24,13 @@ class BettingMessageParserService {
    * 
    * รูปแบบใหม่: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
    * ตัวอย่าง: "0/3(300-330) ล 500 ฟ้าหลังฝน"
+   * 
+   * รูปแบบง่าย: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "300-330 ล 500 ฟ้าหลังฝน"
    */
   static METHOD2_PATTERN = /^(.+?)\s+([ลย]\.)\s+(\d+)\s+(.+)$/;
   static METHOD2_ALT_PATTERN = /^(.+?)\s+([ลย])\s+(\d+)\s+(.+)$/;
+  static METHOD2_SIMPLE_PATTERN = /^(\d+-\d+)\s+([ลย])\s+(\d+)\s+(.+)$/;
 
   /**
    * Parse ข้อความเล่น
@@ -58,6 +62,12 @@ class BettingMessageParserService {
     const method2AltMatch = trimmedMessage.match(this.METHOD2_ALT_PATTERN);
     if (method2AltMatch) {
       return this.parseMethod2Alt(method2AltMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบง่าย
+    const method2SimpleMatch = trimmedMessage.match(this.METHOD2_SIMPLE_PATTERN);
+    if (method2SimpleMatch) {
+      return this.parseMethod2Simple(method2SimpleMatch);
     }
 
     // ไม่ตรงรูปแบบ
@@ -161,6 +171,32 @@ class BettingMessageParserService {
   }
 
   /**
+   * Parse วิธีที่ 2 (ราคาคะแนน) - รูปแบบง่าย
+   * รูปแบบ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+   * ตัวอย่าง: "300-330 ล 500 ฟ้าหลังฝน"
+   * @private
+   */
+  static parseMethod2Simple(match) {
+    const [, price, side, amount, slipName] = match;
+
+    const sideMap = {
+      'ล': 'ไล่',
+      'ย': 'ยั้ง',
+    };
+
+    return {
+      success: true,
+      method: 2,
+      price: price.trim(),
+      side: sideMap[side] || side,
+      sideCode: side,
+      amount: parseInt(amount),
+      slipName: slipName.trim(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
    * ให้คำแนะนำตามข้อความที่ส่งมา
    * @private
    */
@@ -169,9 +205,9 @@ class BettingMessageParserService {
       return 'วิธีที่ 1: [ชื่อบั้งไฟ] [ชล./ชถ.] [ยอดเงิน]\nตัวอย่าง: ฟ้าหลังฝน ชล. 500';
     }
     if (message.includes('ล') || message.includes('ย')) {
-      return 'วิธีที่ 2: [ราคา] [ล./ย.] [ยอดเงิน] [ชื่อบั้งไฟ]\nตัวอย่าง: 0/3(300-330) ล. 500 ฟ้าหลังฝน';
+      return 'วิธีที่ 2: [ราคา] [ล./ย.] [ยอดเงิน] [ชื่อบั้งไฟ]\nตัวอย่าง: 0/3(300-330) ล. 500 ฟ้าหลังฝน\nหรือ: 300-330 ล 500 ฟ้าหลังฝน';
     }
-    return 'กรุณาใช้รูปแบบใดรูปแบบหนึ่ง:\nวิธีที่ 1: ฟ้าหลังฝน ชล. 500\nวิธีที่ 2: 0/3(300-330) ล. 500 ฟ้าหลังฝน';
+    return 'กรุณาใช้รูปแบบใดรูปแบบหนึ่ง:\nวิธีที่ 1: ฟ้าหลังฝน ชล. 500\nวิธีที่ 2: 0/3(300-330) ล. 500 ฟ้าหลังฝน\nหรือ: 300-330 ล 500 ฟ้าหลังฝน';
   }
 
   /**
