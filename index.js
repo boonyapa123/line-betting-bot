@@ -375,9 +375,12 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const userAId = row[1] || '';
     const userAName = row[2] || '';
     const userBId = row[11] || '';
-    const userBName = row[11] || '';
+    const userBName = row[12] || '';  // ✅ Column M (index 12) = User B Name
     const betAmount = parseFloat(row[6]) || 0;
     const fireworkName = row[4] || '';
+    const userAToken = row[15] || '';  // ✅ Column P (index 15) = User A Token
+    const userBToken = row[16] || '';  // ✅ Column Q (index 16) = User B Token
+    const groupId = row[14] || '';     // ✅ Column O (index 14) = Group ID
     
     // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
@@ -451,7 +454,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         `ยินดีด้วย! 🎉`;
       
       if (userAId && userAName) {
-        await sendLineMessageToUser(userAId, messageA, accessToken);
+        await sendLineMessageToUser(userAId, messageA, userAToken);
       }
       
       // ส่งข้อความให้ User B ถ้ามี
@@ -464,7 +467,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
           `👤 ผู้ชนะ: ${userAName}\n\n` +
           `ลองใหม่นะ 💪`;
         
-        await sendLineMessageToUser(userBId, messageB, accessToken);
+        await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     } else if (resultSymbol === '❌') {
       // User A แพ้
@@ -477,7 +480,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         `ลองใหม่นะ 💪`;
       
       if (userAId && userAName) {
-        await sendLineMessageToUser(userAId, messageA, accessToken);
+        await sendLineMessageToUser(userAId, messageA, userAToken);
       }
       
       // ส่งข้อความให้ User B ถ้ามี
@@ -490,7 +493,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
           `👤 ผู้แพ้: ${userAName}\n\n` +
           `ยินดีด้วย! 🎉`;
         
-        await sendLineMessageToUser(userBId, messageB, accessToken);
+        await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     } else {
       // เสมอ
@@ -1141,27 +1144,29 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     const userBResult = getOppositeResult(betDetailsA.betType);
     
     const row = [
-      timestamp,
-      pair.userA,
-      userAName,
-      pair.messageA,
-      betDetailsA.fireworkName || '',
-      betDetailsA.betType || '',
-      betAmount,
-      betAmount,
-      '',
-      '',
-      userBResult,
-      pair.userB,
-      userBName,
-      oppositeBetType,
-      userBToken,
-      groupName
+      timestamp,           // [0] = A: Timestamp
+      pair.userA,          // [1] = B: User A ID
+      userAName,           // [2] = C: ชื่อ User A
+      pair.messageA,       // [3] = D: ข้อความ A
+      betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
+      betDetailsA.betType || '',       // [5] = F: รายการเล่น
+      betAmount,           // [6] = G: ยอดเงิน
+      betAmount,           // [7] = H: ยอดเงิน B
+      '',                  // [8] = I: ผลที่ออก (ว่าง - อัปเดตเมื่อประกาศผล)
+      '',                  // [9] = J: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
+      '',                  // [10] = K: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
+      pair.userB,          // [11] = L: User B ID
+      userBName,           // [12] = M: ชื่อ User B
+      oppositeBetType,     // [13] = N: รายการแทง
+      groupName,           // [14] = O: ชื่อกลุ่มแชท
+      userBToken,          // [15] = P: User B Token
+      pair.groupId || ''   // [16] = Q: Group ID
     ];
     
-    console.log(`   📊 Row data (16 columns):`);
+    console.log(`   📊 Row data (17 columns):`);
     row.forEach((val, idx) => {
-      console.log(`      [${idx}]: "${val}"`);
+      const colLetter = String.fromCharCode(65 + idx); // A=65
+      console.log(`      [${colLetter}]: "${val}"`);
     });
     
     // Get current row count
@@ -1180,7 +1185,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:P${nextRowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:Q${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [row],

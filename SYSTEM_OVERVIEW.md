@@ -124,23 +124,25 @@
 | L | Access Token | 4T31zd9SH2ZeCnipxzAD9L74EHbQAmGK0aAxyoM9gdLerSl/EwLJrsjDGKrV0EzNXn2hFs1hSGM/CU/Gin/UmQCR0pIrzMQIggUXyhCf6/hVI4RrB75We/rGtO2lQXzQHIiTKJTFyTNRQkm+fSq3HAdB04t89/1O/w1cDnyilFU= |
 
 ### **Bets Sheet** (ข้อมูลการเดิมพัน)
-| Column | ชื่อ | ตัวอย่าง |
-|--------|------|---------|
-| A | Timestamp | 28/02/2569 12:51:36 |
-| B | User A ID | Uf08190b1da70f9ba810d424cf7d04366 |
-| C | User A Name | สมชาย สายไหม |
-| D | User A Message | บั้งไฟ 310 ✅ 100 |
-| E | Firework Name | บั้งไฟ 310 |
-| F | Bet Type A | ✅ |
-| G | Amount A | 100 |
-| H | Amount B | 100 |
-| I | Result Number | 310 |
-| J | Result A | ✅ |
-| K | Result B | ❌ |
-| L | User B ID | Uf08190b1da70f9ba810d424cf7d04367 |
-| M | User B Name | วิชัย ศรีสวัสดิ์ |
-| N | Bet Type B | ❌ |
-| O | Group Name | Betting Group |
+| Column | ชื่อ | ตัวอย่าง | หมายเหตุ |
+|--------|------|---------|---------|
+| A | Timestamp | 28/02/2569 12:51:36 | วันเวลาที่บันทึก |
+| B | User A ID | Uf08190b1da70f9ba810d424cf7d04366 | ID ผู้เล่น A |
+| C | User A Name | สมชาย สายไหม | ชื่อผู้เล่น A |
+| D | User A Message | บั้งไฟ 310 ✅ 100 | ข้อความเดิมพัน A |
+| E | Firework Name | บั้งไฟ 310 | ชื่อบั้งไฟ |
+| F | Bet Type A | ✅ | ประเภทเดิมพัน A (✅/❌) |
+| G | Amount A | 100 | ยอดเงินเดิมพัน A |
+| H | Amount B | 100 | ยอดเงินเดิมพัน B |
+| I | Result Number | 310 | ผลที่ออก |
+| J | Result A | ✅ | ผลแพ้ชนะ User A |
+| K | Result B | ❌ | ผลแพ้ชนะ User B |
+| L | User B ID | Uf08190b1da70f9ba810d424cf7d04367 | ID ผู้เล่น B |
+| M | User B Name | วิชัย ศรีสวัสดิ์ | ชื่อผู้เล่น B |
+| N | Bet Type B | ❌ | ประเภทเดิมพัน B (✅/❌) |
+| O | Group Name | Betting Group | ชื่อกลุ่มแชท |
+| P | User A Token | 4T31zd9SH2ZeCnipxzAD9L74EHbQAmGK0aAxyoM9gdLerSl/... | Access Token สำหรับส่งข้อความ User A |
+| Q | User B Token | 4T31zd9SH2ZeCnipxzAD9L74EHbQAmGK0aAxyoM9gdLerSl/... | ✅ Access Token สำหรับส่งข้อความ User B |
 
 ### **Slip Verification Sheet** (ประวัติตรวจสลิป)
 | Column | ชื่อ | ตัวอย่าง |
