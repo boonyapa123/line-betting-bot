@@ -2544,6 +2544,56 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
       });
 
       console.log(`   ✅ UPDATE SUCCESS: ${actualUserName} | Balance: ${currentBalance} → ${newBalance} บาท`);
+      
+      // 🔄 อัปเดต UsersBalance ด้วย
+      console.log(`   🔄 Updating UsersBalance sheet...`);
+      try {
+        const usersBalanceResponse = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: googleSheetId,
+          range: `UsersBalance!A:C`,
+        });
+        
+        const usersBalanceRows = usersBalanceResponse.data.values || [];
+        let usersBalanceRowIndex = null;
+        
+        // ค้นหาผู้เล่นในชีท UsersBalance
+        for (let i = 1; i < usersBalanceRows.length; i++) {
+          if (usersBalanceRows[i] && usersBalanceRows[i][1] === actualUserName) {
+            usersBalanceRowIndex = i + 1;
+            break;
+          }
+        }
+        
+        if (usersBalanceRowIndex) {
+          // อัปเดตยอดเงินในชีท UsersBalance
+          await sheets.spreadsheets.values.update({
+            auth: googleAuth,
+            spreadsheetId: googleSheetId,
+            range: `UsersBalance!C${usersBalanceRowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[newBalance]],
+            },
+          });
+          console.log(`   ✅ UsersBalance updated: ${newBalance} บาท`);
+        } else {
+          // สร้างแถวใหม่ในชีท UsersBalance
+          const nextRowIndex = usersBalanceRows.length + 1;
+          await sheets.spreadsheets.values.update({
+            auth: googleAuth,
+            spreadsheetId: googleSheetId,
+            range: `UsersBalance!A${nextRowIndex}:C${nextRowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[userId, actualUserName, newBalance]],
+            },
+          });
+          console.log(`   ✅ UsersBalance created: ${newBalance} บาท`);
+        }
+      } catch (usersBalanceError) {
+        console.error(`   ⚠️  Failed to update UsersBalance: ${usersBalanceError.message}`);
+      }
     } else {
       // สร้างผู้เล่นใหม่
       console.log(`   📝 CREATE: Creating new player: ${actualUserName}`);
@@ -2575,6 +2625,32 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
       });
 
       console.log(`   ✅ CREATE SUCCESS: ${actualUserName} | Balance: ${amount} บาท`);
+      
+      // 🔄 เพิ่มลงชีท UsersBalance ด้วย
+      console.log(`   🔄 Adding to UsersBalance sheet...`);
+      try {
+        const usersBalanceResponse = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: googleSheetId,
+          range: `UsersBalance!A:C`,
+        });
+        
+        const usersBalanceRows = usersBalanceResponse.data.values || [];
+        const nextRowIndex = usersBalanceRows.length + 1;
+        
+        await sheets.spreadsheets.values.update({
+          auth: googleAuth,
+          spreadsheetId: googleSheetId,
+          range: `UsersBalance!A${nextRowIndex}:C${nextRowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[userId, actualUserName, amount]],
+          },
+        });
+        console.log(`   ✅ UsersBalance created: ${amount} บาท`);
+      } catch (usersBalanceError) {
+        console.error(`   ⚠️  Failed to add to UsersBalance: ${usersBalanceError.message}`);
+      }
     }
 
     return {
