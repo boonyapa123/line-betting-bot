@@ -48,29 +48,50 @@ class BettingPairingService {
    */
   async recordBet(betData, userId, displayName, lineName = '') {
     try {
+      // สร้างข้อมูลสำหรับบันทึก
+      // D: ข้อความที่ส่ง (เช่น "ลูกชายภูน้อย ชล 150")
+      // E: ชื่อบั้งไฟ (เช่น "ลูกชายภูน้อย")
+      // F: รายการเล่น (เช่น "ชล")
+      // G: ยอดเงิน (เช่น "150")
+      
+      const messageText = `${betData.slipName} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''}`;
+      
       const row = [
-        new Date().toISOString(), // Timestamp
-        userId,
-        displayName,
-        lineName, // ชื่อ LINE
-        betData.method, // REPLY หรือ 1 หรือ 2
-        betData.price || '', // ราคา (วิธีที่ 2 เท่านั้น)
-        betData.sideCode, // ชล/ชถ/ล/ย/ต
-        betData.amount || '', // จำนวนเงิน (REPLY method ไม่มี)
-        betData.slipName,
-        'OPEN', // สถานะ
+        new Date().toISOString(), // A: Timestamp
+        userId, // B: User A ID
+        displayName, // C: ชื่อ User A
+        messageText, // D: ข้อความ A (เช่น "ลูกชายภูน้อย ชล 150")
+        betData.slipName, // E: ชื่อบั้งไฟ (เช่น "ลูกชายภูน้อย")
+        betData.sideCode, // F: รายการเล่น (เช่น "ชล")
+        betData.amount || '', // G: ยอดเงิน (เช่น "150")
+        '', // H: ยอดเงิน B (ว่างเปล่า - รอการจับคู่)
+        '', // I: แสดงผล
+        '', // J: แสดงผลชนะ
+        '', // K: User B ID
+        '', // L: ชื่อ User B
+        '', // M: รายการเล่น B
+        '', // N: ผลลัพธ์สุดท้าย
       ];
 
-      // เพิ่มแถวใหม่
+      // เพิ่มแถวใหม่ลงชีท Bets
+      console.log(`📝 Recording bet to Bets sheet: ${this.transactionsSheetName}`);
+      console.log(`   Timestamp: ${row[0]}`);
+      console.log(`   User A: ${displayName}`);
+      console.log(`   Message: ${messageText}`);
+      console.log(`   Slip: ${betData.slipName}`);
+      console.log(`   Side: ${betData.sideCode}`);
+      console.log(`   Amount: ${betData.amount || 'N/A'}`);
+      
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A:J`,
+        range: `${this.transactionsSheetName}!A:N`,
         valueInputOption: 'RAW',
         resource: {
           values: [row],
         },
       });
 
+      console.log(`✅ Bet recorded successfully to ${this.transactionsSheetName}`);
       return { success: true, message: 'บันทึกการเล่นสำเร็จ' };
     } catch (error) {
       console.error('Error recording bet:', error);
