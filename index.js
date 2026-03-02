@@ -1049,6 +1049,32 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     console.log('📤 Recording to Google Sheets...');
     console.log(`   Match Type: ${matchType}`);
     
+    // ดึง Token ของ User A และ User B จาก Players Sheet
+    const playersResponse = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:K`,
+    });
+    
+    const playerRows = playersResponse.data.values || [];
+    let userAToken = '';
+    let userBToken = '';
+    
+    for (let i = 1; i < playerRows.length; i++) {
+      const row = playerRows[i];
+      if (row && row.length >= 11) {
+        if (row[0] === pair.userA) {
+          userAToken = row[10] || ''; // Column K = Token
+        }
+        if (row[0] === pair.userB) {
+          userBToken = row[10] || ''; // Column K = Token
+        }
+      }
+    }
+    
+    console.log(`   🔑 User A Token: ${userAToken ? '✅' : '❌'}`);
+    console.log(`   🔑 User B Token: ${userBToken ? '✅' : '❌'}`);
+    
     // Extract bet details
     const betDetailsA = {
       fireworkName: extractFireworkName(pair.messageA),
@@ -1109,12 +1135,14 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       '',
       '',
       userBResult,
+      pair.userB,
       userBName,
       oppositeBetType,
+      userBToken,
       groupName
     ];
     
-    console.log(`   📊 Row data (14 columns):`);
+    console.log(`   📊 Row data (16 columns):`);
     row.forEach((val, idx) => {
       console.log(`      [${idx}]: "${val}"`);
     });
@@ -1135,7 +1163,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:N${nextRowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:P${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [row],
