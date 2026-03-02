@@ -1596,25 +1596,12 @@ app.post('/webhook', async (req, res) => {
           console.log(`\n🔐 Slip2Go API Response Code: ${code}`);
           console.log(`   Message: ${verificationService.getValidationMessage(verificationResult)}`);
 
-          // ตรวจสอบสลิปจริงหรือไม่
-          if (!verificationService.isVerified(verificationResult)) {
-            console.log(`\n❌ Slip is not valid (fake slip)`);
-            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: สลิปปลอม\n\n` +
-              `📸 กรุณาส่งสลิปจริง`;
-            try {
-              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
-            } catch (sendError) {
-              console.error(`❌ Failed to send error message: ${sendError.message}`);
-            }
-            continue;
-          }
-
-          // ตรวจสอบสลิปซ้ำ
+          // ตรวจสอบสลิปซ้ำ FIRST (ก่อนตรวจสอบอื่น)
           if (verificationService.isDuplicate(verificationResult)) {
-            console.log(`\n❌ Duplicate slip detected`);
+            console.log(`\n❌ Duplicate slip detected (Code: 200501)`);
             const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n\n` +
+              `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n` +
+              `📋 รหัส: 200501\n\n` +
               `📸 กรุณาส่งสลิปใหม่`;
             try {
               await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
@@ -1624,12 +1611,28 @@ app.post('/webhook', async (req, res) => {
             continue;
           }
 
-          // ตรวจสอบบัญชีตรงกันหรือไม่
+          // ตรวจสอบบัญชีตรงกันหรือไม่ SECOND
           if (!verificationService.isReceiverMatched(verificationResult)) {
-            console.log(`\n❌ Receiver account not matched`);
+            console.log(`\n❌ Receiver account not matched (Code: 200401)`);
             const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n\n` +
+              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n` +
+              `📋 รหัส: 200401\n\n` +
               `📸 กรุณาส่งสลิปใหม่`;
+            try {
+              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+            } catch (sendError) {
+              console.error(`❌ Failed to send error message: ${sendError.message}`);
+            }
+            continue;
+          }
+
+          // ตรวจสอบสลิปจริงหรือไม่ THIRD (สลิปปลอม)
+          if (!verificationService.isVerified(verificationResult)) {
+            console.log(`\n❌ Slip is not valid - Fake slip (Code: 200500)`);
+            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+              `🚫 เหตุผล: สลิปปลอม\n` +
+              `📋 รหัส: 200500\n\n` +
+              `📸 กรุณาส่งสลิปจริง`;
             try {
               await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
             } catch (sendError) {
