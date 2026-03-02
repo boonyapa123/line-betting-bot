@@ -1,0 +1,405 @@
+/**
+ * BettingPairingService
+ * จับคู่การเล่นและคำนวณยอดเงิน
+ */
+
+const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
+
+class BettingPairingService {
+  constructor() {
+    this.sheets = null;
+    this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    this.transactionsSheetName = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
+    this.balanceSheetName = 'UsersBalance';
+  }
+
+  /**
+   * Initialize Google Sheets API
+   */
+  async initialize() {
+    try {
+      const credentialsPath = path.join(
+        __dirname,
+        '../../',
+        process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json'
+      );
+      const credentials = JSON.parse(fs.readFileSync(credentialsPath));
+
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      this.sheets = google.sheets({ version: 'v4', auth });
+    } catch (error) {
+      console.error('Error initializing BettingPairingService:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * บันทึกการเล่นลง Google Sheets
+   * @param {object} betData - ข้อมูลการเล่น
+   * @param {string} userId - User ID จาก LINE
+   * @param {string} displayName - ชื่อ User
+   * @returns {object}
+   */
+  async recordBet(betData, userId, displayName, lineName = '') {
+    try {
+      const row = [
+        new Date().toISOString(), // Timestamp
+        userId,
+        displayName,
+        lineName, // ชื่อ LINE
+        betData.method, // REPLY หรือ 1 หรือ 2
+        betData.price || '', // ราคา (วิธีที่ 2 เท่านั้น)
+        betData.sideCode, // ชล/ชถ/ล/ย/ต
+        betData.amount || '', // จำนวนเงิน (REPLY method ไม่มี)
+        betData.slipName,
+        'OPEN', // สถานะ
+      ];
+
+      // เพิ่มแถวใหม่
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.transactionsSheetName}!A:J`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [row],
+        },
+      });
+
+      return { success: true, message: 'บันทึกการเล่นสำเร็จ' };
+    } catch (error) {
+      console.error('Error recording bet:', error);
+      return { success: false, message: 'เกิดข้อผิดพลาดในการบันทึก' };
+    }
+  }
+
+  /**
+   * ดึงข้อมูลการเล่นทั้งหมดในรอบปัจจุบัน
+   * @returns {array}
+   */
+  async getAllBets() {
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.transactionsSheetName}!A2:J`,
+      });
+
+      const values = response.data.values || [];
+      return values.map((row) => ({
+        timestamp: row[0],
+        userId: row[1],
+        displayName: row[2],
+        lineName: row[3] || '',
+        method: row[4],
+        price: row[5],
+        side: row[6],
+        sideCode: row[6],
+        amount: parseInt(row[7]),
+        slipName: row[8],
+        status: row[9],
+      }));
+    } catch (error) {
+      console.error('Error getting all bets:', error);
+      return [];
+    }
+  }
+
+  /**
+   * จับคู่การเล่น (Pairing)
+   * ค้นหาคนที่เล่นบั้งไฟเดียวกัน ราคาเดียวกัน แต่ฝั่งตรงข้าม
+   * @param {array} bets - ข้อมูลการเล่นทั้งหมด
+   * @returns {array} คู่ที่จับได้
+   */
+  static findPairs(bets) {
+    const pairs = [];
+    const processed = new Set();
+
+    for (let i = 0; i < bets.length; i++) {
+      if (processed.has(i)) continue;
+
+      const bet1 = bets[i];
+      if (bet1.status === 'MATCHED') continue;
+
+      for (let j = i + 1; j < bets.length; j++) {
+        if (processed.has(j)) continue;
+
+        const bet2 = bets[j];
+        if (bet2.status === 'MATCHED') continue;
+
+        // ตรวจสอบว่าเป็นคู่หรือไม่
+        let isValid = false;
+
+        // Reply Method: ตรวจสอบ 2 เงื่อนไข
+        if (bet1.method === 'REPLY' && bet2.method === 'REPLY') {
+          isValid = this.isValidReplyPair(bet1, bet2);
+        }
+        // Direct Method: ตรวจสอบ 4 เงื่อนไข
+        else if (bet1.method !== 'REPLY' && bet2.method !== 'REPLY') {
+          isValid = this.isValidDirectPair(bet1, bet2);
+        }
+
+        if (isValid) {
+          pairs.push({
+            bet1: { ...bet1, index: i },
+            bet2: { ...bet2, index: j },
+          });
+          processed.add(i);
+          processed.add(j);
+          break;
+        }
+      }
+    }
+
+    return pairs;
+  }
+
+  /**
+   * ตรวจสอบว่าเป็นคู่ Reply ที่ถูกต้องหรือไม่
+   * @private
+   */
+  static isValidReplyPair(bet1, bet2) {
+    // ต้องเป็นบั้งไฟเดียวกัน
+    if (bet1.slipName !== bet2.slipName) return false;
+
+    // ทั้งคู่ต้อง reply
+    if (bet1.method !== 'REPLY' || bet2.method !== 'REPLY') return false;
+
+    return true;
+  }
+
+  /**
+   * ตรวจสอบว่าเป็นคู่ Direct ที่ถูกต้องหรือไม่
+   * @private
+   */
+  static isValidDirectPair(bet1, bet2) {
+    // ต้องเป็นบั้งไฟเดียวกัน
+    if (bet1.slipName !== bet2.slipName) return false;
+
+    // ต้องเป็นจำนวนเงินเดียวกัน
+    if (bet1.amount !== bet2.amount) return false;
+
+    // ต้องเป็นฝั่งตรงข้าม
+    const oppositeMap = {
+      'ชล': 'ชถ',
+      'ชถ': 'ชล',
+      'ล': 'ย',
+      'ย': 'ล',
+    };
+
+    if (oppositeMap[bet1.side] !== bet2.side) return false;
+
+    // วิธีที่ 2 ต้องมีราคาเดียวกัน
+    if (bet1.method === 2 && bet2.method === 2) {
+      if (bet1.price !== bet2.price) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * คำนวณผลลัพธ์การเล่น
+   * @param {object} pair - คู่การเล่น
+   * @param {string} slipName - ชื่อบั้งไฟ
+   * @param {number} score - คะแนนที่ออก (สำหรับ Direct Method เท่านั้น)
+   * @returns {object} ผลลัพธ์
+   */
+  static calculateResult(pair, slipName, score) {
+    const { bet1, bet2 } = pair;
+
+    // REPLY Method: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
+    if (bet1.method === 'REPLY' && bet2.method === 'REPLY') {
+      // สำหรับ REPLY method ให้ bet1 ชนะ (หรือสามารถกำหนดตามกฎเกมอื่น)
+      // ในที่นี้ให้ bet1 ชนะ
+      return {
+        winner: {
+          userId: bet1.userId,
+          displayName: bet1.displayName,
+          amount: 0, // REPLY method ไม่มีจำนวนเงิน
+          result: 'WIN',
+        },
+        loser: {
+          userId: bet2.userId,
+          displayName: bet2.displayName,
+          amount: 0, // REPLY method ไม่มีจำนวนเงิน
+          result: 'LOSE',
+        },
+      };
+    }
+
+    // Direct Method
+    let winner = null;
+    let loser = null;
+
+    if (bet1.method === 1) {
+      // วิธีที่ 1: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
+      winner = bet1.side === 'ชล' ? bet1 : bet2;
+      loser = bet1.side === 'ชล' ? bet2 : bet1;
+    } else if (bet1.method === 2) {
+      // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
+      const priceRange = this.parsePriceRange(bet1.price);
+      const isInRange = score >= priceRange.min && score <= priceRange.max;
+
+      if (isInRange) {
+        // คะแนนอยู่ในเกณฑ์ -> ฝั่ง "ไล่" (ล) ชนะ
+        winner = bet1.side === 'ไล่' ? bet1 : bet2;
+        loser = bet1.side === 'ไล่' ? bet2 : bet1;
+      } else {
+        // คะแนนไม่อยู่ในเกณฑ์ -> ฝั่ง "ยั้ง" (ย) ชนะ
+        winner = bet1.side === 'ยั้ง' ? bet1 : bet2;
+        loser = bet1.side === 'ยั้ง' ? bet2 : bet1;
+      }
+    }
+
+    return {
+      winner: {
+        userId: winner.userId,
+        displayName: winner.displayName,
+        amount: winner.amount || 0,
+        result: 'WIN',
+      },
+      loser: {
+        userId: loser.userId,
+        displayName: loser.displayName,
+        amount: loser.amount || 0,
+        result: 'LOSE',
+      },
+    };
+  }
+
+  /**
+   * Parse ราคาจากรูปแบบ "0/3(300-330)"
+   * @private
+   */
+  static parsePriceRange(priceStr) {
+    const match = priceStr.match(/\((\d+)-(\d+)\)/);
+    if (match) {
+      return {
+        min: parseInt(match[1]),
+        max: parseInt(match[2]),
+      };
+    }
+    return { min: 0, max: 999 };
+  }
+
+  /**
+   * อัปเดตยอดเงินของ User
+   * @param {string} userId
+   * @param {number} amount - จำนวนเงินที่เพิ่ม/ลด (บวก/ลบ)
+   * @returns {object}
+   */
+  async updateUserBalance(lineName, amount) {
+    try {
+      // ดึงข้อมูล User ปัจจุบัน
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.balanceSheetName}!A:C`,
+      });
+
+      const values = response.data.values || [];
+      let userRowIndex = -1;
+      let currentBalance = 0;
+
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][1] === lineName) {
+          userRowIndex = i;
+          currentBalance = parseInt(values[i][2]) || 0;
+          break;
+        }
+      }
+
+      const newBalance = currentBalance + amount;
+
+      if (userRowIndex >= 0) {
+        // อัปเดตแถวที่มีอยู่
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.balanceSheetName}!C${userRowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [[newBalance]],
+          },
+        });
+      }
+
+      return { success: true, newBalance };
+    } catch (error) {
+      console.error('Error updating user balance:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * ดึงยอดเงินคงเหลือของ User
+   * @param {string} userId
+   * @returns {number}
+   */
+  async getUserBalance(userId) {
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.balanceSheetName}!A:C`,
+      });
+
+      const values = response.data.values || [];
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][0] === userId) {
+          return parseInt(values[i][2]) || 0;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error('Error getting user balance:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * ดึงข้อมูลยอดเงินทั้งหมด
+   * @returns {array}
+   */
+  async getAllBalances() {
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.balanceSheetName}!A2:C`,
+      });
+
+      const values = response.data.values || [];
+      return values.map((row) => ({
+        userId: row[0],
+        displayName: row[1],
+        balance: parseInt(row[2]) || 0,
+      }));
+    } catch (error) {
+      console.error('Error getting all balances:', error);
+      return [];
+    }
+  }
+
+  /**
+   * ล้างข้อมูลการเล่นในรอบปัจจุบัน
+   * @returns {object}
+   */
+  async clearRoundTransactions() {
+    try {
+      // ลบข้อมูลทั้งหมดใน Transactions Sheet
+      await this.sheets.spreadsheets.values.clear({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.transactionsSheetName}!A2:I`,
+      });
+
+      return { success: true, message: 'ล้างข้อมูลการเล่นสำเร็จ' };
+    } catch (error) {
+      console.error('Error clearing transactions:', error);
+      return { success: false, message: 'เกิดข้อผิดพลาดในการล้างข้อมูล' };
+    }
+  }
+}
+
+module.exports = new BettingPairingService();
