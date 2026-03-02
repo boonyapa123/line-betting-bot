@@ -436,11 +436,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     let userBNewBalance = 0;
     
     if (userAId && userAName) {
-      userANewBalance = await getPlayerBalance(userAId, userAName);
+      const userABalanceData = await getPlayerBalance(userAId, userAName);
+      userANewBalance = userABalanceData.balance || 0;
     }
     
     if (userBId && userBName) {
-      userBNewBalance = await getPlayerBalance(userBId, userBName);
+      const userBBalanceData = await getPlayerBalance(userBId, userBName);
+      userBNewBalance = userBBalanceData.balance || 0;
     }
     
     if (resultSymbol === '✅') {
@@ -1589,93 +1591,115 @@ app.post('/webhook', async (req, res) => {
             console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
           }
 
-          // Create reply message
-          const replyMessage = verificationService.createLineMessage(verificationResult);
-          console.log(`   📝 Reply message created`);
+          // ตรวจสอบผลการตรวจสอบจาก Slip2Go API
+          const code = verificationResult?.code;
+          console.log(`\n🔐 Slip2Go API Response Code: ${code}`);
+          console.log(`   Message: ${verificationService.getValidationMessage(verificationResult)}`);
 
-          // Send reply to user FIRST (before recording)
-          console.log(`   📤 Sending reply to user...`);
-          try {
-            await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
-            console.log(`   ✅ Reply sent`);
-          } catch (replyError) {
-            console.error(`   ⚠️  Failed to send reply: ${replyError.message}`);
+          // ตรวจสอบสลิปจริงหรือไม่
+          if (!verificationService.isVerified(verificationResult)) {
+            console.log(`\n❌ Slip is not valid (fake slip)`);
+            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+              `🚫 เหตุผล: สลิปปลอม\n\n` +
+              `📸 กรุณาส่งสลิปจริง`;
+            try {
+              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+            } catch (sendError) {
+              console.error(`❌ Failed to send error message: ${sendError.message}`);
+            }
+            continue;
           }
 
-          // Record to Google Sheets if verified
-          if (verificationService.isVerified(verificationResult)) {
-            const slipData = verificationService.extractSlipData(verificationResult);
-            console.log(`\n💾 Recording slip data:`, slipData);
+          // ตรวจสอบสลิปซ้ำ
+          if (verificationService.isDuplicate(verificationResult)) {
+            console.log(`\n❌ Duplicate slip detected`);
+            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+              `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n\n` +
+              `📸 กรุณาส่งสลิปใหม่`;
+            try {
+              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+            } catch (sendError) {
+              console.error(`❌ Failed to send error message: ${sendError.message}`);
+            }
+            continue;
+          }
+
+          // ตรวจสอบบัญชีตรงกันหรือไม่
+          if (!verificationService.isReceiverMatched(verificationResult)) {
+            console.log(`\n❌ Receiver account not matched`);
+            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n\n` +
+              `📸 กรุณาส่งสลิปใหม่`;
+            try {
+              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+            } catch (sendError) {
+              console.error(`❌ Failed to send error message: ${sendError.message}`);
+            }
+            continue;
+          }
+
+          // ✅ ทั้งหมดตรวจสอบสำเร็จ บันทึกข้อมูล
+          console.log(`\n✅ All validations passed (Real slip, Not duplicate, Receiver matched)`);
+          
+          const slipData = verificationService.extractSlipData(verificationResult);
+          console.log(`💾 Recording slip data:`, slipData);
+          
+          try {
+            // ดึงยอดเงินก่อนหน้าก่อน (ก่อนบันทึก)
+            console.log(`📝 Getting current balance before recording...`);
+            const balanceData = await getPlayerBalance(event.source.userId, lineUserName);
+            const currentBalance = balanceData.balance || 0;
+            console.log(`   Current balance: ${currentBalance} บาท`);
+
+            // Record to Transactions sheet FIRST (ก่อนอัปเดต Players)
+            console.log(`📝 Recording to Transactions sheet...`);
+            await _recordTransactionToSheetFromSlip(
+              googleAuth,
+              GOOGLE_SHEET_ID,
+              event.source.userId,
+              lineUserName,
+              accessToken,
+              slipData,
+              currentBalance
+            );
+
+            // Record to Players sheet AFTER (หลังบันทึก Transactions)
+            console.log(`📝 Recording to Players sheet...`);
+            await _recordPlayerToSheetFromSlip(
+              googleAuth,
+              GOOGLE_SHEET_ID,
+              event.source.userId,
+              lineUserName,
+              accessToken,
+              verificationResult.data.amount
+            );
+
+            console.log(`   ✅ Recorded to Google Sheets`);
+
+            // Create and send success reply message
+            const replyMessage = verificationService.createLineMessage(verificationResult);
+            console.log(`   📝 Reply message created`);
+
+            // Send reply to user AFTER recording
+            console.log(`   📤 Sending reply to user...`);
+            try {
+              await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
+              console.log(`   ✅ Reply sent`);
+            } catch (replyError) {
+              console.error(`   ⚠️  Failed to send reply: ${replyError.message}`);
+            }
+          } catch (recordError) {
+            console.error(`   ⚠️  Failed to record to Google Sheets: ${recordError.message}`);
+            
+            // Send error message to user
+            const errorMessage = `❌ เกิดข้อผิดพลาดในการบันทึกเติมเงิน\n\n` +
+              `เหตุผล: ${recordError.message}\n\n` +
+              `📸 กรุณาติดต่อแอดมิน`;
             
             try {
-              // ตรวจสอบผลการตรวจสอบจาก Slip2Go API
-              const code = verificationResult?.code;
-              console.log(`\n🔐 Slip2Go API Response Code: ${code}`);
-              console.log(`   Message: ${verificationService.getValidationMessage(verificationResult)}`);
-
-              // ตรวจสอบสลิปซ้ำ
-              if (verificationService.isDuplicate(verificationResult)) {
-                console.log(`\n❌ Duplicate slip detected`);
-                const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-                  `🚫 เหตุผล: สลิปซ้ำ (เคยบันทึกไปแล้ว)\n\n` +
-                  `📸 กรุณาส่งสลิปใหม่`;
-                try {
-                  await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
-                } catch (sendError) {
-                  console.error(`❌ Failed to send error message: ${sendError.message}`);
-                }
-                continue;
-              }
-
-              // ตรวจสอบบัญชีตรงกันหรือไม่
-              if (!verificationService.isReceiverMatched(verificationResult)) {
-                console.log(`\n❌ Receiver account not matched`);
-                const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-                  `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n\n` +
-                  `📸 กรุณาส่งสลิปใหม่`;
-                try {
-                  await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
-                } catch (sendError) {
-                  console.error(`❌ Failed to send error message: ${sendError.message}`);
-                }
-                continue;
-              }
-
-              // ✅ ทั้งหมดตรวจสอบสำเร็จ บันทึกข้อมูล
-              console.log(`\n✅ All validations passed`);
-              
-              // ดึงยอดเงินก่อนหน้าก่อน (ก่อนบันทึก)
-              console.log(`📝 Getting current balance before recording...`);
-              const balanceData = await getPlayerBalance(event.source.userId, lineUserName);
-              const currentBalance = balanceData.balance || 0;
-              console.log(`   Current balance: ${currentBalance} บาท`);
-
-              // Record to Transactions sheet FIRST (ก่อนอัปเดต Players)
-              console.log(`📝 Recording to Transactions sheet...`);
-              await _recordTransactionToSheetFromSlip(
-                googleAuth,
-                GOOGLE_SHEET_ID,
-                event.source.userId,
-                lineUserName,
-                accessToken,
-                slipData,
-                currentBalance
-              );
-
-              // Record to Players sheet AFTER (หลังบันทึก Transactions)
-              console.log(`📝 Recording to Players sheet...`);
-              await _recordPlayerToSheetFromSlip(
-                googleAuth,
-                GOOGLE_SHEET_ID,
-                event.source.userId,
-                lineUserName,
-                accessToken,
-                verificationResult.data.amount
-              );
-
-              console.log(`   ✅ Recorded to Google Sheets`);
-            } catch (recordError) {
-              console.error(`   ⚠️  Failed to record to Google Sheets: ${recordError.message}`);
+              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+            } catch (sendError) {
+              console.error(`❌ Failed to send error message: ${sendError.message}`);
             }
           }
         } catch (error) {
@@ -1987,7 +2011,8 @@ app.post('/webhook', async (req, res) => {
                         
                         // จับคู่กับการเดิมพันแรกที่พบ
                         const matchedBet = matchingBets[0];
-                        const matchedUserBalance = await getPlayerBalance(matchedBet.userA, '');
+                        const matchedUserBalanceData = await getPlayerBalance(matchedBet.userA, '');
+                        const matchedUserBalance = matchedUserBalanceData.balance || 0;
                         
                         // ✅ ยึดจากคนยอดน้อยกว่า
                         const finalBetAmount = Math.min(betAmount, matchedBet.amountA, matchedUserBalance, playerBalance);
