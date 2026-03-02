@@ -14,7 +14,7 @@ class LineNotificationService {
     
     this.accessToken = process.env[tokenKey];
     this.accountNumber = accountNumber;
-    this.apiUrl = 'https://api.line.biz/v2/bot/message';
+    this.apiUrl = 'https://api.line.me/v2/bot/message';
     
     if (!this.accessToken) {
       console.warn(`⚠️  Warning: ${tokenKey} not found in environment variables`);
