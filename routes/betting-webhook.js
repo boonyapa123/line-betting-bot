@@ -249,4 +249,37 @@ router.post('/check-balance', async (req, res) => {
   }
 });
 
+/**
+ * GET /slip2go/accounts
+ * ดึงข้อมูลบัญชีที่ตั้งค่าไว้ใน Slip2Go
+ */
+router.get('/slip2go/accounts', async (req, res) => {
+  try {
+    const Slip2GoAccountService = require('../services/betting/slip2GoAccountService');
+    const slip2GoSecretKey = process.env.SLIP2GO_SECRET_KEY;
+    const slip2GoApiUrl = process.env.SLIP2GO_API_URL || 'https://connect.slip2go.com/api/verify-slip/qr-image/info';
+    
+    if (!slip2GoSecretKey) {
+      return res.status(400).json({
+        error: 'SLIP2GO_SECRET_KEY not configured',
+      });
+    }
+
+    const accountService = new Slip2GoAccountService(slip2GoSecretKey, slip2GoApiUrl);
+    const accounts = await accountService.getAccounts();
+
+    res.status(200).json({
+      success: true,
+      count: accounts.length,
+      accounts: accounts
+    });
+  } catch (error) {
+    console.error('Error fetching accounts:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;

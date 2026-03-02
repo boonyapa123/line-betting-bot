@@ -1557,20 +1557,13 @@ app.post('/webhook', async (req, res) => {
           const accountService = new Slip2GoAccountService(process.env.SLIP2GO_SECRET_KEY, process.env.SLIP2GO_API_URL);
           
           // ดึงข้อมูลบัญชีจาก Slip2Go API
-          let receiverAccount = '';
-          try {
-            console.log(`📋 Fetching receiver accounts from Slip2Go...`);
-            const accountsData = await accountService.getAccounts();
-            
-            if (accountsData && accountsData.length > 0) {
-              // ใช้บัญชีแรก (หรือสามารถเลือกตามเงื่อนไขอื่น)
-              receiverAccount = accountsData[0].accountNumber;
-              console.log(`   ✅ Using receiver account: ${receiverAccount}`);
-            } else {
-              console.log(`   ⚠️  No accounts found in Slip2Go`);
-            }
-          } catch (accountError) {
-            console.error(`   ⚠️  Failed to fetch accounts: ${accountError.message}`);
+          // ดึงข้อมูลบัญชีจาก environment variable
+          let receiverAccount = getReceiverAccount(event.source.userId);
+          
+          if (!receiverAccount) {
+            console.log(`   ⚠️  No receiver account configured`);
+          } else {
+            console.log(`   ✅ Using receiver account: ${receiverAccount}`);
           }
           
           const checkCondition = {
