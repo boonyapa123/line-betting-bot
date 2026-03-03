@@ -211,7 +211,7 @@ class BalanceCheckService {
         `3️⃣  รอการยืนยันจากระบบ\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-        `🔗 เข้าร่วมกลุ่ม: https://line.me/ti/g/a8bzxxPQLH`;
+        `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
 
       console.log(`\n📤 === Player Not Registered Notification ===`);
       console.log(`   Player: ${lineName}`);
@@ -242,7 +242,7 @@ class BalanceCheckService {
           `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
           `3️⃣  รอการยืนยันจากระบบ\n\n` +
           `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-          `🔗 เข้าร่วมกลุ่ม: https://line.me/ti/g/a8bzxxPQLH`;
+          `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
 
         console.log(`\n   📢 Sending group message...`);
         const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
@@ -346,7 +346,8 @@ class BalanceCheckService {
     message += `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n`;
     message += `3️⃣  รอการยืนยันจากระบบ\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `📱 ติดต่อแอดมิน หากมีปัญหา`;
+    message += `📱 ติดต่อแอดมิน หากมีปัญหา\n`;
+    message += `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
 
     return message;
   }
