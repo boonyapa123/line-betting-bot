@@ -335,16 +335,14 @@ class BalanceCheckService {
    * @private
    */
   buildInsufficientBalanceMessage(lineName, currentBalance, requiredAmount, shortfall) {
-    let message = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n\n`;
+    let message = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n`;
     message += `👤 ${lineName}\n`;
     message += `💰 ยอดเงินปัจจุบัน: ${currentBalance} บาท\n`;
-    message += `🎰 จำนวนเงินที่ต้องการเดิมพัน: ${requiredAmount} บาท\n`;
-    message += `❌ ขาด: ${shortfall} บาท\n\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `💡 วิธีแก้ไข (เติมเงิน):\n`;
     message += `1️⃣  โอนเงินเพิ่มอย่างน้อย ${shortfall} บาท\n`;
     message += `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n`;
-    message += `3️⃣  รอการยืนยันจากระบบ\n\n`;
+    message += `3️⃣  รอการยืนยันจากระบบ\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `📱 ติดต่อแอดมิน หากมีปัญหา\n`;
     message += `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;

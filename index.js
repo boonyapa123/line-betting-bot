@@ -1784,6 +1784,16 @@ app.post('/webhook', async (req, res) => {
             await sendLineMessage(message.groupId, summary, accessToken);
           }
           console.log(`✅ Summary sent`);
+        } else if (message.content.trim() === 'บช') {
+          console.log(`💳 Bank account command detected`);
+          const bankMessage = `💳✨ ช่องทางการเติมเงิน ✨💳\n\n🏦 ธนาคารกรุงไทย\n🔢 เลขที่บัญชี: 865-0-35901-9\n👤 ชื่อบัญชี: ชญาภา พรรณวงค์\n\n📎 กรุณาแนบสลิปการโอนเงินผ่านลิงก์ด้านล่างนี้\n🔗 https://lin.ee/JO6X7FE`;
+          await sendLineMessage(message.groupId, bankMessage, accessToken);
+          console.log(`✅ Bank account info sent`);
+        } else if (message.content.trim() === 'กติกา') {
+          console.log(`📋 Rules command detected`);
+          const rulesMessage = `👇วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\n-ชล 500 ฟ้าหลังฝน\n-ชถ 500 ฟ้าหลังฝน\n\n📌 วิธีที่ 2 ร้องราคา\n300-330 ล 500 ฟ้าหลังฝน\n300-330 ย 500 ฟ้าหลังฝน\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
+          await sendLineMessage(message.groupId, rulesMessage, accessToken);
+          console.log(`✅ Rules sent`);
         } else {
           // Check if this is a result announcement
           const resultData = parseResultMessage(message.content);
@@ -2040,6 +2050,45 @@ app.post('/webhook', async (req, res) => {
                   try {
                     await appendToGoogleSheets(pair, matchedUserName, userName, groupName, 'auto');
                     console.log(`✅ Auto-matched pair recorded successfully`);
+                    
+                    // 📢 ส่งข้อความแจ้งเตือนเมื่อจับคู่เล่นอัตโนมัติสำเร็จ
+                    const autoBetAmount = finalBetAmount;
+                    
+                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น A
+                    const userAAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 คุณ: ${matchedUserName}\n` +
+                      `👤 คู่แข่ง: ${userName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น B
+                    const userBAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 คุณ: ${userName}\n` +
+                      `👤 คู่แข่ง: ${matchedUserName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ข้อความแจ้งเตือนในกลุ่มแชท
+                    const groupAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 ${matchedUserName} vs ${userName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ส่งข้อความแจ้งเตือนส่วนตัว
+                    console.log(`   📤 Sending auto-pairing notification to ${matchedUserName}`);
+                    await sendLineMessageToUser(matchedBet.userA, userAAutoNotification, accessToken);
+                    
+                    console.log(`   📤 Sending auto-pairing notification to ${userName}`);
+                    await sendLineMessageToUser(message.userId, userBAutoNotification, accessToken);
+                    
+                    // ส่งข้อความแจ้งเตือนในกลุ่ม
+                    console.log(`   📤 Sending auto-pairing notification to group`);
+                    await sendLineMessage(message.groupId, groupAutoNotification, accessToken);
+                    
+                    console.log(`✅ Auto-pairing notifications sent`);
                   } catch (recordError) {
                     console.error(`❌ Failed to record pair: ${recordError.message}`);
                   }
@@ -2232,15 +2281,17 @@ app.post('/webhook', async (req, res) => {
                   
                   // Send detailed message to User A if balance is insufficient
                   if (userABalance < betAmount) {
-                    const userADetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
-                      `ชื่อ: ${userAName}\n` +
-                      `ข้อความ: ${pair.messageA}\n` +
-                      `ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
-                      `ต้องการ: ${betAmount} บาท\n` +
-                      `ขาดอีก: ${(betAmount - userABalance).toFixed(0)} บาท\n\n` +
-                      `💳 ช่องทางเติมเงิน:\n` +
-                      `• เพิ่มเพื่อน @774pojob\n` +
-                      `• https://lin.ee/JO6X7FE`;
+                    const userADetailMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n` +
+                      `👤 ${userAName}\n` +
+                      `💰 ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `💡 วิธีแก้ไข (เติมเงิน):\n` +
+                      `1️⃣  โอนเงินเพิ่มอย่างน้อย ${(betAmount - userABalance).toFixed(0)} บาท\n` +
+                      `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n` +
+                      `3️⃣  รอการยืนยันจากระบบ\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+                      `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userAName} ยอดเงินไม่พอ (ขาด ${(betAmount - userABalance).toFixed(0)} บาท)\n`;
@@ -2248,15 +2299,17 @@ app.post('/webhook', async (req, res) => {
                   
                   // Send detailed message to User B if balance is insufficient
                   if (userBBalance < betAmount) {
-                    const userBDetailMessage = `❌ ยอดเงินไม่เพียงพอ\n\n` +
-                      `ชื่อ: ${userBName}\n` +
-                      `ข้อความ: ${pair.messageB}\n` +
-                      `ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
-                      `ต้องการ: ${betAmount} บาท\n` +
-                      `ขาดอีก: ${(betAmount - userBBalance).toFixed(0)} บาท\n\n` +
-                      `💳 ช่องทางเติมเงิน:\n` +
-                      `• เพิ่มเพื่อน @774pojob\n` +
-                      `• https://lin.ee/JO6X7FE`;
+                    const userBDetailMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n` +
+                      `👤 ${userBName}\n` +
+                      `💰 ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `💡 วิธีแก้ไข (เติมเงิน):\n` +
+                      `1️⃣  โอนเงินเพิ่มอย่างน้อย ${(betAmount - userBBalance).toFixed(0)} บาท\n` +
+                      `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n` +
+                      `3️⃣  รอการยืนยันจากระบบ\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+                      `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending insufficient balance message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userBName} ยอดเงินไม่พอ (ขาด ${(betAmount - userBBalance).toFixed(0)} บาท)\n`;
@@ -2280,6 +2333,46 @@ app.post('/webhook', async (req, res) => {
                   try {
                     await appendToGoogleSheets(pair, userAName, userBName, groupName, 'reply');
                     console.log(`✅ Pair recorded successfully`);
+                    
+                    // 📢 ส่งข้อความแจ้งเตือนเมื่อจับคู่เล่นสำเร็จ
+                    const fireworkName = pair.messageA.split(' ')[0]; // ดึงชื่อบั้งไฟจากข้อความ
+                    const betAmount = pair.betAmount || extractBetAmount(pair.messageA);
+                    
+                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น A
+                    const userANotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 คุณ: ${userAName}\n` +
+                      `👤 คู่แข่ง: ${userBName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น B
+                    const userBNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 คุณ: ${userBName}\n` +
+                      `👤 คู่แข่ง: ${userAName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ข้อความแจ้งเตือนในกลุ่มแชท
+                    const groupNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
+                      `👤 ${userAName} vs ${userBName}\n` +
+                      `🎆 บั้งไฟ: ${fireworkName}\n` +
+                      `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
+                      `⏳ รอการประกาศผล...`;
+                    
+                    // ส่งข้อความแจ้งเตือนส่วนตัว
+                    console.log(`   📤 Sending pairing notification to ${userAName}`);
+                    await sendLineMessageToUser(pair.userA, userANotification, accessToken);
+                    
+                    console.log(`   📤 Sending pairing notification to ${userBName}`);
+                    await sendLineMessageToUser(pair.userB, userBNotification, accessToken);
+                    
+                    // ส่งข้อความแจ้งเตือนในกลุ่ม
+                    console.log(`   📤 Sending pairing notification to group`);
+                    await sendLineMessage(pair.groupId, groupNotification, accessToken);
+                    
+                    console.log(`✅ Pairing notifications sent`);
                   } catch (recordError) {
                     console.error(`❌ Failed to record pair: ${recordError.message}`);
                   }
