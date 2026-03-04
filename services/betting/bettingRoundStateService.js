@@ -12,8 +12,12 @@ class BettingRoundStateService {
     this.sheets = null;
     this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
     this.stateSheetName = 'RoundState';
-    this.currentState = 'CLOSED'; // Default state
-    this.currentRound = null;
+    this.currentState = 'OPEN'; // ✅ Default state = OPEN (ไม่ต้องเปิดรอบ)
+    this.currentRound = {
+      roundId: `ROUND_${Date.now()}`,
+      startTime: new Date().toISOString(),
+      slipName: 'ทดสอบ',
+    };
   }
 
   /**
