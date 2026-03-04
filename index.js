@@ -2342,6 +2342,8 @@ app.post('/webhook', async (req, res) => {
                   groupWarningMessage += `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
                   groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
+                  // Add delay to avoid rate limiting
+                  await new Promise(resolve => setTimeout(resolve, 500));
                   await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
                 } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
@@ -2394,6 +2396,8 @@ app.post('/webhook', async (req, res) => {
                   groupWarningMessage += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
                   groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
+                  // Add delay to avoid rate limiting
+                  await new Promise(resolve => setTimeout(resolve, 500));
                   await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
                 } else {
                   // ยอดเงินเพียงพอ บันทึกการเดิมพัน
