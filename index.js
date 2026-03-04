@@ -2322,7 +2322,8 @@ app.post('/webhook', async (req, res) => {
                       `1️⃣  ติดต่อแอดมิน\n` +
                       `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
                       `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+                      `https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending not registered message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userAName} ยังไม่ลงทะเบียน\n`;
@@ -2339,7 +2340,8 @@ app.post('/webhook', async (req, res) => {
                       `1️⃣  ติดต่อแอดมิน\n` +
                       `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
                       `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา`;
+                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+                      `https://lin.ee/JO6X7FE`;
                     console.log(`   📤 Sending not registered message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userBName} ยังไม่ลงทะเบียน\n`;

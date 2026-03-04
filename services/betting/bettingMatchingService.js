@@ -33,18 +33,30 @@ class BettingMatchingService {
 
           // ตรวจสอบว่าเป็นคู่หรือไม่
           let isValid = false;
+          let matchType = null;
 
           // วิธีที่ 1: Direct + Reply Method
           if (bet1.method !== 'REPLY' && bet2.method === 'REPLY') {
             isValid = bettingPairingService.constructor.isValidDirectReplyPair(bet1, bet2);
+            matchType = 'direct-reply';
           }
           // วิธีที่ 1 (สลับ): Reply + Direct Method
           else if (bet1.method === 'REPLY' && bet2.method !== 'REPLY') {
             isValid = bettingPairingService.constructor.isValidDirectReplyPair(bet2, bet1);
+            matchType = 'reply-direct';
           }
-          // วิธีที่ 2: Direct + Direct Method
+          // วิธีที่ 2: Direct + Direct Method (ราคาเดียวกัน)
           else if (bet1.method !== 'REPLY' && bet2.method !== 'REPLY') {
-            isValid = bettingPairingService.constructor.isValidDirectPair(bet1, bet2);
+            // ตรวจสอบการจับคู่ราคาเดียวกัน (Price Range Matching)
+            if (bettingPairingService.constructor.isValidPriceRangePair(bet1, bet2)) {
+              isValid = true;
+              matchType = 'price-range';
+            }
+            // ตรวจสอบการจับคู่ Direct ปกติ
+            else if (bettingPairingService.constructor.isValidDirectPair(bet1, bet2)) {
+              isValid = true;
+              matchType = 'direct-direct';
+            }
           }
 
           if (isValid) {
@@ -55,6 +67,7 @@ class BettingMatchingService {
               bet1: { ...bet1, index: i },
               bet2: { ...bet2, index: j },
               betAmount,
+              matchType,
             };
 
             // หักเงินจากทั้งสองฝั่ง

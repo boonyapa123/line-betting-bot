@@ -173,6 +173,88 @@ class BettingRoundController {
       };
     }
 
+    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน
+    const PriceRangeMatchingService = require('./priceRangeMatchingService');
+    const allBets = await bettingPairingService.getAllBets();
+    
+    // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้)
+    const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, allBets);
+    
+    if (matchedPair) {
+      console.log(`🎯 Auto-matched price range pair found!`);
+      console.log(`   ${displayName} (${parsedBet.side}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.side})`);
+      console.log(`   Slip: ${parsedBet.slipName}, Amount: ${matchedPair.betAmount} บาท`);
+      
+      // สร้างข้อความแจ้งการจับคู่
+      const messages = PriceRangeMatchingService.createAutoMatchMessage(
+        matchedPair,
+        displayName,
+        matchedPair.existingBet.displayName
+      );
+      
+      // 📝 บันทึกข้อมูลลงชีท Bets
+      try {
+        console.log(`📝 Recording matched pair to Bets sheet...`);
+        
+        // ใช้ bettingPairingService เพื่อบันทึกข้อมูล
+        const { google } = require('googleapis');
+        const sheets = google.sheets({ version: 'v4', auth: bettingPairingService.googleAuth });
+        
+        const recordResult = await PriceRangeMatchingService.recordToGoogleSheets(
+          sheets,
+          bettingPairingService.spreadsheetId,
+          bettingPairingService.transactionsSheetName,
+          matchedPair,
+          matchedPair.existingBet.displayName,
+          displayName,
+          '' // groupName (ยังไม่มีข้อมูล)
+        );
+        
+        if (recordResult.success) {
+          console.log(`   ✅ Pair recorded to Bets sheet (row ${recordResult.rowIndex})`);
+        } else {
+          console.error(`   ⚠️  Failed to record pair: ${recordResult.error}`);
+        }
+      } catch (recordError) {
+        console.error(`   ⚠️  Failed to record pair: ${recordError.message}`);
+      }
+      
+      // ส่งข้อความแจ้งเตือนส่วนตัวและกลุ่ม
+      try {
+        const { LineNotificationService } = require('../line/lineNotificationService');
+        const notificationService = new LineNotificationService(1); // ใช้ Account 1
+        
+        // ส่งข้อความส่วนตัวให้ผู้เล่น A (ผู้เล่นเดิม)
+        console.log(`   📤 Sending private message to ${matchedPair.existingBet.displayName}`);
+        await notificationService.sendPrivateMessage(matchedPair.existingBet.userId, messages.messageB);
+        
+        // ส่งข้อความส่วนตัวให้ผู้เล่น B (ผู้เล่นใหม่)
+        console.log(`   📤 Sending private message to ${displayName}`);
+        await notificationService.sendPrivateMessage(userId, messages.messageA);
+        
+        // ส่งข้อความเข้ากลุ่ม (ถ้ามี groupId)
+        if (source.groupId) {
+          console.log(`   📢 Sending group message to group ${source.groupId}`);
+          await notificationService.sendGroupMessage(source.groupId, messages.groupMessage);
+        }
+        
+        console.log(`✅ Auto-match notifications sent successfully`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to send notifications: ${notificationError.message}`);
+      }
+      
+      return {
+        type: 'text',
+        text: `✅ จับคู่เล่นสำเร็จ\n\n` +
+          `👤 คู่แข่ง: ${matchedPair.existingBet.displayName}\n` +
+          `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+          `💹 ราคาของคุณ: ${parsedBet.price}\n` +
+          `💹 ราคาคู่แข่ง: ${matchedPair.existingBet.price}\n` +
+          `💰 ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
+          `⏳ รอการประกาศผล...`,
+      };
+    }
+
     // ส่งข้อความยืนยัน
     const confirmMessage = this.buildConfirmationMessage(parsedBet, displayName);
     return {

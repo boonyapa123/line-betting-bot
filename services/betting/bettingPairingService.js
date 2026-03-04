@@ -369,6 +369,32 @@ class BettingPairingService {
   }
 
   /**
+   * ตรวจสอบว่าเป็นคู่ Price Range ที่ถูกต้องหรือไม่ (ราคาเดียวกัน ยอดเงินต่างกันได้)
+   * @private
+   */
+  static isValidPriceRangePair(bet1, bet2) {
+    // 1. ต้องเป็นบั้งไฟเดียวกัน
+    if (bet1.slipName !== bet2.slipName) return false;
+
+    // 2. ต้องเป็นฝั่งตรงข้าม (ล ↔ ย)
+    const oppositeMap = {
+      'ล': 'ย',
+      'ย': 'ล',
+    };
+
+    if (oppositeMap[bet1.side] !== bet2.side) return false;
+
+    // 3. ต้องมีราคาเดียวกัน (Price Range)
+    if (bet1.price !== bet2.price) return false;
+
+    // 4. ทั้งคู่ต้องเป็น Direct Method (method 2 หรือ method ที่มีราคา)
+    if (!bet1.price || !bet2.price) return false;
+
+    // 5. จำนวนเงินสามารถต่างกันได้ (ใช้ยอดน้อยกว่า)
+    return true;
+  }
+
+  /**
    * คำนวณผลลัพธ์การเล่น
    * @param {object} pair - คู่การเล่น
    * @param {string} slipName - ชื่อบั้งไฟ
