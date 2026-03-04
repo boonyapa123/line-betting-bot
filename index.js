@@ -196,12 +196,29 @@ function validateLineSignature(signature, body, channelSecret) {
 // LINE API: Get user profile
 async function getLineUserProfile(userId, accessToken) {
   return new Promise((resolve, reject) => {
+    // ถ้า accessToken ไม่มี ให้ใช้ token จากบัญชีหลัก
+    const token = accessToken || LINE_CHANNEL_ACCESS_TOKEN;
+    
+    if (!token) {
+      console.log(`      ❌ No access token available`);
+      resolve('Unknown');
+      return;
+    }
+    
+    if (!userId) {
+      console.log(`      ❌ No userId provided`);
+      resolve('Unknown');
+      return;
+    }
+    
+    console.log(`      🔍 Fetching profile for userId: ${userId}`);
+    
     const options = {
       hostname: 'api.line.me',
       path: `/v2/bot/profile/${userId}`,
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${accessToken}`
+        'Authorization': `Bearer ${token}`
       }
     };
 
@@ -210,9 +227,19 @@ async function getLineUserProfile(userId, accessToken) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
+          console.log(`      📊 HTTP Status: ${res.statusCode}`);
+          
+          // ถ้า status 403 หรือ 404 แสดงว่าไม่เป็นเพื่อน
+          if (res.statusCode === 403 || res.statusCode === 404) {
+            console.log(`      ⚠️  User is not a friend of this OA (Status: ${res.statusCode})`);
+            resolve('Unknown');
+            return;
+          }
+          
           const profile = JSON.parse(data);
           console.log(`      👤 Profile response:`, profile);
           if (profile.displayName) {
+            console.log(`      ✅ Got displayName: ${profile.displayName}`);
             resolve(profile.displayName);
           } else {
             console.log(`      ⚠️  No displayName in profile`);
@@ -220,6 +247,7 @@ async function getLineUserProfile(userId, accessToken) {
           }
         } catch (e) {
           console.log(`      ❌ Parse error:`, e.message);
+          console.log(`      📝 Response data:`, data);
           resolve('Unknown');
         }
       });
@@ -1133,12 +1161,21 @@ function detectPair(currentMessage) {
 async function appendToGoogleSheets(pair, userAName, userBName, groupName, matchType = 'reply') {
   if (!googleAuth) {
     console.log('⚠️  Google Sheets not initialized');
+    console.log('   googleAuth:', googleAuth);
+    console.log('   GOOGLE_SHEET_ID:', GOOGLE_SHEET_ID);
+    console.log('   GOOGLE_WORKSHEET_NAME:', GOOGLE_WORKSHEET_NAME);
     return;
   }
   
   try {
     console.log('📤 Recording to Google Sheets...');
     console.log(`   Match Type: ${matchType}`);
+    console.log(`   Pair data:`, pair);
+    console.log(`   User A Name: ${userAName}`);
+    console.log(`   User B Name: ${userBName}`);
+    console.log(`   Group Name: ${groupName}`);
+    console.log(`   GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID}`);
+    console.log(`   GOOGLE_WORKSHEET_NAME: ${GOOGLE_WORKSHEET_NAME}`);
     
     // ดึง Token ของ User A และ User B จาก Players Sheet
     const playersResponse = await sheets.spreadsheets.values.get({
@@ -1178,6 +1215,9 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       betType: extractBetType(pair.messageB),
       betAmount: extractBetAmount(pair.messageB)
     };
+    
+    console.log(`   📊 Bet Details A:`, betDetailsA);
+    console.log(`   📊 Bet Details B:`, betDetailsB);
     
     // 🎯 ตัดสินใจยอดเงินตามประเภทการจับคู่
     let betAmount;
@@ -1299,6 +1339,8 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     }
   } catch (error) {
     console.error('❌ Failed to append to Google Sheets:', error.message);
+    console.error('   Error details:', error);
+    console.error('   Stack:', error.stack);
   }
 }
 
@@ -1906,6 +1948,25 @@ app.post('/webhook', async (req, res) => {
                 // ดึงชื่อผู้เล่น
                 const userName = await getLineUserProfile(message.userId, accessToken);
                 console.log(`   Player: ${userName}`);
+                
+                // ถ้าชื่อเป็น Unknown แสดงว่าไม่เป็นเพื่อน OA
+                if (userName === 'Unknown') {
+                  console.log(`❌ User is not a friend of this OA`);
+                  
+                  const notFriendMessage = `❌ ไม่สามารถเข้าใช้งานได้\n\n` +
+                    `🔗 กรุณาเพิ่มเพื่อน LINE OA ก่อน:\n` +
+                    `https://lin.ee/JO6X7FE\n\n` +
+                    `📝 หลังจากเพิ่มเพื่อนแล้ว ให้ส่งสลิปการโอนเงินเพื่อลงทะเบียน`;
+                  
+                  try {
+                    await sendLineMessageToUser(message.userId, notFriendMessage, accessToken);
+                    console.log(`   📤 Not friend notification sent`);
+                  } catch (sendError) {
+                    console.error(`   ❌ Failed to send notification: ${sendError.message}`);
+                  }
+                  
+                  continue;
+                }
                 
                 // ตรวจสอบยอดเงินของผู้เล่น
                 const playerBalanceData = await getPlayerBalance(message.userId, userName);
