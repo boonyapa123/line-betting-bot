@@ -1264,18 +1264,18 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       betAmount,           // [6] = G: ยอดเงิน
       betAmount,           // [7] = H: ยอดเงิน B
       '',                  // [8] = I: ผลที่ออก (ว่าง - อัปเดตเมื่อประกาศผล)
-      '',                  // [9] = J: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
-      '',                  // [10] = K: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
-      pair.userB,          // [11] = L: User B ID (ตำแหน่ง K)
-      userBName,           // [12] = M: ชื่อ User B (ตำแหน่ง L)
-      oppositeBetType,     // [13] = N: รายการแทง (ตำแหน่ง M)
-      groupName,           // [14] = O: ชื่อกลุ่มแชท (ตำแหน่ง N)
-      userAToken,          // [15] = P: User A Token (ตำแหน่ง O)
-      pair.groupId || '',  // [16] = Q: Group ID (ตำแหน่ง P)
-      userBToken           // [17] = R: User B Token (ตำแหน่ง Q)
+      '',                  // [9] = J: ผลแพ้ชนะ A (ว่าง - อัปเดตเมื่อประกาศผล)
+      '',                  // [10] = K: ผลแพ้ชนะ B (ว่าง - อัปเดตเมื่อประกาศผล)
+      pair.userB,          // [11] = L: User B ID
+      userBName,           // [12] = M: ชื่อ User B
+      oppositeBetType,     // [13] = N: รายการแทง B
+      groupName,           // [14] = O: ชื่อกลุ่มแชท
+      userAToken,          // [15] = P: User A Token
+      pair.groupId || '',  // [16] = Q: Group ID
+      userBToken           // [17] = R: User B Token
     ];
     
-    console.log(`   📊 Row data (17 columns):`);
+    console.log(`   📊 Row data (18 columns):`);
     row.forEach((val, idx) => {
       const colLetter = String.fromCharCode(65 + idx); // A=65
       console.log(`      [${colLetter}]: "${val}"`);
