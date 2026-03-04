@@ -7,6 +7,7 @@ const BettingMessageParserService = require('./bettingMessageParserService');
 const bettingRoundStateService = require('./bettingRoundStateService');
 const bettingPairingService = require('./bettingPairingService');
 const balanceCheckService = require('./balanceCheckService');
+const pendingBalanceService = require('./pendingBalanceService');
 const selfBettingService = require('./selfBettingService');
 
 class BettingRoundController {
@@ -18,6 +19,7 @@ class BettingRoundController {
       await bettingRoundStateService.initialize();
       await bettingPairingService.initialize();
       await balanceCheckService.initialize();
+      await pendingBalanceService.initialize();
       console.log('BettingRoundController initialized successfully');
     } catch (error) {
       console.error('Error initializing BettingRoundController:', error);
