@@ -63,6 +63,9 @@ class BettingPairingService {
    */
   async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '') {
     try {
+      // Ensure initialization is complete
+      await this.ensureInitialized();
+
       const BetsSheetColumns = require('./betsSheetColumns');
 
       // สร้างข้อมูลสำหรับบันทึก
@@ -622,4 +625,19 @@ class BettingPairingService {
   }
 }
 
-module.exports = new BettingPairingService();
+const instance = new BettingPairingService();
+
+// Initialize immediately and ensure it's ready before export
+let initPromise = instance.initialize().catch(error => {
+  console.error('Failed to auto-initialize BettingPairingService:', error);
+});
+
+// Add a method to ensure initialization is complete
+instance.ensureInitialized = async function() {
+  await initPromise;
+  if (!this.sheets) {
+    throw new Error('BettingPairingService failed to initialize');
+  }
+};
+
+module.exports = instance;

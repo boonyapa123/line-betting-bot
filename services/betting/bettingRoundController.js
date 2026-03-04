@@ -194,37 +194,6 @@ class BettingRoundController {
         matchedPair.existingBet.displayName
       );
       
-      // 📝 บันทึกข้อมูลลงชีท Bets
-      try {
-        console.log(`📝 Recording matched pair to Bets sheet...`);
-        
-        // ใช้ bettingPairingService เพื่อบันทึกข้อมูล
-        const { google } = require('googleapis');
-        const sheets = google.sheets({ version: 'v4', auth: bettingPairingService.googleAuth });
-        
-        // เพิ่ม userId และ groupId ให้ matchedPair
-        matchedPair.newBet.userId = userId;
-        matchedPair.newBet.groupId = source.groupId || '';
-        
-        const recordResult = await PriceRangeMatchingService.recordToGoogleSheets(
-          sheets,
-          bettingPairingService.spreadsheetId,
-          bettingPairingService.transactionsSheetName,
-          matchedPair,
-          matchedPair.existingBet.displayName,
-          displayName,
-          '' // groupName (ยังไม่มีข้อมูล)
-        );
-        
-        if (recordResult.success) {
-          console.log(`   ✅ Pair recorded to Bets sheet (row ${recordResult.rowIndex})`);
-        } else {
-          console.error(`   ⚠️  Failed to record pair: ${recordResult.error}`);
-        }
-      } catch (recordError) {
-        console.error(`   ⚠️  Failed to record pair: ${recordError.message}`);
-      }
-      
       // ส่งข้อความแจ้งเตือนส่วนตัวและกลุ่ม
       try {
         const { LineNotificationService } = require('../line/lineNotificationService');

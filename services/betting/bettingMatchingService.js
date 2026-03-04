@@ -182,4 +182,11 @@ class BettingMatchingService {
   }
 }
 
-module.exports = new BettingMatchingService();
+const instance = new BettingMatchingService();
+
+// Auto-initialize when module is loaded
+instance.initialize?.().catch(error => {
+  console.error('Failed to auto-initialize BettingMatchingService:', error);
+});
+
+module.exports = instance;

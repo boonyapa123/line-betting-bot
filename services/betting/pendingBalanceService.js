@@ -56,6 +56,9 @@ class PendingBalanceService {
    */
   async getPendingAmount(displayName) {
     try {
+      // Ensure initialization is complete
+      await this.ensureInitialized();
+
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `${this.betsSheetName}!A2:N`,
@@ -235,4 +238,19 @@ class PendingBalanceService {
   }
 }
 
-module.exports = new PendingBalanceService();
+const instance = new PendingBalanceService();
+
+// Initialize immediately and ensure it's ready before export
+let initPromise = instance.initialize().catch(error => {
+  console.error('Failed to auto-initialize PendingBalanceService:', error);
+});
+
+// Add a method to ensure initialization is complete
+instance.ensureInitialized = async function() {
+  await initPromise;
+  if (!this.sheets) {
+    throw new Error('PendingBalanceService failed to initialize');
+  }
+};
+
+module.exports = instance;
