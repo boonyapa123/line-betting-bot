@@ -1502,20 +1502,26 @@ async function sendLineMessageToGroup(groupId, message, accessToken) {
       },
     };
 
+    console.log(`   📍 Sending to group: ${groupId}`);
+    console.log(`   📝 Message length: ${message.length} chars`);
+
     https.request(options, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
+        console.log(`   📊 Response status: ${res.statusCode}`);
         if (res.statusCode === 200) {
           console.log(`   ✅ Group message sent successfully`);
         } else {
           console.log(`   ⚠️  Group message send status: ${res.statusCode}`);
+          console.log(`   📋 Response body: ${data}`);
         }
         resolve(true);
       });
     })
       .on('error', (err) => {
         console.log(`   ❌ Error sending group message: ${err.message}`);
+        console.log(`   📋 Error details:`, err);
         resolve(false);
       })
       .write(body);
@@ -2317,6 +2323,8 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending not registered message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userAName} ยังไม่ลงทะเบียน\n`;
+                    // Add delay between messages to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 300));
                   }
                   
                   // Send message to User B if not registered
@@ -2332,6 +2340,8 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending not registered message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userBName} ยังไม่ลงทะเบียน\n`;
+                    // Add delay between messages to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 300));
                   }
                   
                   // แจ้งในกลุ่มด้วย
@@ -2342,9 +2352,9 @@ app.post('/webhook', async (req, res) => {
                   groupWarningMessage += `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
                   groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
-                  // Add delay to avoid rate limiting
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
+                  // Add delay to avoid rate limiting (1 second total)
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
                 } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
                   
@@ -2367,6 +2377,8 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending insufficient balance message to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userAName} ยอดเงินไม่พอ (ขาด ${(betAmount - userABalance).toFixed(0)} บาท)\n`;
+                    // Add delay between messages to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 300));
                   }
                   
                   // Send detailed message to User B if balance is insufficient
@@ -2385,6 +2397,8 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending insufficient balance message to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
                     groupWarningMessage += `👤 ${userBName} ยอดเงินไม่พอ (ขาด ${(betAmount - userBBalance).toFixed(0)} บาท)\n`;
+                    // Add delay between messages to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 300));
                   }
                   
                   // แจ้งในกลุ่มด้วย
@@ -2396,9 +2410,9 @@ app.post('/webhook', async (req, res) => {
                   groupWarningMessage += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
                   groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
-                  // Add delay to avoid rate limiting
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  await sendLineMessageToGroup(pair.groupId, groupWarningMessage, accessToken);
+                  // Add delay to avoid rate limiting (1 second total)
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
                 } else {
                   // ยอดเงินเพียงพอ บันทึกการเดิมพัน
                   console.log(`✅ Balance sufficient for both players`);
@@ -2439,8 +2453,14 @@ app.post('/webhook', async (req, res) => {
                     console.log(`   📤 Sending pairing notification to ${userAName}`);
                     await sendLineMessageToUser(pair.userA, userANotification, accessToken);
                     
+                    // Add delay between messages to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
                     console.log(`   📤 Sending pairing notification to ${userBName}`);
                     await sendLineMessageToUser(pair.userB, userBNotification, accessToken);
+                    
+                    // Add delay before sending group message
+                    await new Promise(resolve => setTimeout(resolve, 300));
                     
                     // ส่งข้อความแจ้งเตือนในกลุ่ม
                     console.log(`   📤 Sending pairing notification to group`);
