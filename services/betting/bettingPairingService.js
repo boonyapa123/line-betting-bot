@@ -131,6 +131,9 @@ class BettingPairingService {
    */
   async getAllBets() {
     try {
+      // Ensure initialization is complete
+      await this.ensureInitialized();
+
       const BetsSheetColumns = require('./betsSheetColumns');
 
       const response = await this.sheets.spreadsheets.values.get({

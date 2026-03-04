@@ -177,10 +177,26 @@ class BettingRoundController {
 
     // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน)
     const PriceRangeMatchingService = require('./priceRangeMatchingService');
+    
+    console.log(`🔍 Fetching bets for group: ${source.groupId || 'NO_GROUP'}`);
     const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
+    console.log(`   Found ${groupBets.length} bets in group`);
+    
+    if (groupBets.length > 0) {
+      console.log(`   Bets in group:`, groupBets.map(b => ({
+        displayName: b.displayName,
+        slipName: b.slipName,
+        sideCode: b.sideCode,
+        price: b.price,
+        amount: b.amount,
+        status: b.status
+      })));
+    }
     
     // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้) เฉพาะในกลุ่มเดียวกัน
     const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, groupBets);
+    
+    console.log(`   Matching result:`, matchedPair ? 'FOUND' : 'NOT FOUND');
     
     if (matchedPair) {
       console.log(`🎯 Auto-matched price range pair found!`);
