@@ -37,26 +37,26 @@ async function clearAndResetBetsSheet() {
     });
     console.log('✅ Sheet cleared');
 
-    // Now add headers
+    // Now add headers - MUST be exactly 18 columns
     const headers = [
-      'Timestamp',           // A
-      'User A ID',           // B
-      'ชื่อ User A',         // C
-      'ข้อความ A',           // D
-      'ชื่อบั้งไฟ',          // E
-      'รายการเล่น',          // F
-      'ยอดเงิน',             // G
-      'ยอดเงิน B',           // H
-      'ผลที่ออก',            // I
-      'ผลแพ้ชนะ A',          // J
-      'ผลแพ้ชนะ B',          // K
-      'User B ID',           // L
-      'ชื่อ User B',         // M
-      'รายการแทง B',         // N
-      'ชื่อกลุ่มแชท',        // O
-      'User A Token',        // P
-      'Group ID',            // Q
-      'User B Token'         // R
+      'Timestamp',           // A - 0
+      'User A ID',           // B - 1
+      'ชื่อ User A',         // C - 2
+      'ข้อความ A',           // D - 3
+      'ชื่อบั้งไฟ',          // E - 4
+      'รายการเล่น',          // F - 5
+      'ยอดเงิน',             // G - 6
+      'ยอดเงิน B',           // H - 7
+      'ผลที่ออก',            // I - 8
+      'ผลแพ้ชนะ A',          // J - 9
+      'ผลแพ้ชนะ B',          // K - 10
+      'User B ID',           // L - 11
+      'ชื่อ User B',         // M - 12
+      'รายการแทง B',         // N - 13
+      'ชื่อกลุ่มแชท',        // O - 14
+      'User A Token',        // P - 15
+      'Group ID',            // Q - 16
+      'User B Token'         // R - 17
     ];
 
     console.log('📝 Adding headers...');

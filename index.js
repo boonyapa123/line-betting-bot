@@ -1016,8 +1016,11 @@ function extractFireworkName(message) {
   const words = message.split(/\s+/);
   
   for (const word of words) {
-    // ข้ามคำที่เป็นตัวเลข
+    // ข้ามคำที่เป็นตัวเลขเพียงอย่างเดียว
     if (/^\d+$/.test(word)) continue;
+    
+    // ข้ามคำที่มีตัวเลขผสมกับข้อความ (เช่น "ชถ500ฟ้า", "ชล100แอด")
+    if (/\d/.test(word)) continue;
     
     // ข้ามคำที่เป็นประเภทเดิมพัน
     if (betTypes.includes(word)) continue;
