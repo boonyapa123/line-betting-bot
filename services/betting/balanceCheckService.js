@@ -7,6 +7,7 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const { LineNotificationService } = require('../line/lineNotificationService');
+const pendingBalanceService = require('./pendingBalanceService');
 
 class BalanceCheckService {
   constructor() {
@@ -98,10 +99,10 @@ class BalanceCheckService {
   }
 
   /**
-   * ตรวจสอบยอดเงินคงเหลือ
+   * ตรวจสอบยอดเงินคงเหลือ (รวมการตรวจสอบเงินค้าง)
    * @param {string} lineName - ชื่อ LINE
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
-   * @returns {object} ผลลัพธ์ {sufficient: boolean, currentBalance: number, shortfall: number, registered: boolean}
+   * @returns {object} ผลลัพธ์ {sufficient: boolean, currentBalance: number, shortfall: number, registered: boolean, pendingAmount: number, availableBalance: number}
    */
   async checkBalance(lineName, requiredAmount) {
     try {
@@ -114,29 +115,39 @@ class BalanceCheckService {
           currentBalance: 0,
           shortfall: requiredAmount,
           registered: false,
+          pendingAmount: 0,
+          availableBalance: 0,
           message: `ผู้เล่นไม่พบในระบบ`,
         };
       }
 
       const currentBalance = await this.getUserBalance(lineName);
+      
+      // ตรวจสอบเงินค้าง (เงินเดิมพันที่จับคู่แล้วแต่ยังไม่มีผล)
+      const pendingAmount = await pendingBalanceService.getPendingAmount(lineName);
+      const availableBalance = currentBalance - pendingAmount;
 
-      if (currentBalance >= requiredAmount) {
+      if (availableBalance >= requiredAmount) {
         return {
           sufficient: true,
           currentBalance,
           shortfall: 0,
           registered: true,
-          message: `ยอดเงินเพียงพอ (${currentBalance} บาท)`,
+          pendingAmount,
+          availableBalance,
+          message: `ยอดเงินเพียงพอ (${availableBalance} บาท หลังหักเงินค้าง)`,
         };
       }
 
-      const shortfall = requiredAmount - currentBalance;
+      const shortfall = requiredAmount - availableBalance;
       return {
         sufficient: false,
         currentBalance,
         shortfall,
         registered: true,
-        message: `ยอดเงินไม่พอ ขาด ${shortfall} บาท`,
+        pendingAmount,
+        availableBalance,
+        message: `ยอดเงินไม่พอ ขาด ${shortfall} บาท (หลังหักเงินค้าง)`,
       };
     } catch (error) {
       console.error('Error checking balance:', error);
@@ -145,6 +156,8 @@ class BalanceCheckService {
         currentBalance: 0,
         shortfall: requiredAmount,
         registered: false,
+        pendingAmount: 0,
+        availableBalance: 0,
         error: error.message,
       };
     }
@@ -262,7 +275,7 @@ class BalanceCheckService {
   }
 
   /**
-   * แจ้งเตือนเมื่อยอดเงินไม่พอ
+   * แจ้งเตือนเมื่อยอดเงินไม่พอ (รวมเงินค้าง)
    * @param {string} lineName - ชื่อ LINE
    * @param {number} currentBalance - ยอดเงินปัจจุบัน
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
@@ -270,20 +283,26 @@ class BalanceCheckService {
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
    * @param {number} accountNumber - LINE OA Account Number (1, 2, หรือ 3)
    * @param {string} groupId - LINE Group ID (สำหรับส่งข้อความในกลุ่ม)
+   * @param {number} pendingAmount - เงินค้างที่ยังไม่มีผล
+   * @param {number} availableBalance - เงินที่สามารถใช้ได้
    */
-  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1, groupId = null) {
+  async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1, groupId = null, pendingAmount = 0, availableBalance = 0) {
     try {
       const message = this.buildInsufficientBalanceMessage(
         lineName,
         currentBalance,
         requiredAmount,
-        shortfall
+        shortfall,
+        pendingAmount,
+        availableBalance
       );
 
       console.log(`\n📤 === Insufficient Balance Notification ===`);
       console.log(`   Player: ${lineName}`);
       console.log(`   User ID: ${userId}`);
       console.log(`   Current balance: ${currentBalance} บาท`);
+      console.log(`   Pending amount: ${pendingAmount} บาท`);
+      console.log(`   Available balance: ${availableBalance} บาท`);
       console.log(`   Required amount: ${requiredAmount} บาท`);
       console.log(`   Shortfall: ${shortfall} บาท`);
       console.log(`   Account: ${accountNumber}`);
@@ -304,14 +323,15 @@ class BalanceCheckService {
 
       // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
       if (groupId) {
-        const groupMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n` +
-          `👤 ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n\n` +
+        const groupMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n` +
+          `👤 ${lineName} ยอดเงินไม่พอ\n` +
           `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
           `💡 วิธีแก้ไข (เติมเงิน):\n` +
           `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
           `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
-          `3️⃣  รอการยืนยันจากระบบ\n\n` +
-          `📱 ติดต่อแอดมิน หากมีปัญหา`;
+          `3️⃣  รอการยืนยันจากระบบ\n` +
+          `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
+          `https://lin.ee/JO6X7FE`;
 
         console.log(`\n   📢 Sending group message...`);
         const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
@@ -331,13 +351,17 @@ class BalanceCheckService {
   }
 
   /**
-   * สร้างข้อความแจ้งเตือนยอดเงินไม่พอ
+   * สร้างข้อความแจ้งเตือนยอดเงินไม่พอ (รวมเงินค้าง)
    * @private
    */
-  buildInsufficientBalanceMessage(lineName, currentBalance, requiredAmount, shortfall) {
+  buildInsufficientBalanceMessage(lineName, currentBalance, requiredAmount, shortfall, pendingAmount = 0, availableBalance = 0) {
     let message = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n`;
     message += `👤 ${lineName}\n`;
     message += `💰 ยอดเงินปัจจุบัน: ${currentBalance} บาท\n`;
+    if (pendingAmount > 0) {
+      message += `⏳ เงินค้างที่ยังไม่มีผล: ${pendingAmount} บาท\n`;
+      message += `✅ เงินที่สามารถใช้ได้: ${availableBalance} บาท\n`;
+    }
     message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `💡 วิธีแก้ไข (เติมเงิน):\n`;
     message += `1️⃣  โอนเงินเพิ่มอย่างน้อย ${shortfall} บาท\n`;
@@ -351,7 +375,7 @@ class BalanceCheckService {
   }
 
   /**
-   * ตรวจสอบและแจ้งเตือนยอดเงิน
+   * ตรวจสอบและแจ้งเตือนยอดเงิน (รวมเงินค้าง)
    * @param {string} lineName - ชื่อ LINE
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
    * @param {string} userId - LINE User ID (สำหรับส่งข้อความ)
@@ -374,7 +398,7 @@ class BalanceCheckService {
         return checkResult;
       }
 
-      // ถ้ายอดเงินไม่พอ ให้แจ้งเตือน
+      // ถ้ายอดเงินไม่พอ ให้แจ้งเตือน (รวมเงินค้าง)
       if (!checkResult.sufficient) {
         await this.notifyInsufficientBalance(
           lineName,
@@ -383,7 +407,9 @@ class BalanceCheckService {
           checkResult.shortfall,
           userId,
           accountNumber,
-          groupId
+          groupId,
+          checkResult.pendingAmount,
+          checkResult.availableBalance
         );
       }
 

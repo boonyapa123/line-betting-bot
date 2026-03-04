@@ -6,6 +6,7 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+const balanceUpdateService = require('./balanceUpdateService');
 
 class BettingPairingService {
   constructor() {
@@ -141,12 +142,11 @@ class BettingPairingService {
   }
 
   /**
-   * จับคู่การเล่น (Pairing)
-   * ค้นหาคนที่เล่นบั้งไฟเดียวกัน ราคาเดียวกัน แต่ฝั่งตรงข้าม
+   * จับคู่การเล่นและหักเงินทันที
    * @param {array} bets - ข้อมูลการเล่นทั้งหมด
-   * @returns {array} คู่ที่จับได้
+   * @returns {array} คู่ที่จับได้พร้อมการหักเงิน
    */
-  static findPairs(bets) {
+  static async findPairsAndDeductBalance(bets) {
     const pairs = [];
     const processed = new Set();
 
@@ -179,9 +179,13 @@ class BettingPairingService {
         }
 
         if (isValid) {
+          // คำนวณจำนวนเงินที่ใช้ (ใช้ยอดน้อยกว่า)
+          const betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
+
           pairs.push({
             bet1: { ...bet1, index: i },
             bet2: { ...bet2, index: j },
+            betAmount,
           });
           processed.add(i);
           processed.add(j);
@@ -191,6 +195,94 @@ class BettingPairingService {
     }
 
     return pairs;
+  }
+
+  /**
+   * หักเงินเดิมพันจากยอดคงเหลือ
+   * @param {string} displayName - ชื่อ LINE
+   * @param {number} betAmount - จำนวนเงินที่เดิมพัน
+   * @returns {object} ผลการหักเงิน
+   */
+  async deductBetAmount(displayName, betAmount) {
+    try {
+      // ดึงยอดเงินปัจจุบัน
+      const currentBalance = await this.getUserBalance(displayName);
+      const newBalance = currentBalance - betAmount;
+
+      // อัปเดตยอดเงิน
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.balanceSheetName}!A:C`,
+      });
+
+      const values = response.data.values || [];
+      let userRowIndex = -1;
+
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][1] === displayName) {
+          userRowIndex = i;
+          break;
+        }
+      }
+
+      if (userRowIndex >= 0) {
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.balanceSheetName}!C${userRowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [[newBalance]],
+          },
+        });
+
+        console.log(`💰 Deducted ${betAmount} บาท from ${displayName} (${currentBalance} → ${newBalance})`);
+
+        return {
+          success: true,
+          displayName,
+          previousBalance: currentBalance,
+          deductedAmount: betAmount,
+          newBalance,
+        };
+      }
+
+      return {
+        success: false,
+        error: `ไม่พบผู้เล่น ${displayName}`,
+      };
+    } catch (error) {
+      console.error('Error deducting bet amount:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * ดึงยอดเงินคงเหลือของผู้เล่น (ใช้ DisplayName)
+   * @param {string} displayName - ชื่อ LINE
+   * @returns {number}
+   */
+  async getUserBalance(displayName) {
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.balanceSheetName}!A:C`,
+      });
+
+      const values = response.data.values || [];
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][1] === displayName) {
+          return parseInt(values[i][2]) || 0;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error('Error getting user balance:', error);
+      return 0;
+    }
   }
 
   /**
@@ -413,7 +505,7 @@ class BettingPairingService {
    * @param {string} userId
    * @returns {number}
    */
-  async getUserBalance(userId) {
+  async getUserBalanceByUserId(userId) {
     try {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,

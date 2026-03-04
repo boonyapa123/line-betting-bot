@@ -1,0 +1,249 @@
+================================================================================
+BALANCE MANAGEMENT SYSTEM - CHANGES SUMMARY
+================================================================================
+
+📅 Date: 2024-03-04
+🎯 Purpose: Implement pending balance checking and automatic deduction system
+
+================================================================================
+NEW FILES CREATED
+================================================================================
+
+SERVICES (2 files):
+  ✅ services/betting/pendingBalanceService.js
+     - getPendingAmount(displayName)
+     - checkSufficientBalance(displayName, currentBalance, newBetAmount)
+     - getPendingBetsDetails(displayName)
+     - buildInsufficientBalanceMessage(checkResult)
+     - buildPendingBetsMessage(pendingBets)
+
+  ✅ services/betting/bettingMatchingService.js
+     - findPairsAndDeductBalance(bets)
+     - checkBalanceBeforeMatching(displayName, betAmount)
+     - buildMatchingReport(matchingResult)
+
+DOCUMENTATION (5 files):
+  ✅ BALANCE_MANAGEMENT_SYSTEM.md
+     - System overview and workflow
+     - Services description
+     - Data flow examples
+     - Notification templates
+
+  ✅ BALANCE_MANAGEMENT_USAGE.md
+     - Usage guide
+     - Code examples
+     - Scenario examples
+     - Testing instructions
+
+  ✅ BALANCE_MANAGEMENT_API.md
+     - Complete API documentation
+     - Function signatures
+     - Return types
+     - Error handling
+     - Best practices
+
+  ✅ IMPLEMENTATION_SUMMARY.md
+     - Changes summary
+     - File modifications
+     - Data flow changes
+     - Installation steps
+
+  ✅ INSTALLATION_CHECKLIST.md
+     - Installation checklist
+     - Verification steps
+     - Troubleshooting guide
+     - Final verification
+
+EXAMPLES (1 file):
+  ✅ examples/balance-management-example.js
+     - 10 usage examples
+     - Test scenarios
+     - Error handling examples
+
+README (1 file):
+  ✅ BALANCE_MANAGEMENT_README.md
+     - Quick start guide
+     - Feature overview
+     - Configuration
+     - Support information
+
+================================================================================
+UPDATED FILES
+================================================================================
+
+SERVICES (2 files):
+  ✅ services/betting/balanceCheckService.js
+     - Added: import pendingBalanceService
+     - Updated: checkBalance() - now includes pending balance check
+     - Updated: buildInsufficientBalanceMessage() - shows pending details
+     - Updated: notifyInsufficientBalance() - includes pending info
+     - Updated: checkAndNotify() - passes pending data to notification
+
+  ✅ services/betting/bettingPairingService.js
+     - Added: import balanceUpdateService
+     - Added: deductBetAmount(displayName, betAmount)
+     - Added: getUserBalance(displayName)
+     - Added: findPairsAndDeductBalance(bets)
+     - Renamed: getUserBalance(userId) → getUserBalanceByUserId(userId)
+
+================================================================================
+KEY FEATURES
+================================================================================
+
+1. PENDING BALANCE CHECKING
+   - Calculates total pending bets (matched but no result)
+   - Checks if available balance >= new bet amount
+   - Available balance = current balance - pending amount
+
+2. AUTOMATIC DEDUCTION
+   - Deducts bet amount immediately when pair is matched
+   - Uses minimum amount: betAmount = Math.min(bet1.amount, bet2.amount)
+   - Updates balance in Google Sheets
+
+3. DETAILED NOTIFICATIONS
+   - Shows current balance
+   - Shows pending amount
+   - Shows available balance
+   - Shows shortfall if insufficient
+
+4. PENDING BETS TRACKING
+   - Lists all pending bets with details
+   - Shows opponent and amount
+   - Shows timestamp
+
+================================================================================
+DATA FLOW CHANGES
+================================================================================
+
+BEFORE:
+  1. PARSING → 2. VALIDATION → 3. RECORDING → 4. PAIRING → 5. SETTLEMENT → 6. BALANCE UPDATE
+
+AFTER:
+  1. PARSING → 2. VALIDATION → 3. BALANCE CHECK (NEW) → 4. RECORDING → 5. PAIRING → 6. DEDUCT (NEW) → 7. SETTLEMENT → 8. BALANCE UPDATE
+
+================================================================================
+GOOGLE SHEETS SCHEMA
+================================================================================
+
+BETS SHEET (Columns A-N):
+  A: Timestamp
+  B: User A ID
+  C: ชื่อ User A
+  D: ข้อความ A
+  E: ชื่อบั้งไฟ
+  F: รายการเล่น
+  G: ยอดเงิน A
+  H: ยอดเงิน B (empty = not matched)
+  I: แสดงผล (empty = no result)
+  J: แสดงผลชนะ
+  K: User B ID
+  L: ชื่อ User B
+  M: รายการเล่น B
+  N: ผลลัพธ์สุดท้าย
+
+USERSBALANCE SHEET (Columns A-C):
+  A: User ID
+  B: Display Name
+  C: Balance
+
+TRANSACTIONS SHEET (Columns A-G):
+  A: Timestamp
+  B: Player Name
+  C: Transaction Type
+  D: Amount
+  E: Previous Balance
+  F: New Balance
+  G: Slip Name
+
+================================================================================
+PENDING BALANCE CALCULATION
+================================================================================
+
+Checks Bets sheet for rows where:
+  1. Column H (ยอดเงิน B) has value = MATCHED
+  2. Column I (แสดงผล) is empty = NO RESULT
+
+Then sums the amounts for the player:
+  - If User A: sum Column G (ยอดเงิน A)
+  - If User B: sum Column H (ยอดเงิน B)
+
+================================================================================
+EXAMPLE SCENARIO
+================================================================================
+
+User A: Balance 1000, Pending 500
+User B: Balance 800, Pending 0
+
+Scenario 1: User A wants to bet 600
+  - Available balance: 1000 - 500 = 500
+  - Required: 600
+  - Result: INSUFFICIENT ❌
+  - Notification sent with details
+
+Scenario 2: User A wants to bet 400
+  - Available balance: 1000 - 500 = 500
+  - Required: 400
+  - Result: SUFFICIENT ✅
+  - Bet recorded
+  - Pair matched (use 300)
+  - Deduct 300 from both players
+  - User A: 1000 → 700
+  - User B: 800 → 500
+
+================================================================================
+TESTING
+================================================================================
+
+Run all examples:
+  node examples/balance-management-example.js
+
+Check syntax:
+  node -c services/betting/pendingBalanceService.js
+  node -c services/betting/bettingMatchingService.js
+  node -c services/betting/balanceCheckService.js
+  node -c services/betting/bettingPairingService.js
+
+================================================================================
+INSTALLATION STEPS
+================================================================================
+
+1. Copy new service files to services/betting/
+2. Update existing service files
+3. Verify Google Sheets schema
+4. Set environment variables
+5. Run tests
+6. Deploy to production
+
+================================================================================
+BENEFITS
+================================================================================
+
+✅ Accurate balance checking (includes pending bets)
+✅ Automatic deduction when pair matched
+✅ Prevents over-betting
+✅ Clear notifications to players
+✅ Detailed pending bets tracking
+✅ Reduced financial risk
+✅ Increased system transparency
+
+================================================================================
+DOCUMENTATION FILES
+================================================================================
+
+1. BALANCE_MANAGEMENT_README.md - Quick start and overview
+2. BALANCE_MANAGEMENT_SYSTEM.md - System architecture and workflow
+3. BALANCE_MANAGEMENT_USAGE.md - Usage guide with examples
+4. BALANCE_MANAGEMENT_API.md - Complete API documentation
+5. IMPLEMENTATION_SUMMARY.md - Changes and installation
+6. INSTALLATION_CHECKLIST.md - Verification checklist
+7. CHANGES_SUMMARY.txt - This file
+
+================================================================================
+VERSION
+================================================================================
+
+Version: 1.0.0
+Release Date: 2024-03-04
+Status: Production Ready
+
+================================================================================
