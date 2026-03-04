@@ -626,6 +626,48 @@ class BettingPairingService {
       return { success: false, message: 'เกิดข้อผิดพลาดในการล้างข้อมูล' };
     }
   }
+
+  /**
+   * อัปเดตแถวของ User A ด้วยข้อมูลของ User B (เมื่อจับคู่สำเร็จ)
+   * @param {number} rowIndex - ตำแหน่งแถวของ User A (0-based)
+   * @param {object} userBData - ข้อมูลของ User B
+   * @returns {object} ผลการอัปเดต
+   */
+  async updateRowWithUserB(rowIndex, userBData) {
+    try {
+      // Ensure initialization is complete
+      await this.ensureInitialized();
+
+      const BetsSheetColumns = require('./betsSheetColumns');
+
+      // ดึงข้อมูลแถวปัจจุบัน
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.transactionsSheetName}!A${rowIndex + 2}:T${rowIndex + 2}`,
+      });
+
+      const currentRow = response.data.values?.[0] || [];
+
+      // สร้างแถวใหม่ด้วยข้อมูล User B
+      const updatedRow = BetsSheetColumns.updateRowWithUserB(currentRow, userBData);
+
+      // อัปเดตแถวในชีท
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.transactionsSheetName}!A${rowIndex + 2}:T${rowIndex + 2}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [updatedRow],
+        },
+      });
+
+      console.log(`✅ Row ${rowIndex + 2} updated with User B data`);
+      return { success: true, message: 'อัปเดตแถวสำเร็จ' };
+    } catch (error) {
+      console.error('Error updating row with User B:', error);
+      return { success: false, message: 'เกิดข้อผิดพลาดในการอัปเดต' };
+    }
+  }
 }
 
 const instance = new BettingPairingService();

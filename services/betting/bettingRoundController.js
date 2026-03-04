@@ -203,6 +203,27 @@ class BettingRoundController {
       console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
       console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
       
+      // 📝 อัปเดตแถวของ User A ด้วยข้อมูล User B
+      const userBData = {
+        userId: userId,
+        displayName: displayName,
+        sideCode: parsedBet.sideCode,
+        amount: matchedPair.betAmount,
+        price: parsedBet.price,
+        slipName: parsedBet.slipName,
+        groupName: '', // ยังไม่มีข้อมูล
+        tokenB: '', // ยังไม่มีข้อมูล
+      };
+
+      const updateResult = await bettingPairingService.updateRowWithUserB(
+        matchedPair.existingBet.index,
+        userBData
+      );
+
+      if (!updateResult.success) {
+        console.error(`❌ Failed to update row: ${updateResult.message}`);
+      }
+      
       // สร้างข้อความแจ้งการจับคู่
       const messages = PriceRangeMatchingService.createAutoMatchMessage(
         matchedPair,

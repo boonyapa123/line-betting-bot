@@ -209,6 +209,38 @@ class BetsSheetColumns {
       console.log(`  [${colLetter}] ${key}: ${value}`);
     });
   }
+
+  /**
+   * อัปเดตแถวด้วยข้อมูล User B (เมื่อจับคู่สำเร็จ)
+   * @param {array} currentRow - แถวปัจจุบัน
+   * @param {object} userBData - ข้อมูล User B
+   * @returns {array} แถวที่อัปเดตแล้ว
+   */
+  static updateRowWithUserB(currentRow, userBData) {
+    const row = [...currentRow]; // Copy แถวปัจจุบัน
+
+    // อัปเดตข้อมูล User B
+    if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
+    if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
+    if (userBData.sideCode) row[this.COLUMNS.SIDE_B] = userBData.sideCode;
+    if (userBData.amount !== undefined && userBData.amount !== null) {
+      row[this.COLUMNS.AMOUNT_B] = userBData.amount;
+    }
+    if (userBData.price) {
+      // สร้างข้อความ User B
+      const messageB = `${userBData.price} ${userBData.sideCode}${userBData.amount ? ' ' + userBData.amount : ''} ${userBData.slipName}`;
+      // ไม่ได้เก็บ messageB ในชีท แต่เก็บข้อมูลแยกกัน
+    }
+    if (userBData.groupName) row[this.COLUMNS.GROUP_NAME] = userBData.groupName;
+    if (userBData.tokenB) row[this.COLUMNS.TOKEN_B] = userBData.tokenB;
+
+    // ทำเครื่องหมาย MATCHED (ใส่ค่าใน RESULT_WIN_LOSE)
+    if (!row[this.COLUMNS.RESULT_WIN_LOSE]) {
+      row[this.COLUMNS.RESULT_WIN_LOSE] = 'MATCHED';
+    }
+
+    return row;
+  }
 }
 
 module.exports = BetsSheetColumns;
