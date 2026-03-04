@@ -1297,7 +1297,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:Q${nextRowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [row],
