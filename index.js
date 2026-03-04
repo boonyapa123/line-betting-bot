@@ -1951,260 +1951,33 @@ app.post('/webhook', async (req, res) => {
                 console.log(`✅ Results updated successfully`);
               }
             } else {
-              // ตรวจสอบว่าเป็นข้อความแทงหรือไม่
-              const betAmount = extractBetAmount(message.content);
+              // ✅ ใช้ bettingRoundController ที่ทำงานถูกต้องแล้ว
+              console.log(`🎯 Using bettingRoundController for message processing`);
               
-              if (betAmount > 0) {
-                // นี่คือข้อความแทง ตรวจสอบยอดเงินทันที
-                console.log(`💰 Betting message detected: ${betAmount} บาท`);
+              try {
+                const bettingRoundController = require('./services/betting/bettingRoundController');
                 
-                // ดึงชื่อผู้เล่น
-                const userName = await getLineUserProfile(message.userId, accessToken);
-                console.log(`   Player: ${userName}`);
-                
-                // ถ้าชื่อเป็น Unknown แสดงว่าไม่เป็นเพื่อน OA
-                if (userName === 'Unknown') {
-                  console.log(`❌ User is not a friend of this OA`);
-                  
-                  const notFriendMessage = `❌ ไม่สามารถเข้าใช้งานได้\n\n` +
-                    `🔗 กรุณาเพิ่มเพื่อน LINE OA ก่อน:\n` +
-                    `https://lin.ee/JO6X7FE\n\n` +
-                    `📝 หลังจากเพิ่มเพื่อนแล้ว ให้ส่งสลิปการโอนเงินเพื่อลงทะเบียน`;
-                  
-                  try {
-                    await sendLineMessageToUser(message.userId, notFriendMessage, accessToken);
-                    console.log(`   📤 Not friend notification sent`);
-                  } catch (sendError) {
-                    console.error(`   ❌ Failed to send notification: ${sendError.message}`);
+                // เตรียมข้อมูลสำหรับ bettingRoundController
+                const result = await bettingRoundController.handleMessage({
+                  message: {
+                    text: message.content
+                  },
+                  source: {
+                    userId: message.userId,
+                    displayName: await getLineUserProfile(message.userId, accessToken),
+                    groupId: message.groupId
                   }
-                  
-                  continue;
-                }
+                });
                 
-                // ตรวจสอบยอดเงินของผู้เล่น
-                const playerBalanceData = await getPlayerBalance(message.userId, userName);
-                const playerBalance = playerBalanceData.balance;
-                const playerFound = playerBalanceData.found;
+                console.log(`✅ bettingRoundController processed successfully`);
+                console.log(`   Result:`, result);
                 
-                console.log(`   Current balance: ${playerBalance} บาท (Found: ${playerFound})`);
-                console.log(`   Bet amount: ${betAmount} บาท`);
-                
-                // ถ้าผู้เล่นไม่ลงทะเบียน ให้แจ้งเลย
-                if (!playerFound) {
-                  console.log(`❌ Player not registered: ${userName}`);
-                  
-                  // ใช้ balanceCheckService เพื่อส่งข้อความแจ้งเตือนผ่าน Account ที่ถูกต้อง
-                  const balanceCheckService = require('./services/betting/balanceCheckService');
-                  
-                  // ส่งข้อความแจ้งเตือนส่วนตัวและในกลุ่มผ่าน balanceCheckService
-                  await balanceCheckService.notifyPlayerNotRegistered(
-                    userName,
-                    message.userId,
-                    accountNumber,
-                    message.groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
-                  );
-                  console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
-                  console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
-                  
-                  // ❌ หยุดการประมวลผลทันที ไม่บันทึกการเล่น
-                  continue;
-
-                } else if (playerBalance < betAmount) {
-                  console.log(`❌ Insufficient balance for ${userName}`);
-                  
-                  // ใช้ balanceCheckService เพื่อส่งข้อความแจ้งเตือนผ่าน Account ที่ถูกต้อง
-                  const balanceCheckService = require('./services/betting/balanceCheckService');
-                  
-                  // ส่งข้อความแจ้งเตือนส่วนตัวและในกลุ่มผ่าน balanceCheckService
-                  await balanceCheckService.notifyInsufficientBalance(
-                    userName,
-                    playerBalance,
-                    betAmount,
-                    betAmount - playerBalance,
-                    message.userId,
-                    accountNumber,
-                    message.groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
-                  );
-                  console.log(`   📤 Personal message sent to ${userName} via Account ${accountNumber}`);
-                  console.log(`   📢 Group warning message sent via Account ${accountNumber}`);
-                  
-                  // ❌ หยุดการประมวลผลทันที ไม่บันทึกการเล่น
-                  continue;
-                } else {
-                  console.log(`✅ Balance sufficient for ${userName}`);
-                  
-                  // 🎯 AUTO MATCHING: ตรวจชื่อบั้งไฟต้องตรงกัน ใช้ยอดเงินน้อยกว่าเป็นหลัก
-                  const betAmount = extractBetAmount(message.content);
-                  const fireworkName = extractFireworkName(message.content);
-                  const betType = extractBetType(message.content);
-                  
-                  if (betAmount > 0 && fireworkName && betType) {
-                    console.log(`🔍 Looking for matching players for firework: ${fireworkName}`);
-                    
-                    // ดึงข้อมูลการเดิมพันทั้งหมดจาก Google Sheets
-                    try {
-                      const response = await sheets.spreadsheets.values.get({
-                        auth: googleAuth,
-                        spreadsheetId: GOOGLE_SHEET_ID,
-                        range: `${GOOGLE_WORKSHEET_NAME}!A:O`,
-                      });
-                      
-                      const rows = response.data.values || [];
-                      const matchingBets = [];
-                      
-                      // ค้นหาการเดิมพันที่ยังไม่มีผลลัพธ์ และเล่นบั้งไฟเดียวกัน
-                      for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row) continue;
-                        
-                        const rowFireworkName = row[4] || ''; // Column E
-                        const rowResultA = row[9] || ''; // Column J
-                        const rowResultB = row[10] || ''; // Column K
-                        const rowUserA = row[1] || ''; // Column B
-                        const rowUserB = row[11] || ''; // Column L
-                        const rowBetTypeA = row[5] || ''; // Column F
-                        
-                        // ตรวจสอบว่าเป็นการเดิมพันที่ยังไม่มีผลลัพธ์ และเล่นบั้งไฟเดียวกัน
-                        // ✅ ต้องตรวจชื่อบั้งไฟให้ตรงกันทั้งหมด
-                        if (!rowResultA && !rowResultB && 
-                            rowFireworkName === fireworkName &&
-                            rowUserA !== message.userId && rowUserB !== message.userId) {
-                          
-                          // ตรวจสอบว่าประเภทเดิมพันตรงข้ามกันหรือไม่
-                          const isOpposite = (typeA, typeB) => {
-                            const opposites = {
-                              '✅': '❌',
-                              '❌': '✅',
-                              'ต่ำ/ยั่ง': 'สูง/ไล่',
-                              'สูง/ไล่': 'ต่ำ/ยั่ง',
-                              'ถอย': 'ยั้ง',
-                              'ยั้ง': 'ถอย',
-                              'ล่าง': 'บน',
-                              'บน': 'ล่าง'
-                            };
-                            return opposites[typeA] === typeB;
-                          };
-                          
-                          if (isOpposite(rowBetTypeA, betType)) {
-                            matchingBets.push({
-                              rowIndex: i + 1,
-                              userA: rowUserA,
-                              userB: rowUserB,
-                              amountA: parseFloat(row[6]) || 0,
-                              amountB: parseFloat(row[7]) || 0,
-                              betTypeA: rowBetTypeA
-                            });
-                          }
-                        }
-                      }
-                      
-                      if (matchingBets.length > 0) {
-                        console.log(`✅ Found ${matchingBets.length} matching bet(s)`);
-                        
-                        // จับคู่กับการเดิมพันแรกที่พบ
-                        const matchedBet = matchingBets[0];
-                        const matchedUserBalanceData = await getPlayerBalance(matchedBet.userA, '');
-                        const matchedUserBalance = matchedUserBalanceData.balance || 0;
-                        
-                        // ✅ ยึดจากคนยอดน้อยกว่า
-                        const finalBetAmount = Math.min(betAmount, matchedBet.amountA, matchedUserBalance, playerBalance);
-                        
-                        console.log(`🎯 Auto-matching with user: ${matchedBet.userA}`);
-                        console.log(`   Final bet amount: ${finalBetAmount} บาท (using minimum)`);
-                        
-                        // บันทึกการเดิมพันใหม่ (ผู้เล่นที่จับคู่ vs ผู้เล่นปัจจุบัน)
-                        const groupName = await getLineGroupName(message.groupId, accessToken);
-                        const matchedUserName = await getLineUserProfile(matchedBet.userA, accessToken);
-                        
-                        const pair = {
-                          userA: matchedBet.userA,
-                          messageA: `${fireworkName} ${matchedBet.betTypeA} ${matchedBet.amountA}`,
-                          timestampA: Date.now(),
-                          userB: message.userId,
-                          messageB: message.content,
-                          timestampB: message.timestamp,
-                          groupId: message.groupId
-                        };
-                        
-                  try {
-                    await appendToGoogleSheets(pair, matchedUserName, userName, groupName, 'auto');
-                    console.log(`✅ Auto-matched pair recorded successfully`);
-                    
-                    // 📢 ส่งข้อความแจ้งเตือนเมื่อจับคู่เล่นอัตโนมัติสำเร็จ
-                    const autoBetAmount = finalBetAmount;
-                    
-                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น A
-                    const userAAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
-                      `👤 คุณ: ${matchedUserName}\n` +
-                      `👤 คู่แข่ง: ${userName}\n` +
-                      `🎆 บั้งไฟ: ${fireworkName}\n` +
-                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
-                      `⏳ รอการประกาศผล...`;
-                    
-                    // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น B
-                    const userBAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
-                      `👤 คุณ: ${userName}\n` +
-                      `👤 คู่แข่ง: ${matchedUserName}\n` +
-                      `🎆 บั้งไฟ: ${fireworkName}\n` +
-                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
-                      `⏳ รอการประกาศผล...`;
-                    
-                    // ข้อความแจ้งเตือนในกลุ่มแชท
-                    const groupAutoNotification = `✅ จับคู่เล่นสำเร็จ\n\n` +
-                      `👤 ${matchedUserName} vs ${userName}\n` +
-                      `🎆 บั้งไฟ: ${fireworkName}\n` +
-                      `💰 ยอดเงิน: ${autoBetAmount} บาท\n\n` +
-                      `⏳ รอการประกาศผล...`;
-                    
-                    // ส่งข้อความแจ้งเตือนส่วนตัว
-                    console.log(`   📤 Sending auto-pairing notification to ${matchedUserName}`);
-                    await sendLineMessageToUser(matchedBet.userA, userAAutoNotification, accessToken);
-                    
-                    console.log(`   📤 Sending auto-pairing notification to ${userName}`);
-                    await sendLineMessageToUser(message.userId, userBAutoNotification, accessToken);
-                    
-                    // ส่งข้อความแจ้งเตือนในกลุ่ม
-                    console.log(`   📤 Sending auto-pairing notification to group`);
-                    await sendLineMessage(message.groupId, groupAutoNotification, accessToken);
-                    
-                    console.log(`✅ Auto-pairing notifications sent`);
-                  } catch (recordError) {
-                    console.error(`❌ Failed to record pair: ${recordError.message}`);
-                  }
-                      } else {
-                        console.log(`⏭️  No matching bets found, storing in memory for future matching...`);
-                        
-                        // 📝 เก็บการเดิมพันแรกไว้ในหน่วยความจำ (ไม่บันทึกลงชีท)
-                        const tempPair = {
-                          userA: message.userId,
-                          messageA: message.content,
-                          timestampA: message.timestamp,
-                          userB: '', // ยังไม่มี User B
-                          messageB: '',
-                          timestampB: message.timestamp,
-                          groupId: message.groupId
-                        };
-                        
-                        // เก็บไว้ในตัวแปร messageMap เพื่อรอการจับคู่
-                        messageMap.set(message.messageId, {
-                          userId: message.userId,
-                          content: message.content,
-                          timestamp: message.timestamp,
-                          groupId: message.groupId,
-                          userName: userName,
-                          betAmount: betAmount,
-                          fireworkName: fireworkName,
-                          betType: betType
-                        });
-                        
-                        console.log(`   📦 Stored in memory: ${fireworkName} ${betType} ${betAmount} บาท`);
-                      }
-                    } catch (matchError) {
-                      console.error(`⚠️  Error finding matching bets: ${matchError.message}`);
-                    }
-                  }
-                }
+              } catch (controllerError) {
+                console.error(`❌ bettingRoundController error: ${controllerError.message}`);
+                console.error(controllerError.stack);
               }
+              
+
               
               // Detect pair
               const pair = detectPair(message);
