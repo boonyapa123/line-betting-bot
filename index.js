@@ -1270,15 +1270,16 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       userBName,           // [12] = M: ชื่อ User B
       oppositeBetType,     // [13] = N: รายการแทง B
       groupName,           // [14] = O: ชื่อกลุ่มแชท
-      userAToken,          // [15] = P: User A Token
+      userAToken || '',    // [15] = P: User A Token
       pair.groupId || '',  // [16] = Q: Group ID
-      userBToken           // [17] = R: User B Token
+      userBToken || ''     // [17] = R: User B Token
     ];
     
     console.log(`   📊 Row data (18 columns):`);
+    console.log(`   Array length: ${row.length}`);
     row.forEach((val, idx) => {
       const colLetter = String.fromCharCode(65 + idx); // A=65
-      console.log(`      [${colLetter}]: "${val}"`);
+      console.log(`      [${colLetter}] (index ${idx}): "${val}"`);
     });
     
     // Get current row count
@@ -1292,9 +1293,11 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     const nextRowIndex = rows.length + 1;
     
     console.log(`   📊 Current rows: ${rows.length}, appending to row ${nextRowIndex}`);
+    console.log(`   📍 Writing to range: ${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`);
+    console.log(`   📦 Payload: [${row.map(v => `"${v}"`).join(', ')}]`);
     
     // Append row
-    await sheets.spreadsheets.values.update({
+    const updateResponse = await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`,
@@ -1305,6 +1308,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     });
     
     console.log(`   ✅ Row appended successfully to row ${nextRowIndex}`);
+    console.log(`   📊 Update response:`, updateResponse.data);
     
     // บันทึกข้อมูลผู้เล่น User A ถ้ายังไม่มี
     console.log(`📝 Recording Player A to Players sheet...`);
