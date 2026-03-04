@@ -63,40 +63,46 @@ class BettingPairingService {
    */
   async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '') {
     try {
-      // สร้างข้อมูลสำหรับบันทึก (18 คอลัมน์ A-R)
-      const messageText = `${betData.slipName} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''}`;
+      const BetsSheetColumns = require('./betsSheetColumns');
+
+      // สร้างข้อมูลสำหรับบันทึก
+      const messageText = betData.price 
+        ? `${betData.price} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`
+        : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`;
       
-      const row = [
-        new Date().toISOString(), // A: Timestamp
-        userId, // B: User A ID
-        displayName, // C: ชื่อ User A
-        messageText, // D: ข้อความ A (เช่น "ลูกชายภูน้อย ชล 150")
-        betData.slipName, // E: ชื่อบั้งไฟ (เช่น "ลูกชายภูน้อย")
-        betData.sideCode, // F: ฝั่ง A (เช่น "ชล")
-        betData.amount || '', // G: เงิน A (เช่น "150")
-        '', // H: เงิน B (ว่างเปล่า - รอการจับคู่)
-        '', // I: ผลลัพธ์
-        '', // J: ผู้ชนะ
-        '', // K: User B ID
-        '', // L: ชื่อ User B
-        '', // M: ฝั่ง B (ว่างเปล่า - รอการจับคู่)
-        betData.sideCode, // N: ฝั่ง A (รหัส)
-        groupName || '', // O: ชื่อกลุ่ม
-        userToken || '', // P: Token A
-        groupId || '', // Q: ID กลุ่ม
-        '', // R: Token B
-        '', // S: ผลลัพธ์ A (ว่างเปล่า - รอผลลัพธ์)
-        '', // T: ผลลัพธ์ B (ว่างเปล่า - รอผลลัพธ์)
-      ];
+      const timestamp = new Date().toLocaleString('th-TH', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      // ใช้ helper สร้างแถว
+      const row = BetsSheetColumns.createRow({
+        timestamp,
+        userAId: userId,
+        userAName: displayName,
+        messageA: messageText,
+        slipName: betData.slipName,
+        sideA: betData.sideCode,
+        amount: betData.amount || '',
+        groupName: groupName || '',
+        tokenA: userToken || '',
+        groupId: groupId || '',
+      });
 
       // เพิ่มแถวใหม่ลงชีท Bets
       console.log(`📝 Recording bet to Bets sheet: ${this.transactionsSheetName}`);
-      console.log(`   Timestamp: ${row[0]}`);
+      console.log(`   Timestamp: ${timestamp}`);
       console.log(`   User A: ${displayName}`);
       console.log(`   Message: ${messageText}`);
       console.log(`   Slip: ${betData.slipName}`);
       console.log(`   Side: ${betData.sideCode}`);
       console.log(`   Amount: ${betData.amount || 'N/A'}`);
+      console.log(`   Price: ${betData.price || 'N/A'}`);
       
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
@@ -121,25 +127,15 @@ class BettingPairingService {
    */
   async getAllBets() {
     try {
+      const BetsSheetColumns = require('./betsSheetColumns');
+
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A2:J`,
+        range: `${this.transactionsSheetName}!A2:T`,
       });
 
       const values = response.data.values || [];
-      return values.map((row) => ({
-        timestamp: row[0],
-        userId: row[1],
-        displayName: row[2],
-        lineName: row[3] || '',
-        method: row[4],
-        price: row[5],
-        side: row[6],
-        sideCode: row[6],
-        amount: parseInt(row[7]),
-        slipName: row[8],
-        status: row[9],
-      }));
+      return values.map((row) => BetsSheetColumns.parseRow(row));
     } catch (error) {
       console.error('Error getting all bets:', error);
       return [];
@@ -316,15 +312,16 @@ class BettingPairingService {
       'ย': 'ล',
     };
 
-    // ถ้า directBet เป็น ชล แล้ว replyBet ต้องเป็น ชถ
-    const expectedReplyBetSide = oppositeMap[directBet.side];
+    // ใช้ sideCode ของ directBet
+    const directBetSideCode = directBet.sideCode || directBet.side;
+    const expectedReplyBetSideCode = oppositeMap[directBetSideCode];
     
     // replyBet.side จะเป็น 'ต' (ตอบ) ต้องแปลงเป็นฝั่งตรงข้าม
     if (replyBet.side !== 'ต') return false;
 
-    // ตั้งค่า replyBet.side เป็นฝั่งตรงข้าม
-    replyBet.side = expectedReplyBetSide;
-    replyBet.sideCode = expectedReplyBetSide;
+    // ตั้งค่า replyBet.side และ sideCode เป็นฝั่งตรงข้าม
+    replyBet.side = expectedReplyBetSideCode;
+    replyBet.sideCode = expectedReplyBetSideCode;
 
     return true;
   }
@@ -348,6 +345,7 @@ class BettingPairingService {
     if (bet1.slipName !== bet2.slipName) return false;
 
     // 2. ต้องเป็นฝั่งตรงข้าม
+    // ใช้ sideCode (ล/ย/ชล/ชถ) ไม่ใช่ side (ไล่/ยั้ง/ถอย)
     const oppositeMap = {
       'ชล': 'ชถ',
       'ชถ': 'ชล',
@@ -355,7 +353,10 @@ class BettingPairingService {
       'ย': 'ล',
     };
 
-    if (oppositeMap[bet1.side] !== bet2.side) return false;
+    const bet1SideCode = bet1.sideCode || bet1.side;
+    const bet2SideCode = bet2.sideCode || bet2.side;
+
+    if (oppositeMap[bet1SideCode] !== bet2SideCode) return false;
 
     // 3. วิธีที่ 2 ต้องมีราคาเดียวกัน
     if (bet1.method === 2 && bet2.method === 2) {
@@ -377,12 +378,16 @@ class BettingPairingService {
     if (bet1.slipName !== bet2.slipName) return false;
 
     // 2. ต้องเป็นฝั่งตรงข้าม (ล ↔ ย)
+    // ใช้ sideCode (ล/ย) ไม่ใช่ side (ไล่/ยั้ง)
     const oppositeMap = {
       'ล': 'ย',
       'ย': 'ล',
     };
 
-    if (oppositeMap[bet1.side] !== bet2.side) return false;
+    const bet1SideCode = bet1.sideCode || bet1.side;
+    const bet2SideCode = bet2.sideCode || bet2.side;
+
+    if (oppositeMap[bet1SideCode] !== bet2SideCode) return false;
 
     // 3. ต้องมีราคาเดียวกัน (Price Range)
     if (bet1.price !== bet2.price) return false;

@@ -17,12 +17,16 @@ class PriceRangeMatchingService {
     if (bet1.slipName !== bet2.slipName) return false;
 
     // 2. ต้องเป็นฝั่งตรงข้าม (ล ↔ ย)
+    // ใช้ sideCode (ล/ย) ไม่ใช่ side (ไล่/ยั้ง)
     const oppositeMap = {
       'ล': 'ย',
       'ย': 'ล',
     };
 
-    if (oppositeMap[bet1.side] !== bet2.side) return false;
+    const bet1SideCode = bet1.sideCode || bet1.side;
+    const bet2SideCode = bet2.sideCode || bet2.side;
+
+    if (oppositeMap[bet1SideCode] !== bet2SideCode) return false;
 
     // 3. ทั้งคู่ต้องมีราคา (Direct Method ที่มีราคา)
     if (!bet1.price || !bet2.price) return false;
@@ -328,9 +332,13 @@ class PriceRangeMatchingService {
    */
   static async recordToGoogleSheets(sheets, spreadsheetId, worksheetName, pair, userAName, userBName, groupName) {
     try {
+      const BetsSheetColumns = require('./betsSheetColumns');
+
       console.log(`📝 Recording matched pair to ${worksheetName} sheet...`);
 
-      // สร้างข้อมูลแถว ตรงกับโครงสร้างชีท Bets ปัจจุบัน
+      // ใช้ pair.price (ราคาที่ตรงกัน)
+      const price = pair.price || pair.existingBet.price || pair.newBet.price || '';
+
       const timestamp = new Date().toLocaleString('th-TH', {
         year: 'numeric',
         month: '2-digit',
@@ -341,34 +349,25 @@ class PriceRangeMatchingService {
         hour12: false
       });
 
-      const row = [
-        timestamp,                                    // [0] = A: Timestamp
-        pair.existingBet.userId || '',               // [1] = B: User A ID
-        userAName,                                    // [2] = C: ชื่อ User A
-        `${pair.existingBet.price} ${pair.existingBet.side} ${pair.existingBet.amount} ${pair.slipName}`, // [3] = D: ข้อความ A
-        pair.slipName,                                // [4] = E: ชื่อบั้งไฟ
-        pair.existingBet.side,                        // [5] = F: รายการเล่น
-        pair.betAmount,                               // [6] = G: ยอดเงิน
-        pair.betAmount,                               // [7] = H: ยอดเงิน B
-        '',                                           // [8] = I: ผลที่ออก (ว่าง - อัปเดตเมื่อประกาศผล)
-        '',                                           // [9] = J: ผลแพ้ชนะ (ว่าง - อัปเดตเมื่อประกาศผล)
-        pair.newBet.userId || '',                     // [10] = K: User B ID
-        userBName,                                    // [11] = L: ชื่อ User B
-        pair.newBet.side,                             // [12] = M: รายการแทง
-        '',                                           // [13] = N: ชื่อกลุ่มแชท (ว่าง)
-        groupName || '',                              // [14] = O: ชื่อกลุ่ม
-        '',                                           // [15] = P: Token A
-        pair.newBet.groupId || '',                    // [16] = Q: ID กลุ่ม
-        '',                                           // [17] = R: Token B
-        '',                                           // [18] = S: ผลลัพธ์ A (ว่าง - อัปเดตเมื่อประกาศผล)
-        ''                                            // [19] = T: ผลลัพธ์ B (ว่าง - อัปเดตเมื่อประกาศผล)
-      ];
+      // ใช้ helper สร้างแถว
+      const row = BetsSheetColumns.createRow({
+        timestamp,
+        userAId: pair.existingBet.userId || '',
+        userAName: userAName,
+        messageA: `${price} ${pair.existingBet.sideCode} ${pair.existingBet.amount} ${pair.slipName}`,
+        slipName: pair.slipName,
+        sideA: pair.existingBet.sideCode,
+        amount: pair.betAmount,
+        amountB: pair.betAmount,
+        userBId: pair.newBet.userId || '',
+        userBName: userBName,
+        sideB: pair.newBet.sideCode,
+        groupName: groupName || '',
+        groupId: pair.newBet.groupId || '',
+      });
 
       console.log(`   📊 Row data (20 columns):`);
-      row.forEach((val, idx) => {
-        const colLetter = String.fromCharCode(65 + idx);
-        console.log(`      [${colLetter}] (index ${idx}): "${val}"`);
-      });
+      BetsSheetColumns.logRow(row);
 
       // ดึงจำนวนแถวปัจจุบัน
       const response = await sheets.spreadsheets.values.get({

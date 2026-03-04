@@ -182,8 +182,8 @@ class BettingRoundController {
     
     if (matchedPair) {
       console.log(`🎯 Auto-matched price range pair found!`);
-      console.log(`   ${displayName} (${parsedBet.side}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.side})`);
-      console.log(`   Slip: ${parsedBet.slipName}, Amount: ${matchedPair.betAmount} บาท`);
+      console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
+      console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
       
       // สร้างข้อความแจ้งการจับคู่
       const messages = PriceRangeMatchingService.createAutoMatchMessage(
@@ -199,6 +199,10 @@ class BettingRoundController {
         // ใช้ bettingPairingService เพื่อบันทึกข้อมูล
         const { google } = require('googleapis');
         const sheets = google.sheets({ version: 'v4', auth: bettingPairingService.googleAuth });
+        
+        // เพิ่ม userId และ groupId ให้ matchedPair
+        matchedPair.newBet.userId = userId;
+        matchedPair.newBet.groupId = source.groupId || '';
         
         const recordResult = await PriceRangeMatchingService.recordToGoogleSheets(
           sheets,
