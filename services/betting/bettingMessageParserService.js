@@ -317,6 +317,27 @@ class BettingMessageParserService {
       error: 'ไม่ใช่ reply ที่ถูกต้อง',
     };
   }
+
+  /**
+   * แสดงข้อมูลการเล่นในรูปแบบที่อ่านง่าย
+   * @param {object} parsedBet - ข้อมูลการเล่นที่ถอดแล้ว
+   * @returns {string} ข้อมูลในรูปแบบ "ชื่อบั้งไฟ: xxx ยอดเงิน: xxx เดิมพัน: xxx ราคา: xxx"
+   */
+  static formatBetInfo(parsedBet) {
+    if (!parsedBet.success) {
+      return '';
+    }
+
+    let info = `ชื่อบั้งไฟ: ${parsedBet.slipName}`;
+    info += `ยอดเงิน: ${parsedBet.amount}`;
+    info += `เดิมพัน: ${parsedBet.sideCode}`;
+    
+    if (parsedBet.price) {
+      info += `ราคา: ${parsedBet.price}`;
+    }
+
+    return info;
+  }
 }
 
 module.exports = BettingMessageParserService;
