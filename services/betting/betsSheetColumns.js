@@ -27,6 +27,7 @@ class BetsSheetColumns {
     TOKEN_B: 17,            // R: Token B
     RESULT_A: 18,           // S: ผลลัพธ์ A
     RESULT_B: 19,           // T: ผลลัพธ์ B
+    MATCHED_AUTO: 20,       // U: MATCHED Auto (จับคู่อัตโนมัติ)
   };
 
   // ชื่อคอลัมน์ (สำหรับอ้างอิง)
@@ -51,6 +52,7 @@ class BetsSheetColumns {
     17: 'R - Token B',
     18: 'S - ผลลัพธ์ A',
     19: 'T - ผลลัพธ์ B',
+    20: 'U - MATCHED Auto',
   };
 
   /**
@@ -59,7 +61,7 @@ class BetsSheetColumns {
    * @returns {array} แถวข้อมูล (20 คอลัมน์)
    */
   static createRow(data) {
-    const row = new Array(20).fill('');
+    const row = new Array(21).fill('');
 
     // ตั้งค่าข้อมูลตามคอลัมน์
     if (data.timestamp) row[this.COLUMNS.TIMESTAMP] = data.timestamp;
@@ -82,6 +84,7 @@ class BetsSheetColumns {
     if (data.tokenB) row[this.COLUMNS.TOKEN_B] = data.tokenB;
     if (data.resultA) row[this.COLUMNS.RESULT_A] = data.resultA;
     if (data.resultB) row[this.COLUMNS.RESULT_B] = data.resultB;
+    if (data.matchedAuto) row[this.COLUMNS.MATCHED_AUTO] = data.matchedAuto;
 
     return row;
   }
@@ -131,6 +134,7 @@ class BetsSheetColumns {
       tokenB: row[this.COLUMNS.TOKEN_B],
       resultA: row[this.COLUMNS.RESULT_A],
       resultB: row[this.COLUMNS.RESULT_B],
+      matchedAuto: row[this.COLUMNS.MATCHED_AUTO],
       price: price,
       method: price ? 2 : 1,
       status: row[this.COLUMNS.RESULT_WIN_LOSE] ? 'MATCHED' : '',
@@ -234,10 +238,8 @@ class BetsSheetColumns {
     if (userBData.groupName) row[this.COLUMNS.GROUP_NAME] = userBData.groupName;
     if (userBData.tokenB) row[this.COLUMNS.TOKEN_B] = userBData.tokenB;
 
-    // ทำเครื่องหมาย MATCHED (ใส่ค่าใน RESULT_WIN_LOSE)
-    if (!row[this.COLUMNS.RESULT_WIN_LOSE]) {
-      row[this.COLUMNS.RESULT_WIN_LOSE] = 'MATCHED';
-    }
+    // ทำเครื่องหมาย MATCHED Auto ใน Column U
+    row[this.COLUMNS.MATCHED_AUTO] = 'AUTO';
 
     return row;
   }
