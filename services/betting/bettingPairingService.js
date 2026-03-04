@@ -66,6 +66,7 @@ class BettingPairingService {
       const BetsSheetColumns = require('./betsSheetColumns');
 
       // สร้างข้อมูลสำหรับบันทึก
+      // รูปแบบข้อความ: "320-340 ล 100 คำไผ่" หรือ "ชล 500 ฟ้าหลังฝน"
       const messageText = betData.price 
         ? `${betData.price} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`
         : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`;
@@ -138,6 +139,22 @@ class BettingPairingService {
       return values.map((row) => BetsSheetColumns.parseRow(row));
     } catch (error) {
       console.error('Error getting all bets:', error);
+      return [];
+    }
+  }
+
+  /**
+   * ดึงข้อมูลการเล่นจากกลุ่มเฉพาะ
+   * @param {string} groupId - ID ของกลุ่ม
+   * @returns {array} ข้อมูลการเล่นในกลุ่มนั้น
+   */
+  async getBetsByGroupId(groupId) {
+    try {
+      const allBets = await this.getAllBets();
+      // กรองเฉพาะข้อมูลที่มี groupId ตรงกัน
+      return allBets.filter(bet => bet.groupId === groupId);
+    } catch (error) {
+      console.error('Error getting bets by group ID:', error);
       return [];
     }
   }

@@ -120,13 +120,16 @@ class PriceRangeMatchingService {
    * @returns {object} ข้อความสำหรับทั้งสองฝั่ง
    */
   static createAutoMatchMessage(pair, userAName, userBName) {
-    const { slipName, price, betAmount } = pair;
+    const { slipName, betAmount } = pair;
+    const priceA = pair.newBet?.price || pair.price;
+    const priceB = pair.existingBet?.price || pair.price;
 
     const messageA = `✅ จับคู่เล่นสำเร็จ (ร้องราคา)\n\n` +
       `👤 คุณ: ${userAName}\n` +
       `👤 คู่แข่ง: ${userBName}\n` +
       `🎆 บั้งไฟ: ${slipName}\n` +
-      `💹 ราคา: ${price}\n` +
+      `💹 ราคาของคุณ: ${priceA}\n` +
+      `💹 ราคาคู่แข่ง: ${priceB}\n` +
       `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
       `⏳ รอการประกาศผล...`;
 
@@ -134,14 +137,16 @@ class PriceRangeMatchingService {
       `👤 คุณ: ${userBName}\n` +
       `👤 คู่แข่ง: ${userAName}\n` +
       `🎆 บั้งไฟ: ${slipName}\n` +
-      `💹 ราคา: ${price}\n` +
+      `💹 ราคาของคุณ: ${priceB}\n` +
+      `💹 ราคาคู่แข่ง: ${priceA}\n` +
       `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
       `⏳ รอการประกาศผล...`;
 
     const groupMessage = `✅ จับคู่เล่นสำเร็จ (ร้องราคา)\n\n` +
       `👤 ${userAName} vs ${userBName}\n` +
       `🎆 บั้งไฟ: ${slipName}\n` +
-      `💹 ราคา: ${price}\n` +
+      `💹 ราคา A: ${priceA}\n` +
+      `💹 ราคา B: ${priceB}\n` +
       `💰 ยอดเงิน: ${betAmount} บาท\n\n` +
       `⏳ รอการประกาศผล...`;
 

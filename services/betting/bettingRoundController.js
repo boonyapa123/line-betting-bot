@@ -173,12 +173,12 @@ class BettingRoundController {
       };
     }
 
-    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน
+    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน)
     const PriceRangeMatchingService = require('./priceRangeMatchingService');
-    const allBets = await bettingPairingService.getAllBets();
+    const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
     
-    // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้)
-    const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, allBets);
+    // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้) เฉพาะในกลุ่มเดียวกัน
+    const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, groupBets);
     
     if (matchedPair) {
       console.log(`🎯 Auto-matched price range pair found!`);

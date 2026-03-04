@@ -94,16 +94,27 @@ class BetsSheetColumns {
   static parseRow(row) {
     // Parse price จากข้อความ (column D)
     // ตัวอย่าง: "320-340 ล 100 คำไผ่" → price = "320-340"
+    // ตัวอย่าง: "ชล 500 ฟ้าหลังฝน" → price = null (Method 1)
     const message = row[this.COLUMNS.MESSAGE_A] || '';
     const priceMatch = message.match(/^(\d+-\d+)/);
     const price = priceMatch ? priceMatch[1] : null;
+
+    // ดึง slipName จาก column E (ชื่อบั้งไฟ)
+    // ถ้าไม่มี ให้ดึงจากท้ายข้อความ
+    let slipName = row[this.COLUMNS.SLIP_NAME];
+    if (!slipName) {
+      // Parse slipName จากท้ายข้อความ
+      // ตัวอย่าง: "320-340 ล 100 คำไผ่" → slipName = "คำไผ่"
+      const slipMatch = message.match(/\s+(\S+)$/);
+      slipName = slipMatch ? slipMatch[1] : '';
+    }
 
     return {
       timestamp: row[this.COLUMNS.TIMESTAMP],
       userId: row[this.COLUMNS.USER_A_ID],
       displayName: row[this.COLUMNS.USER_A_NAME],
       message: row[this.COLUMNS.MESSAGE_A],
-      slipName: row[this.COLUMNS.SLIP_NAME],
+      slipName: slipName,
       side: row[this.COLUMNS.SIDE_A],
       sideCode: row[this.COLUMNS.SIDE_A],
       amount: parseInt(row[this.COLUMNS.AMOUNT]) || 0,
