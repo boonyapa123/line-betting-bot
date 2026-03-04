@@ -55,16 +55,15 @@ class BettingPairingService {
    * @param {object} betData - ข้อมูลการเล่น
    * @param {string} userId - User ID จาก LINE
    * @param {string} displayName - ชื่อ User
+   * @param {string} lineName - ชื่อ LINE
+   * @param {string} groupName - ชื่อกลุ่มแชท (optional)
+   * @param {string} userToken - User Access Token (optional)
+   * @param {string} groupId - Group ID (optional)
    * @returns {object}
    */
-  async recordBet(betData, userId, displayName, lineName = '') {
+  async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '') {
     try {
-      // สร้างข้อมูลสำหรับบันทึก
-      // D: ข้อความที่ส่ง (เช่น "ลูกชายภูน้อย ชล 150")
-      // E: ชื่อบั้งไฟ (เช่น "ลูกชายภูน้อย")
-      // F: รายการเล่น (เช่น "ชล")
-      // G: ยอดเงิน (เช่น "150")
-      
+      // สร้างข้อมูลสำหรับบันทึก (18 คอลัมน์ A-R)
       const messageText = `${betData.slipName} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''}`;
       
       const row = [
@@ -73,15 +72,21 @@ class BettingPairingService {
         displayName, // C: ชื่อ User A
         messageText, // D: ข้อความ A (เช่น "ลูกชายภูน้อย ชล 150")
         betData.slipName, // E: ชื่อบั้งไฟ (เช่น "ลูกชายภูน้อย")
-        betData.sideCode, // F: รายการเล่น (เช่น "ชล")
-        betData.amount || '', // G: ยอดเงิน (เช่น "150")
-        '', // H: ยอดเงิน B (ว่างเปล่า - รอการจับคู่)
-        '', // I: แสดงผล
-        '', // J: แสดงผลชนะ
+        betData.sideCode, // F: ฝั่ง A (เช่น "ชล")
+        betData.amount || '', // G: เงิน A (เช่น "150")
+        '', // H: เงิน B (ว่างเปล่า - รอการจับคู่)
+        '', // I: ผลลัพธ์
+        '', // J: ผู้ชนะ
         '', // K: User B ID
         '', // L: ชื่อ User B
-        '', // M: รายการเล่น B
-        '', // N: ผลลัพธ์สุดท้าย
+        '', // M: ฝั่ง B (ว่างเปล่า - รอการจับคู่)
+        betData.sideCode, // N: ฝั่ง A (รหัส)
+        groupName || '', // O: ชื่อกลุ่ม
+        userToken || '', // P: Token A
+        groupId || '', // Q: ID กลุ่ม
+        '', // R: Token B
+        '', // S: ผลลัพธ์ A (ว่างเปล่า - รอผลลัพธ์)
+        '', // T: ผลลัพธ์ B (ว่างเปล่า - รอผลลัพธ์)
       ];
 
       // เพิ่มแถวใหม่ลงชีท Bets
@@ -95,7 +100,7 @@ class BettingPairingService {
       
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A:N`,
+        range: `${this.transactionsSheetName}!A:T`,
         valueInputOption: 'RAW',
         resource: {
           values: [row],

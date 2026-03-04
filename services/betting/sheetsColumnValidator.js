@@ -54,7 +54,7 @@ class SheetsColumnValidator {
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'Bets!A1:R1',
+        range: 'Bets!A1:T1',
       });
 
       const headers = response.data.values?.[0] || [];
@@ -65,22 +65,28 @@ class SheetsColumnValidator {
         console.log(`  ${column}: ${header}`);
       });
 
-      // ตรวจสอบคอลัมน์ที่ถูกต้อง
+      // ตรวจสอบคอลัมน์ที่ถูกต้อง (ตามคอลัมน์จริงในชีท)
       const expectedColumns = {
-        A: 'Timestamp',
-        B: 'User A ID',
-        C: 'ชื่อ User A',
-        D: 'ข้อความ A',
+        A: 'วันเวลา',
+        B: 'ID ผู้เล่น A',
+        C: 'ชื่อผู้เล่น A',
+        D: 'ข้อความ',
         E: 'ชื่อบั้งไฟ',
-        F: 'รายการเล่น',
-        G: 'ยอดเงิน A',
-        H: 'ยอดเงิน B',
-        I: 'แสดงผล',
-        J: 'แสดงผลชนะ',
-        K: 'User B ID',
-        L: 'ชื่อ User B',
-        M: 'รายการเล่น B',
-        N: 'ผลลัพธ์สุดท้าย',
+        F: 'ฝั่ง A',
+        G: 'เงิน A',
+        H: 'เงิน B',
+        I: 'ผลลัพธ์',
+        J: 'ผู้ชนะ',
+        K: 'ID ผู้เล่น B',
+        L: 'ชื่อผู้เล่น B',
+        M: 'ฝั่ง B',
+        N: 'ฝั่ง A (รหัส)',
+        O: 'ชื่อกลุ่ม',
+        P: 'Token A',
+        Q: 'ID กลุ่ม',
+        R: 'Token B',
+        S: 'ผลลัพธ์ A',
+        T: 'ผลลัพธ์ B',
       };
 
       console.log('\n✅ คอลัมน์ที่ควรมี:');
@@ -247,25 +253,31 @@ class SheetsColumnValidator {
       console.log('\n🔧 แก้ไขคอลัมน์ใน Bets Sheet...\n');
 
       const headers = [
-        'Timestamp',
-        'User A ID',
-        'ชื่อ User A',
-        'ข้อความ A',
+        'วันเวลา',
+        'ID ผู้เล่น A',
+        'ชื่อผู้เล่น A',
+        'ข้อความ',
         'ชื่อบั้งไฟ',
-        'รายการเล่น',
-        'ยอดเงิน A',
-        'ยอดเงิน B',
-        'แสดงผล',
-        'แสดงผลชนะ',
-        'User B ID',
-        'ชื่อ User B',
-        'รายการเล่น B',
-        'ผลลัพธ์สุดท้าย',
+        'ฝั่ง A',
+        'เงิน A',
+        'เงิน B',
+        'ผลลัพธ์',
+        'ผู้ชนะ',
+        'ID ผู้เล่น B',
+        'ชื่อผู้เล่น B',
+        'ฝั่ง B',
+        'ฝั่ง A (รหัส)',
+        'ชื่อกลุ่ม',
+        'Token A',
+        'ID กลุ่ม',
+        'Token B',
+        'ผลลัพธ์ A',
+        'ผลลัพธ์ B',
       ];
 
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: 'Bets!A1:N1',
+        range: 'Bets!A1:R1',
         valueInputOption: 'RAW',
         resource: {
           values: [headers],

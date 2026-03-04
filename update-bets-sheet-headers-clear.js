@@ -1,0 +1,69 @@
+const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
+
+async function updateBetsSheetHeaders() {
+  try {
+    const credentialsPath = path.join(__dirname, 'credentials.json');
+    const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    const worksheetName = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
+
+    // ชื่อคอลัมน์ใหม่ที่เข้าใจง่าย
+    const headers = [
+      'Timestamp',           // A: วันเวลา
+      'User A ID',           // B: ID ผู้เล่นคนแรก
+      'User A Name',         // C: ชื่อผู้เล่นคนแรก
+      'Message',             // D: ข้อความที่ส่ง
+      'Slip Name',           // E: ชื่อบั้งไฟ
+      'Side A',              // F: ฝั่งที่เดิมพัน (ชล/ถอย/ล/ย)
+      'Amount A',            // G: ยอดเงินคนแรก
+      'Amount B',            // H: ยอดเงินคนที่สอง
+      'Result',              // I: ผลลัพธ์ที่ออก
+      'Winner',              // J: ผู้ชนะ
+      'User B ID',           // K: ID ผู้เล่นคนที่สอง
+      'User B Name',         // L: ชื่อผู้เล่นคนที่สอง
+      'Side B',              // M: ฝั่งของผู้เล่นคนที่สอง
+      'Side A Code',         // N: รหัสฝั่ง A (ชล/ถอย/ล/ย)
+      'Group Name',          // O: ชื่อกลุ่มแชท
+      'User A Token',        // P: Token ผู้เล่นคนแรก
+      'Group ID',            // Q: ID กลุ่ม
+      'User B Token',        // R: Token ผู้เล่นคนที่สอง
+    ];
+
+    console.log('\n📋 อัปเดตชื่อคอลัมน์ในชีท Bets:');
+    console.log('=====================================\n');
+
+    headers.forEach((header, index) => {
+      const columnLetter = String.fromCharCode(65 + index);
+      console.log(`${columnLetter}: ${header}`);
+    });
+
+    // Update headers
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${worksheetName}!A1:R1`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [headers],
+      },
+    });
+
+    console.log('\n✅ อัปเดตชื่อคอลัมน์สำเร็จ');
+    console.log('=====================================\n');
+
+  } catch (error) {
+    console.error('❌ เกิดข้อผิดพลาด:', error.message);
+    process.exit(1);
+  }
+}
+
+require('dotenv').config();
+updateBetsSheetHeaders();

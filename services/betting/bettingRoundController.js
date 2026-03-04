@@ -88,7 +88,10 @@ class BettingRoundController {
         parsedBet,
         userId,
         displayName,
-        lineName
+        lineName,
+        '', // groupName (ยังไม่มีข้อมูล)
+        '', // userToken (ยังไม่มีข้อมูล)
+        source.groupId || '' // groupId
       );
 
       if (!recordResult.success) {
@@ -157,7 +160,10 @@ class BettingRoundController {
       parsedBet,
       userId,
       displayName,
-      lineName
+      lineName,
+      '', // groupName (ยังไม่มีข้อมูล)
+      '', // userToken (ยังไม่มีข้อมูล)
+      source.groupId || '' // groupId
     );
 
     if (!recordResult.success) {
