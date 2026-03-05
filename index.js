@@ -1370,33 +1370,130 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       console.log(`      [${colLetter}] (index ${idx}): "${val}"`);
     });
     
-    // Get current row count
-    const response = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A:A`,
-    });
-    
-    const rows = response.data.values || [];
-    const nextRowIndex = rows.length + 1;
-    
-    console.log(`   📊 Current rows: ${rows.length}, appending to row ${nextRowIndex}`);
-    console.log(`   📍 Writing to range: ${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`);
-    console.log(`   📦 Payload: [${row.map(v => `"${v}"`).join(', ')}]`);
-    
-    // Append row
-    const updateResponse = await sheets.spreadsheets.values.update({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [row],
-      },
-    });
-    
-    console.log(`   ✅ Row appended successfully to row ${nextRowIndex}`);
-    console.log(`   📊 Update response:`, updateResponse.data);
+    // 🔄 สำหรับ Reply matching: ค้นหาแถวที่มี messageA ของ User A ที่รอจับคู่
+    if (matchType === 'reply') {
+      console.log(`   🔍 Searching for existing row with User A message...`);
+      
+      const betsResponse = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${GOOGLE_WORKSHEET_NAME}!A:R`,
+      });
+      
+      const betsRows = betsResponse.data.values || [];
+      let existingRowIndex = -1;
+      
+      // ค้นหาแถวที่มี messageA ของ User A และยังไม่มี User B (column L ว่าง)
+      for (let i = 1; i < betsRows.length; i++) {
+        const betsRow = betsRows[i];
+        if (!betsRow || betsRow.length < 12) continue;
+        
+        const rowUserA = betsRow[1] || '';
+        const rowMessageA = betsRow[3] || '';
+        const rowUserBName = betsRow[11] || '';
+        
+        // ตรวจสอบว่าเป็นแถวของ User A ที่รอจับคู่ (ยังไม่มี User B)
+        if (rowUserA === pair.userA && rowMessageA === pair.messageA && !rowUserBName) {
+          existingRowIndex = i + 1; // Google Sheets ใช้ 1-indexed
+          console.log(`   ✅ Found existing row at ${existingRowIndex}`);
+          break;
+        }
+      }
+      
+      if (existingRowIndex > 0) {
+        // Update existing row with User B data
+        console.log(`   📍 Updating row ${existingRowIndex} with User B data...`);
+        
+        const updateRow = [
+          timestamp,           // [0] = A: Timestamp (update)
+          pair.userA,          // [1] = B: User A ID
+          userAName,           // [2] = C: ชื่อ User A
+          pair.messageA,       // [3] = D: ข้อความ A
+          betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
+          betDetailsA.betType || '',       // [5] = F: รายการเล่น
+          betAmount,           // [6] = G: ยอดเงิน
+          betAmount,           // [7] = H: ยอดเงิน B
+          '',                  // [8] = I: ผลที่ออก
+          '',                  // [9] = J: ผลแพ้ชนะ A
+          '',                  // [10] = K: ผลแพ้ชนะ B
+          userBName,           // [11] = L: ชื่อ User B (UPDATE)
+          oppositeBetType,     // [12] = M: รายการแทง B (UPDATE)
+          '',                  // [13] = N: ชื่อกลุ่มแชท
+          groupName,           // [14] = O: ชื่อกลุ่ม
+          userAToken || '',    // [15] = P: Token A
+          pair.groupId || '',  // [16] = Q: Group ID
+          pair.userB           // [17] = R: User B ID (UPDATE)
+        ];
+        
+        const updateResponse = await sheets.spreadsheets.values.update({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `${GOOGLE_WORKSHEET_NAME}!A${existingRowIndex}:R${existingRowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [updateRow],
+          },
+        });
+        
+        console.log(`   ✅ Row updated successfully at row ${existingRowIndex}`);
+        console.log(`   📊 Update response:`, updateResponse.data);
+      } else {
+        // ไม่พบแถวเดิม ให้ append แถวใหม่
+        console.log(`   ⚠️  No existing row found, appending new row...`);
+        
+        const response = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `${GOOGLE_WORKSHEET_NAME}!A:A`,
+        });
+        
+        const rows = response.data.values || [];
+        const nextRowIndex = rows.length + 1;
+        
+        console.log(`   📊 Current rows: ${rows.length}, appending to row ${nextRowIndex}`);
+        console.log(`   📍 Writing to range: ${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`);
+        
+        const updateResponse = await sheets.spreadsheets.values.update({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [row],
+          },
+        });
+        
+        console.log(`   ✅ Row appended successfully to row ${nextRowIndex}`);
+        console.log(`   📊 Update response:`, updateResponse.data);
+      }
+    } else {
+      // สำหรับ Auto/Direct matching: append แถวใหม่
+      const response = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${GOOGLE_WORKSHEET_NAME}!A:A`,
+      });
+      
+      const rows = response.data.values || [];
+      const nextRowIndex = rows.length + 1;
+      
+      console.log(`   📊 Current rows: ${rows.length}, appending to row ${nextRowIndex}`);
+      console.log(`   📍 Writing to range: ${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`);
+      console.log(`   📦 Payload: [${row.map(v => `"${v}"`).join(', ')}]`);
+      
+      const updateResponse = await sheets.spreadsheets.values.update({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${GOOGLE_WORKSHEET_NAME}!A${nextRowIndex}:R${nextRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [row],
+        },
+      });
+      
+      console.log(`   ✅ Row appended successfully to row ${nextRowIndex}`);
+      console.log(`   📊 Update response:`, updateResponse.data);
+    }
     
     // บันทึกข้อมูลผู้เล่น User A ถ้ายังไม่มี
     console.log(`📝 Recording Player A to Players sheet...`);
