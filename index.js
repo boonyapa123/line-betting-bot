@@ -383,70 +383,92 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     console.log('⚠️  Google Sheets not initialized');
     return;
   }
-  
+
   try {
-    // Column I (index 8) = ผลที่ออก
-    // Column J (index 9) = ผลแพ้ชนะ User A
-    // Column K (index 10) = ผลแพ้ชนะ User B (opposite)
-    
-    // Get opposite result for User B
-    const oppositeResult = getOppositeResultSymbol(resultSymbol);
-    
-    // ดึงข้อมูลการเดิมพันจากชีท (ต้องดึงถึง Column U เพื่อได้ข้อมูล UserB ทั้งหมด)
+    // ดึงข้อมูลการเดิมพันจากชีท
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
     });
-    
+
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[17] || '';  // ✅ R = User B ID (index 17)
-    const userBName = row[11] || '';  // L = ชื่อ User B (index 11)
-    const betAmountA = parseFloat(row[6]) || 0;  // ✅ Column G = ยอดเงิน A
-    const betAmountB = parseFloat(row[7]) || 0;  // ✅ Column H = ยอดเงิน B
-    // ✅ ใช้ยอดเงินที่น้อยกว่า (สำหรับการจับคู่ที่ยอดเงินต่างกัน)
+    const userBId = row[17] || '';
+    const userBName = row[11] || '';
+    const betAmountA = parseFloat(row[6]) || 0;
+    const betAmountB = parseFloat(row[7]) || 0;
     const betAmount = betAmountB > 0 ? Math.min(betAmountA, betAmountB) : betAmountA;
     const fireworkName = row[4] || '';
-    // ✅ ใช้ LINE Channel Access Token จาก environment variables แทนที่จะดึงจากชีท
     const userAToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
     const userBToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
-    const groupId = row[16] || '';     // Q = Group ID (index 16)
-    
-    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
-    console.log(`   💰 Calculating winnings and updating balances...`);
-    
-    let userAWinnings = 0;
-    let userBWinnings = 0;
-    
-    if (resultSymbol === '✅') {
-      // User A ชนะ
-      const commission = betAmount * 0.1; // 10% commission
-      userAWinnings = betAmount - commission;  // ได้รับ: เดิมพัน - ค่าธรรมเนียม
-      userBWinnings = -betAmount;  // เสีย: เดิมพันทั้งหมด
-    } else if (resultSymbol === '❌') {
-      // User A แพ้
-      const commission = betAmount * 0.1; // 10% commission
-      userAWinnings = -betAmount;  // เสีย: เดิมพันทั้งหมด
-      userBWinnings = betAmount - commission;  // ได้รับ: เดิมพัน - ค่าธรรมเนียม
-    } else {
-      // เสมอ
-      const commission = betAmount * 0.05; // 5% commission
-      userAWinnings = -commission;  // เสีย: ค่าธรรมเนียม
-      userBWinnings = -commission;  // เสีย: ค่าธรรมเนียม
+    const groupId = row[16] || '';
+
+    // 🔍 เช็คว่ามีคู่เล่นหรือไม่
+    if (!userAId || !userBId) {
+      console.log(`   ⚠️  Skipping row ${rowIndex}: ไม่มีคู่เล่นที่สมบูรณ์`);
+      console.log(`      User A ID: ${userAId || '(ว่าง)'}`);
+      console.log(`      User B ID: ${userBId || '(ว่าง)'}`);
+      return;
     }
 
-    // ดึงข้อมูลแถวเต็มเพื่อเก็บข้อมูล UserB ที่มีอยู่
+    // 🔍 ตรวจสอบรายการเล่น (Column F) และปรับผลแพ้ชนะตามเงื่อนไข
+    const betTypeA = row[5] || '';
+    console.log(`   📋 Bet Type A (Column F): ${betTypeA}`);
+
+    let finalResultSymbol = resultSymbol;
+
+    // ตรวจสอบเงื่อนไข:
+    if (resultSymbol === '❌' && (betTypeA === 'ชถ' || betTypeA === 'ย')) {
+      console.log(`   🔄 Adjusting result: ❌️ + ${betTypeA} → ✅️`);
+      finalResultSymbol = '✅';
+    } else if (resultSymbol === '✅' && (betTypeA === 'ชล' || betTypeA === 'ล')) {
+      console.log(`   ✅ Result confirmed: ✅️ + ${betTypeA} → ✅️`);
+      finalResultSymbol = '✅';
+    } else if (resultSymbol === '✅' && (betTypeA === 'ชถ' || betTypeA === 'ย')) {
+      console.log(`   🔄 Adjusting result: ✅️ + ${betTypeA} → ❌️`);
+      finalResultSymbol = '❌';
+    } else if (resultSymbol === '❌' && (betTypeA === 'ชล' || betTypeA === 'ล')) {
+      console.log(`   ✅ Result confirmed: ❌️ + ${betTypeA} → ❌️`);
+      finalResultSymbol = '❌';
+    }
+
+    console.log(`   📊 Final Result Symbol: ${finalResultSymbol}`);
+
+    // Get opposite result for User B
+    const oppositeResult = getOppositeResultSymbol(finalResultSymbol);
+
+    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
+    console.log(`   💰 Calculating winnings and updating balances...`);
+
+    let userAWinnings = 0;
+    let userBWinnings = 0;
+
+    if (finalResultSymbol === '✅') {
+      const commission = betAmount * 0.1;
+      userAWinnings = betAmount - commission;
+      userBWinnings = -betAmount;
+    } else if (finalResultSymbol === '❌') {
+      const commission = betAmount * 0.1;
+      userAWinnings = -betAmount;
+      userBWinnings = betAmount - commission;
+    } else {
+      const commission = betAmount * 0.05;
+      userAWinnings = -commission;
+      userBWinnings = -commission;
+    }
+
+    // ดึงข้อมูลแถวเต็ม
     const fullRowResponse = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
     });
-    
+
     const fullRow = fullRowResponse.data.values?.[0] || [];
-    
-    // อัปเดตผลลัพธ์ในชีท (เฉพาะคอลัมน์ที่ต้องอัปเดต)
+
+    // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
@@ -454,143 +476,96 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
-          resultNumber,           // I: ผลที่ออก
-          resultSymbol,           // J: ผลแพ้ชนะ
-          oppositeResult,         // K: ผลแพ้ชนะ B
-          fullRow[11] || '',      // L: ชื่อ User B (เก็บข้อมูลเดิม)
-          fullRow[12] || '',      // M: รายการแทง B (เก็บข้อมูลเดิม)
-          fullRow[13] || '',      // N: ชื่อกลุ่มแชท (เก็บข้อมูลเดิม)
-          fullRow[14] || '',      // O: ชื่อกลุ่ม (เก็บข้อมูลเดิม)
-          fullRow[15] || '',      // P: Token A (เก็บข้อมูลเดิม)
-          fullRow[16] || '',      // Q: ID กลุ่ม (เก็บข้อมูลเดิม)
-          fullRow[17] || '',      // R: User B ID (เก็บข้อมูลเดิม)
-          resultSymbol === '✅' ? `ชนะ ${userAWinnings.toFixed(0)} บาท` : resultSymbol === '❌' ? `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`,  // S: ผลลัพธ์ A
-          oppositeResult === '✅' ? `ชนะ ${userBWinnings.toFixed(0)} บาท` : oppositeResult === '❌' ? `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`,  // T: ผลลัพธ์ B
+          resultNumber,
+          finalResultSymbol,
+          oppositeResult,
+          fullRow[11] || '',
+          fullRow[12] || '',
+          fullRow[13] || '',
+          fullRow[14] || '',
+          fullRow[15] || '',
+          fullRow[16] || '',
+          fullRow[17] || '',
+          finalResultSymbol === '✅' ? `ชนะ ${userAWinnings.toFixed(0)} บาท` : finalResultSymbol === '❌' ? `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`,
+          oppositeResult === '✅' ? `ชนะ ${userBWinnings.toFixed(0)} บาท` : oppositeResult === '❌' ? `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`,
         ]],
       },
     });
-    
-    console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${resultSymbol} | User B: ${oppositeResult}`);
-    
+
+    console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${finalResultSymbol} | User B: ${oppositeResult}`);
+
     // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
-    
-    // 💰 อัปเดตยอดเงินของผู้เล่น (ต้องทำก่อนดึงยอดเงินใหม่)
+
+    // 💰 อัปเดตยอดเงินของผู้เล่น
     if (userAId && userAName) {
       await updatePlayerBalance(userAId, userAName, userAWinnings);
     }
-    
+
     if (userBId && userBName) {
       await updatePlayerBalance(userBId, userBName, userBWinnings);
     }
-    
-    // ดึงยอดเงินคงเหลือใหม่ของผู้เล่น (หลังจากอัปเดตแล้ว)
-    // ⏳ รอให้ Google Sheets อัปเดตเสร็จ
+
+    // ดึงยอดเงินคงเหลือใหม่
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     let userANewBalance = 0;
     let userBNewBalance = 0;
-    
+
     if (userAId && userAName) {
       const userABalanceData = await getPlayerBalance(userAId, userAName);
       userANewBalance = userABalanceData.balance || 0;
     }
-    
+
     if (userBId && userBName) {
       const userBBalanceData = await getPlayerBalance(userBId, userBName);
       userBNewBalance = userBBalanceData.balance || 0;
     }
-    
-    if (resultSymbol === '✅') {
-      // User A ชนะ
-      const messageA = `✅ ชนะแล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `🏆 ได้รับ: ${userAWinnings.toFixed(0)} บาท\n` +
-        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
-        `${userBName ? `👤 ผู้แพ้: ${userBName}\n\n` : ''}\n` +
-        `ยินดีด้วย! 🎉`;
-      
+
+    if (finalResultSymbol === '✅') {
+      const messageA = `✅ ชนะแล้ว\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n🏆 ได้รับ: ${userAWinnings.toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n${userBName ? `👤 ผู้แพ้: ${userBName}\n\n` : ''}\nยินดีด้วย! 🎉`;
+
       if (userAId && userAName) {
         await sendLineMessageToUser(userAId, messageA, userAToken);
       }
-      
-      // ส่งข้อความให้ User B ถ้ามี
+
       if (userBId && userBName) {
-        const messageB = `❌ แพ้แล้ว\n\n` +
-          `🎆 บั้งไฟ: ${fireworkName}\n` +
-          `💰 เดิมพัน: ${betAmount} บาท\n` +
-          `💸 เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
-          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
-          `👤 ผู้ชนะ: ${userAName}\n\n` +
-          `ลองใหม่นะ 💪`;
-        
+        const messageB = `❌ แพ้แล้ว\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n👤 ผู้ชนะ: ${userAName}\n\nลองใหม่นะ 💪`;
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
-    } else if (resultSymbol === '❌') {
-      // User A แพ้
-      const messageA = `❌ แพ้แล้ว\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
-        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
-        `${userBName ? `👤 ผู้ชนะ: ${userBName}\n\n` : ''}\n` +
-        `ลองใหม่นะ 💪`;
-      
+    } else if (finalResultSymbol === '❌') {
+      const messageA = `❌ แพ้แล้ว\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n${userBName ? `👤 ผู้ชนะ: ${userBName}\n\n` : ''}\nลองใหม่นะ 💪`;
+
       if (userAId && userAName) {
         await sendLineMessageToUser(userAId, messageA, userAToken);
       }
-      
-      // ส่งข้อความให้ User B ถ้ามี
+
       if (userBId && userBName) {
-        const messageB = `✅ ชนะแล้ว\n\n` +
-          `🎆 บั้งไฟ: ${fireworkName}\n` +
-          `💰 เดิมพัน: ${betAmount} บาท\n` +
-          `🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n` +
-          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
-          `👤 ผู้แพ้: ${userAName}\n\n` +
-          `ยินดีด้วย! 🎉`;
-        
+        const messageB = `✅ ชนะแล้ว\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n👤 ผู้แพ้: ${userAName}\n\nยินดีด้วย! 🎉`;
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     } else {
-      // เสมอ
-      const messageA = `⛔️ เสมอ\n\n` +
-        `🎆 บั้งไฟ: ${fireworkName}\n` +
-        `💰 เดิมพัน: ${betAmount} บาท\n` +
-        `💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n` +
-        `💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n` +
-        `${userBName ? `👤 คู่แข่ง: ${userBName}\n\n` : ''}\n` +
-        `ผลเสมอ 🤝`;
-      
+      const messageA = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
+
       if (userAId && userAName) {
         await sendLineMessageToUser(userAId, messageA, userAToken);
       }
-      
-      // ส่งข้อความให้ User B ถ้ามี
+
       if (userBId && userBName) {
-        const messageB = `⛔️ เสมอ\n\n` +
-          `🎆 บั้งไฟ: ${fireworkName}\n` +
-          `💰 เดิมพัน: ${betAmount} บาท\n` +
-          `💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n` +
-          `💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n` +
-          `👤 คู่แข่ง: ${userAName}\n\n` +
-          `ผลเสมอ 🤝`;
-        
+        const messageB = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     }
-    
-    // ✅ ส่งข้อความแจ้งเตือนกลุ่ม
+
     if (groupId) {
       console.log(`   📢 Sending group notification...`);
-      const groupMessage = `${fireworkName} ${resultNumber}${resultSymbol}${userAName} ${resultSymbol === '✅' ? '✅' : resultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
+      const groupMessage = `${fireworkName} ${resultNumber}${finalResultSymbol}${userAName} ${finalResultSymbol === '✅' ? '✅' : finalResultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
       await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
-    
-    console.log(`   ✅ Result messages sent successfully`);
   } catch (error) {
-    console.error('❌ Failed to update result:', error.message);
+    console.error('❌ Error updating bet result:', error.message);
+    console.error('   Error details:', error);
+    console.error('   Stack:', error.stack);
   }
 }
 
