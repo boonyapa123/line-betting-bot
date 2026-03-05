@@ -584,7 +584,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     // ✅ ส่งข้อความแจ้งเตือนกลุ่ม
     if (groupId) {
       console.log(`   📢 Sending group notification...`);
-      const groupMessage = `${fireworkName} ${score}${resultSymbol}${userAName} ${resultSymbol === '✅' ? '✅' : resultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
+      const groupMessage = `${fireworkName} ${resultNumber}${resultSymbol}${userAName} ${resultSymbol === '✅' ? '✅' : resultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
       await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
     
