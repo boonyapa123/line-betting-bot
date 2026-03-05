@@ -226,7 +226,7 @@ class BettingResultService {
 
       // Column J: ผลแพ้ชนะ (ชนะ/แพ้/เสมอ)
       // ✅ ใช้ winner.userId เพื่อเปรียบเทียบกับ bet1.userId
-      const resultStatus = isDraw ? 'เสมอ' : (winner.userId === bet1.userId ? 'ชนะ' : 'แพ้');
+      const resultStatus = isDraw ? '⛔️' : (winner.userId === bet1.userId ? 'ชนะ' : 'แพ้');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
         values: [[resultStatus]],
