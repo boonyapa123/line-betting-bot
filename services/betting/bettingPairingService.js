@@ -519,13 +519,24 @@ class BettingPairingService {
    * @private
    */
   static parsePriceRange(priceStr) {
-    const match = priceStr.match(/\((\d+)-(\d+)\)/);
+    // รูปแบบ 1: (350-370) - มีวงเล็บ
+    let match = priceStr.match(/\((\d+)-(\d+)\)/);
     if (match) {
       return {
         min: parseInt(match[1]),
         max: parseInt(match[2]),
       };
     }
+
+    // รูปแบบ 2: 350-370 - ไม่มีวงเล็บ (จากข้อความ A)
+    match = priceStr.match(/^(\d+)-(\d+)/);
+    if (match) {
+      return {
+        min: parseInt(match[1]),
+        max: parseInt(match[2]),
+      };
+    }
+
     return { min: 0, max: 999 };
   }
 
