@@ -643,7 +643,7 @@ async function updatePlayerBalance(userId, userName, winnings) {
     if (playerRowIndex > 0) {
       const newBalance = Math.max(0, currentBalance + winnings); // ไม่ให้ยอดเงินติดลบ
       
-      // อัปเดตยอดเงิน
+      // ✅ อัปเดตยอดเงินในชีท Players
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: GOOGLE_SHEET_ID,
@@ -654,7 +654,63 @@ async function updatePlayerBalance(userId, userName, winnings) {
         },
       });
       
-      console.log(`      ✅ Balance updated: ${currentBalance} → ${newBalance} บาท`);
+      console.log(`      ✅ Players sheet updated: ${currentBalance} → ${newBalance} บาท`);
+      
+      // ✅ อัปเดตยอดเงินในชีท UsersBalance ด้วย
+      try {
+        const usersBalanceResponse = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `UsersBalance!A:C`,
+        });
+        
+        const usersBalanceRows = usersBalanceResponse.data.values || [];
+        let usersBalanceRowIndex = -1;
+        
+        // ค้นหาผู้เล่นในชีท UsersBalance
+        for (let i = 1; i < usersBalanceRows.length; i++) {
+          const row = usersBalanceRows[i];
+          if (!row) continue;
+          
+          const displayName = row[1] || '';
+          if (displayName === userName) {
+            usersBalanceRowIndex = i + 1;
+            break;
+          }
+        }
+        
+        if (usersBalanceRowIndex > 0) {
+          // อัปเดตยอดเงินในชีท UsersBalance
+          await sheets.spreadsheets.values.update({
+            auth: googleAuth,
+            spreadsheetId: GOOGLE_SHEET_ID,
+            range: `UsersBalance!C${usersBalanceRowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[newBalance]],
+            },
+          });
+          
+          console.log(`      ✅ UsersBalance sheet updated: ${currentBalance} → ${newBalance} บาท`);
+        } else {
+          // สร้างแถวใหม่ในชีท UsersBalance
+          const nextRowIndex = usersBalanceRows.length + 1;
+          
+          await sheets.spreadsheets.values.update({
+            auth: googleAuth,
+            spreadsheetId: GOOGLE_SHEET_ID,
+            range: `UsersBalance!A${nextRowIndex}:C${nextRowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[userId, userName, newBalance]],
+            },
+          });
+          
+          console.log(`      ✅ UsersBalance sheet created: ${newBalance} บาท`);
+        }
+      } catch (usersBalanceError) {
+        console.error(`      ⚠️  Failed to update UsersBalance: ${usersBalanceError.message}`);
+      }
     } else {
       console.log(`      ⚠️  Player not found in Players sheet (name: ${userName}, userId: ${userId})`);
     }
