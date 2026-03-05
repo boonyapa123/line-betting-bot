@@ -416,13 +416,17 @@ class BettingRoundController {
         );
 
         // แจ้งเตือน LINE ส่วนตัว
-        await bettingResultService.notifyLineResult(
-          result,
-          slipName,
-          score,
-          source?.groupId || null, // groupId
-          accountNumber // ใช้ Account ของกลุ่ม
-        );
+        try {
+          await bettingResultService.notifyLineResult(
+            result,
+            slipName,
+            score,
+            source?.groupId || null, // groupId
+            accountNumber // ใช้ Account ของกลุ่ม
+          );
+        } catch (notifyError) {
+          console.error('❌ Error sending notifications:', notifyError);
+        }
 
         results.push(result);
       }

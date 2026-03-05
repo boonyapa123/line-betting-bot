@@ -449,8 +449,9 @@ class BettingPairingService {
           result: 'WIN',
         },
         loser: {
-          userId: bet2.userId,
-          displayName: bet2.displayName,
+          // ✅ ใช้ userBId จาก bet1 (ดึงจาก Column R) แทน bet2.userId
+          userId: bet1.userBId || bet2.userId,
+          displayName: bet1.userBName || bet2.displayName,
           amount: 0, // REPLY method ไม่มีจำนวนเงิน
           result: 'LOSE',
         },
@@ -486,6 +487,10 @@ class BettingPairingService {
       betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
     }
 
+    // ✅ ถ้า loser คือ bet2 ให้ใช้ userBId จาก bet1 แทน
+    const loserUserId = loser === bet2 ? (bet1.userBId || bet2.userId) : loser.userId;
+    const loserDisplayName = loser === bet2 ? (bet1.userBName || bet2.displayName) : loser.displayName;
+
     return {
       winner: {
         userId: winner.userId,
@@ -494,8 +499,8 @@ class BettingPairingService {
         result: 'WIN',
       },
       loser: {
-        userId: loser.userId,
-        displayName: loser.displayName,
+        userId: loserUserId,
+        displayName: loserDisplayName,
         amount: betAmount,
         result: 'LOSE',
       },

@@ -87,6 +87,7 @@ class BettingResultService {
       const drawFee = Math.round(winAmount * this.DRAW_FEE_PERCENTAGE);
       return {
         ...baseResult,
+        pair, // ✅ เพิ่ม pair property
         isDraw: true,
         winAmount,
         drawFee,
@@ -113,6 +114,7 @@ class BettingResultService {
 
     return {
       ...baseResult,
+      pair, // ✅ เพิ่ม pair property
       isDraw: false,
       winAmount,
       fee,
@@ -192,12 +194,15 @@ class BettingResultService {
         const rowSlipName = row[4]; // Column E
         const userBAmount = row[7]; // Column H (ถ้ามีค่า = MATCHED)
 
+        // ✅ ใช้ bet1.userBName แทน bet2.displayName
+        const expectedUserBName = bet1.userBName || bet2.displayName;
+
         if (
           rowSlipName === slipName &&
           userBAmount !== undefined &&
           userBAmount !== '' &&
-          ((userAName === bet1.displayName && userBName === bet2.displayName) ||
-            (userAName === bet2.displayName && userBName === bet1.displayName))
+          userAName === bet1.displayName &&
+          userBName === expectedUserBName
         ) {
           matchedRowIndex = i + 2; // +2 เพราะ header + 0-indexed
           break;
@@ -206,6 +211,7 @@ class BettingResultService {
 
       if (matchedRowIndex === -1) {
         console.warn(`No matched row found for slip: ${slipName}`);
+        console.warn(`   Looking for: ${bet1.displayName} vs ${bet1.userBName || bet2.displayName}`);
         return { success: false, error: 'No matched row found' };
       }
 
@@ -219,14 +225,15 @@ class BettingResultService {
       });
 
       // Column J: ผลแพ้ชนะ (ชนะ/แพ้/เสมอ)
-      const resultStatus = isDraw ? 'เสมอ' : (winner.displayName === bet1.displayName ? 'ชนะ' : 'แพ้');
+      // ✅ ใช้ winner.userId เพื่อเปรียบเทียบกับ bet1.userId
+      const resultStatus = isDraw ? 'เสมอ' : (winner.userId === bet1.userId ? 'ชนะ' : 'แพ้');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
         values: [[resultStatus]],
       });
 
       // Column S: ผลลัพธ์ A
-      const resultA = winner.displayName === bet1.displayName
+      const resultA = winner.userId === bet1.userId
         ? `ชนะ ${winner.netAmount} บาท`
         : `แพ้ ${Math.abs(loser.netAmount)} บาท`;
       updates.push({
@@ -235,9 +242,9 @@ class BettingResultService {
       });
 
       // Column T: ผลลัพธ์ B
-      const resultB = winner.displayName === bet2.displayName
-        ? `ชนะ ${winner.netAmount} บาท`
-        : `แพ้ ${Math.abs(loser.netAmount)} บาท`;
+      const resultB = winner.userId === bet1.userId
+        ? `แพ้ ${Math.abs(loser.netAmount)} บาท`
+        : `ชนะ ${winner.netAmount} บาท`;
       updates.push({
         range: `${this.betsSheetName}!T${matchedRowIndex}`,
         values: [[resultB]],
@@ -275,6 +282,11 @@ class BettingResultService {
       // เลือก notification service ตามหมายเลข Account
       const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
 
+      console.log(`\n📊 === Notifying Result (Account ${accountNumber}) ===`);
+      console.log(`   Winner: ${winner.displayName} (${winner.userId})`);
+      console.log(`   Loser: ${loser.displayName} (${loser.userId})`);
+      console.log(`   Group ID: ${groupId}`);
+
       // สร้างข้อความแจ้งเตือน
       const resultMessage = this.buildResultMessage(
         result,
@@ -285,30 +297,43 @@ class BettingResultService {
 
       // แจ้งเตือนส่วนตัวผู้เล่น
       if (winner.userId) {
-        await notificationService.sendPrivateMessage(
+        console.log(`\n   📤 Sending winner message to ${winner.displayName}...`);
+        const winnerResult = await notificationService.sendPrivateMessage(
           winner.userId,
           this.buildWinnerMessage(winner, slipName, score, isDraw)
         );
+        if (!winnerResult.success) {
+          console.error(`   ❌ Failed to send winner message: ${winnerResult.error}`);
+        }
       }
 
       if (loser.userId) {
-        await notificationService.sendPrivateMessage(
+        console.log(`\n   📤 Sending loser message to ${loser.displayName}...`);
+        const loserResult = await notificationService.sendPrivateMessage(
           loser.userId,
           this.buildLoserMessage(loser, slipName, score, isDraw)
         );
+        if (!loserResult.success) {
+          console.error(`   ❌ Failed to send loser message: ${loserResult.error}`);
+        }
       }
 
       // แจ้งเตือนในกลุ่ม
       if (groupId) {
-        await notificationService.sendGroupMessage(
+        console.log(`\n   📢 Sending group message...`);
+        const groupResult = await notificationService.sendGroupMessage(
           groupId,
           resultMessage
         );
+        if (!groupResult.success) {
+          console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+        }
       }
 
+      console.log(`\n   ✅ Notification process completed`);
       return { success: true };
     } catch (error) {
-      console.error('Error notifying LINE result:', error);
+      console.error('❌ Error notifying LINE result:', error);
       return { success: false, error: error.message };
     }
   }
