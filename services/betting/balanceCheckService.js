@@ -15,11 +15,6 @@ class BalanceCheckService {
     this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
     this.playersSheetName = 'Players';
     this.usersBalanceSheetName = 'UsersBalance';
-    // สร้าง notification service สำหรับแต่ละ Account (Account 1 & 2 เท่านั้น)
-    this.lineNotificationServices = {
-      1: new LineNotificationService(1),
-      2: new LineNotificationService(2),
-    };
   }
 
   /**
@@ -232,8 +227,18 @@ class BalanceCheckService {
       console.log(`   Account: ${accountNumber}`);
       console.log(`   Group ID: ${groupId || 'N/A'}`);
 
-      // เลือก notification service ตามหมายเลข Account
-      const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
+      // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
+      let finalAccountNumber = accountNumber;
+      if (groupId) {
+        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+        if (groupAccountNumber) {
+          finalAccountNumber = groupAccountNumber;
+          console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+        }
+      }
+
+      // สร้าง notification service ตามหมายเลข Account
+      const notificationService = new LineNotificationService(finalAccountNumber);
 
       // ส่งข้อความส่วนตัว
       console.log(`\n   📤 Sending private message...`);
@@ -308,8 +313,18 @@ class BalanceCheckService {
       console.log(`   Account: ${accountNumber}`);
       console.log(`   Group ID: ${groupId || 'N/A'}`);
 
-      // เลือก notification service ตามหมายเลข Account
-      const notificationService = this.lineNotificationServices[accountNumber] || this.lineNotificationServices[1];
+      // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
+      let finalAccountNumber = accountNumber;
+      if (groupId) {
+        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+        if (groupAccountNumber) {
+          finalAccountNumber = groupAccountNumber;
+          console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+        }
+      }
+
+      // สร้าง notification service ตามหมายเลข Account
+      const notificationService = new LineNotificationService(finalAccountNumber);
 
       // ส่งข้อความส่วนตัว
       console.log(`\n   📤 Sending private message...`);
@@ -452,6 +467,36 @@ class BalanceCheckService {
     } catch (error) {
       console.error('Error getting all balances:', error);
       return [];
+    }
+  }
+
+  /**
+   * ดึง Account Number จาก groupId
+   * @private
+   */
+  async getGroupAccountNumber(groupId) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // อ่านไฟล์ groups.json
+      const groupsFilePath = path.join(__dirname, '../../data/groups.json');
+      
+      if (!fs.existsSync(groupsFilePath)) {
+        console.warn(`Groups data file not found at ${groupsFilePath}`);
+        return null;
+      }
+      
+      const groupsData = JSON.parse(fs.readFileSync(groupsFilePath, 'utf8'));
+      
+      if (groupsData[groupId]) {
+        return groupsData[groupId].account;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error getting group account number: ${error.message}`);
+      return null;
     }
   }
 }

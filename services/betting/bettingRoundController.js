@@ -8,7 +8,6 @@ const bettingRoundStateService = require('./bettingRoundStateService');
 const bettingPairingService = require('./bettingPairingService');
 const balanceCheckService = require('./balanceCheckService');
 const pendingBalanceService = require('./pendingBalanceService');
-const selfBettingService = require('./selfBettingService');
 
 class BettingRoundController {
   /**
@@ -132,11 +131,16 @@ class BettingRoundController {
 
     // ตรวจสอบยอดเงินคงเหลือและชื่อผู้เล่น (อันดับแรก)
     const groupId = source.groupId || null; // ดึง groupId จาก source
+    
+    // ดึง Account Number จากกลุ่ม (ใช้ Account 1 เป็น default)
+    const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+    const accountNumber = groupAccountNumber || 1;
+    
     const balanceCheck = await balanceCheckService.checkAndNotify(
       lineName,
       parsedBet.amount,
       userId,
-      1, // Account 1
+      accountNumber, // ใช้ Account ของกลุ่ม
       groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
     );
 
@@ -367,11 +371,8 @@ class BettingRoundController {
         };
       }
 
-      // จับคู่การเล่น (รวมทั้งการเล่นกับตัวเอง)
+      // จับคู่การเล่น
       const pairs = bettingPairingService.constructor.findPairs(slipBets);
-      
-      // ตรวจสอบการเล่นกับตัวเอง
-      const selfBets = selfBettingService.findSelfBets(slipBets, slipName);
 
       // คำนวณผลลัพธ์และค่าธรรมเนียม
       const results = [];
@@ -413,49 +414,7 @@ class BettingRoundController {
         results.push(result);
       }
 
-      // ประมวลผลการเล่นกับตัวเอง
-      for (const selfBet of selfBets) {
-        const selfResults = selfBettingService.calculateSelfBettingResults(
-          selfBet,
-          slipName,
-          score
-        );
 
-        for (const selfResult of selfResults) {
-          const result = bettingResultService.calculateResultWithFees(
-            selfResult.pair,
-            slipName,
-            score
-          );
-
-          // บันทึกผลลัพธ์
-          await bettingResultService.recordResult(result, slipName, score);
-
-          // อัปเดตยอดเงิน (เล่นกับตัวเอง ยอดเงินไม่เปลี่ยน แต่หักค่าธรรมเนียม)
-          const netChange = result.winner.netAmount + result.loser.netAmount;
-          await bettingPairingService.updateUserBalance(
-            result.winner.lineName,
-            netChange
-          );
-
-          // ส่งข้อความแจ้งเตือน
-          const selfBettingMessage = selfBettingService.buildSelfBettingMessage(
-            selfResult,
-            slipName,
-            score
-          );
-          
-          // ส่งข้อความส่วนตัว (ใช้ Account ของกลุ่ม)
-          const { LineNotificationService } = require('../line/lineNotificationService');
-          const selfBetNotificationService = new LineNotificationService(accountNumber);
-          await selfBetNotificationService.sendPrivateMessage(
-            selfBet.lineName,
-            selfBettingMessage
-          );
-
-          results.push(result);
-        }
-      }
 
       // สร้างรายงานผลลัพธ์
       const reportMessage = await this.buildResultReport(slipName, score, results);
