@@ -16,15 +16,15 @@ class BetsSheetColumns {
     AMOUNT: 6,              // G: ยอดเงิน
     AMOUNT_B: 7,            // H: ยอดเงิน B
     RESULT: 8,              // I: ผลที่ออก
-    RESULT_WIN_LOSE: 9,     // J: ผลแพ้ชนะ
-    USER_B_ID: 10,          // K: User B ID
+    RESULT_WIN_LOSE: 9,     // J: ผลแพ้ชนะ A
+    RESULT_WIN_LOSE_B: 10,  // K: ผลแพ้ชนะ B
     USER_B_NAME: 11,        // L: ชื่อ User B
     SIDE_B: 12,             // M: รายการแทง (ฝั่ง B)
     GROUP_CHAT_NAME: 13,    // N: ชื่อกลุ่มแชท
     GROUP_NAME: 14,         // O: ชื่อกลุ่ม
     TOKEN_A: 15,            // P: Token A
     GROUP_ID: 16,           // Q: ID กลุ่ม
-    TOKEN_B: 17,            // R: Token B
+    USER_B_ID: 17,          // R: User B ID
     RESULT_A: 18,           // S: ผลลัพธ์ A
     RESULT_B: 19,           // T: ผลลัพธ์ B
     MATCHED_AUTO: 20,       // U: MATCHED Auto (จับคู่อัตโนมัติ)
@@ -41,15 +41,15 @@ class BetsSheetColumns {
     6: 'G - ยอดเงิน',
     7: 'H - ยอดเงิน B',
     8: 'I - ผลที่ออก',
-    9: 'J - ผลแพ้ชนะ',
-    10: 'K - User B ID',
+    9: 'J - ผลแพ้ชนะ A',
+    10: 'K - ผลแพ้ชนะ B',
     11: 'L - ชื่อ User B',
     12: 'M - รายการแทง (ฝั่ง B)',
     13: 'N - ชื่อกลุ่มแชท',
     14: 'O - ชื่อกลุ่ม',
     15: 'P - Token A',
     16: 'Q - ID กลุ่ม',
-    17: 'R - Token B',
+    17: 'R - User B ID',
     18: 'S - ผลลัพธ์ A',
     19: 'T - ผลลัพธ์ B',
     20: 'U - MATCHED Auto',
@@ -125,14 +125,14 @@ class BetsSheetColumns {
       amountB: parseInt(row[this.COLUMNS.AMOUNT_B]) || 0,
       result: row[this.COLUMNS.RESULT],
       resultWinLose: row[this.COLUMNS.RESULT_WIN_LOSE],
-      userBId: row[this.COLUMNS.TOKEN_B], // ✅ ดึง User B ID จาก Column R (TOKEN_B) แทน Column K
+      resultWinLoseB: row[this.COLUMNS.RESULT_WIN_LOSE_B],
+      userBId: row[this.COLUMNS.USER_B_ID],  // ✅ ดึง User B ID จาก Column R (index 17)
       userBName: row[this.COLUMNS.USER_B_NAME],
       sideBCode: row[this.COLUMNS.SIDE_B],
       groupChatName: row[this.COLUMNS.GROUP_CHAT_NAME],
       groupName: row[this.COLUMNS.GROUP_NAME],
       tokenA: row[this.COLUMNS.TOKEN_A],
       groupId: row[this.COLUMNS.GROUP_ID],
-      tokenB: row[this.COLUMNS.TOKEN_B],
       resultA: row[this.COLUMNS.RESULT_A],
       resultB: row[this.COLUMNS.RESULT_B],
       matchedAuto: row[this.COLUMNS.MATCHED_AUTO],
@@ -225,8 +225,8 @@ class BetsSheetColumns {
     const row = [...currentRow]; // Copy แถวปัจจุบัน
 
     // อัปเดตข้อมูล User B
-    // ✅ บันทึก User B ID ที่คอลัมน์ R (TOKEN_B) แทนคอลัมน์ K (USER_B_ID)
-    if (userBData.userId) row[this.COLUMNS.TOKEN_B] = userBData.userId;
+    // ✅ บันทึก User B ID ที่คอลัมน์ R (index 17)
+    if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
     if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
     if (userBData.sideCode) row[this.COLUMNS.SIDE_B] = userBData.sideCode;
     if (userBData.amount !== undefined && userBData.amount !== null) {

@@ -678,7 +678,7 @@ class BettingPairingService {
       // สร้างแถวใหม่ด้วยข้อมูล User B
       const updatedRow = BetsSheetColumns.updateRowWithUserB(currentRow, userBData);
       console.log(`   Updated Row Length: ${updatedRow.length}`);
-      console.log(`   Column R (TOKEN_B): ${updatedRow[17]}`);
+      console.log(`   Column R (USER_B_ID): ${updatedRow[17]}`);
 
       // อัปเดตแถวในชีท
       await this.sheets.spreadsheets.values.update({

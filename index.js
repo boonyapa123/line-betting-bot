@@ -392,19 +392,22 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     // Get opposite result for User B
     const oppositeResult = getOppositeResultSymbol(resultSymbol);
     
-    // ดึงข้อมูลการเดิมพันจากชีท
+    // ดึงข้อมูลการเดิมพันจากชีท (ต้องดึงถึง Column U เพื่อได้ข้อมูล UserB ทั้งหมด)
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:N${rowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
     });
     
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[17] || '';  // ✅ R = User B ID (index 17) - ดึงจาก Column R (TOKEN_B)
+    const userBId = row[17] || '';  // ✅ R = User B ID (index 17)
     const userBName = row[11] || '';  // L = ชื่อ User B (index 11)
-    const betAmount = parseFloat(row[6]) || 0;
+    const betAmountA = parseFloat(row[6]) || 0;  // ✅ Column G = ยอดเงิน A
+    const betAmountB = parseFloat(row[7]) || 0;  // ✅ Column H = ยอดเงิน B
+    // ✅ ใช้ยอดเงินที่น้อยกว่า (สำหรับการจับคู่ที่ยอดเงินต่างกัน)
+    const betAmount = betAmountB > 0 ? Math.min(betAmountA, betAmountB) : betAmountA;
     const fireworkName = row[4] || '';
     // ✅ ใช้ LINE Channel Access Token จาก environment variables แทนที่จะดึงจากชีท
     const userAToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
@@ -420,21 +423,30 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     if (resultSymbol === '✅') {
       // User A ชนะ
       const commission = betAmount * 0.1; // 10% commission
-      userAWinnings = betAmount - commission;
-      userBWinnings = -betAmount;
+      userAWinnings = betAmount - commission;  // ได้รับ: เดิมพัน - ค่าธรรมเนียม
+      userBWinnings = -betAmount;  // เสีย: เดิมพันทั้งหมด
     } else if (resultSymbol === '❌') {
       // User A แพ้
-      userAWinnings = -betAmount;
       const commission = betAmount * 0.1; // 10% commission
-      userBWinnings = betAmount - commission;
+      userAWinnings = -betAmount;  // เสีย: เดิมพันทั้งหมด
+      userBWinnings = betAmount - commission;  // ได้รับ: เดิมพัน - ค่าธรรมเนียม
     } else {
       // เสมอ
       const commission = betAmount * 0.05; // 5% commission
-      userAWinnings = -commission;
-      userBWinnings = -commission;
+      userAWinnings = -commission;  // เสีย: ค่าธรรมเนียม
+      userBWinnings = -commission;  // เสีย: ค่าธรรมเนียม
     }
 
-    // อัปเดตผลลัพธ์ในชีท
+    // ดึงข้อมูลแถวเต็มเพื่อเก็บข้อมูล UserB ที่มีอยู่
+    const fullRowResponse = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
+    });
+    
+    const fullRow = fullRowResponse.data.values?.[0] || [];
+    
+    // อัปเดตผลลัพธ์ในชีท (เฉพาะคอลัมน์ที่ต้องอัปเดต)
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
@@ -445,13 +457,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
           resultNumber,           // I: ผลที่ออก
           resultSymbol,           // J: ผลแพ้ชนะ
           oppositeResult,         // K: ผลแพ้ชนะ B
-          '',                     // L: ชื่อ User B (ไม่เปลี่ยน)
-          '',                     // M: รายการแทง B (ไม่เปลี่ยน)
-          '',                     // N: ชื่อกลุ่มแชท (ไม่เปลี่ยน)
-          '',                     // O: ชื่อกลุ่ม (ไม่เปลี่ยน)
-          '',                     // P: Token A (ไม่เปลี่ยน)
-          '',                     // Q: ID กลุ่ม (ไม่เปลี่ยน)
-          '',                     // R: Token B (ไม่เปลี่ยน)
+          fullRow[11] || '',      // L: ชื่อ User B (เก็บข้อมูลเดิม)
+          fullRow[12] || '',      // M: รายการแทง B (เก็บข้อมูลเดิม)
+          fullRow[13] || '',      // N: ชื่อกลุ่มแชท (เก็บข้อมูลเดิม)
+          fullRow[14] || '',      // O: ชื่อกลุ่ม (เก็บข้อมูลเดิม)
+          fullRow[15] || '',      // P: Token A (เก็บข้อมูลเดิม)
+          fullRow[16] || '',      // Q: ID กลุ่ม (เก็บข้อมูลเดิม)
+          fullRow[17] || '',      // R: User B ID (เก็บข้อมูลเดิม)
           resultSymbol === '✅' ? `ชนะ ${userAWinnings.toFixed(0)} บาท` : resultSymbol === '❌' ? `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`,  // S: ผลลัพธ์ A
           oppositeResult === '✅' ? `ชนะ ${userBWinnings.toFixed(0)} บาท` : oppositeResult === '❌' ? `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`,  // T: ผลลัพธ์ B
         ]],
@@ -473,6 +485,9 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     }
     
     // ดึงยอดเงินคงเหลือใหม่ของผู้เล่น (หลังจากอัปเดตแล้ว)
+    // ⏳ รอให้ Google Sheets อัปเดตเสร็จ
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     let userANewBalance = 0;
     let userBNewBalance = 0;
     
@@ -588,11 +603,11 @@ async function updatePlayerBalance(userId, userName, winnings) {
   try {
     console.log(`   💰 Updating balance for ${userName}: ${winnings > 0 ? '+' : ''}${winnings.toFixed(0)} บาท`);
     
-    // ดึงข้อมูลผู้เล่นจากชีท Players
+    // ดึงข้อมูลผู้เล่นจากชีท Players (ต้องดึงถึง Column E เพื่อได้ Balance)
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `Players!A:D`,
+      range: `Players!A:E`,
     });
     
     const rows = response.data.values || [];
@@ -604,8 +619,8 @@ async function updatePlayerBalance(userId, userName, winnings) {
       const row = rows[i];
       if (!row) continue;
       
-      const playerName = row[0] || '';
-      const balance = parseFloat(row[3]) || 0;
+      const playerName = row[1] || '';  // ✅ Column B (index 1) = ชื่อ
+      const balance = parseFloat(row[4]) || 0;  // ✅ Column E (index 4) = Balance
       
       // ตรวจสอบชื่อ LINE ก่อน
       if (playerName === userName) {
@@ -616,26 +631,20 @@ async function updatePlayerBalance(userId, userName, winnings) {
       }
     }
     
-    // ถ้าไม่พบตามชื่อ ค่อยค้นหาจาก Linked IDs
+    // ถ้าไม่พบตามชื่อ ค่อยค้นหาจาก User ID
     if (playerRowIndex === -1) {
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row) continue;
         
-        const playerName = row[0] || '';
-        const linkedIdsStr = row[1] || '';
-        const balance = parseFloat(row[3]) || 0;
+        const playerUserId = row[0] || '';  // ✅ Column A (index 0) = User ID
+        const balance = parseFloat(row[4]) || 0;  // ✅ Column E (index 4) = Balance
         
-        try {
-          const linkedIds = JSON.parse(linkedIdsStr);
-          if (Array.isArray(linkedIds) && linkedIds.includes(userId)) {
-            playerRowIndex = i + 1;
-            currentBalance = balance;
-            console.log(`      🔍 Found player by Linked ID: ${playerName}`);
-            break;
-          }
-        } catch (e) {
-          // ถ้า parse ไม่ได้ ให้ข้ามไป
+        if (playerUserId === userId) {
+          playerRowIndex = i + 1;
+          currentBalance = balance;
+          console.log(`      🔍 Found player by User ID: ${playerUserId}`);
+          break;
         }
       }
     }
@@ -643,11 +652,11 @@ async function updatePlayerBalance(userId, userName, winnings) {
     if (playerRowIndex > 0) {
       const newBalance = Math.max(0, currentBalance + winnings); // ไม่ให้ยอดเงินติดลบ
       
-      // ✅ อัปเดตยอดเงินในชีท Players
+      // ✅ อัปเดตยอดเงินในชีท Players (Column E)
       await sheets.spreadsheets.values.update({
         auth: googleAuth,
         spreadsheetId: GOOGLE_SHEET_ID,
-        range: `Players!D${playerRowIndex}`,
+        range: `Players!E${playerRowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[newBalance]],
@@ -2832,7 +2841,7 @@ async function getPlayerBalance(userId, userName) {
       const response = await sheets.spreadsheets.values.get({
         auth: googleAuth,
         spreadsheetId: GOOGLE_SHEET_ID,
-        range: `Players!A:K`,
+        range: `Players!A:E`,
       });
       
       const rows = response.data.values || [];
@@ -2843,7 +2852,7 @@ async function getPlayerBalance(userId, userName) {
         console.log(`   📋 Players data:`);
         for (let i = 1; i < Math.min(rows.length, 10); i++) {
           if (rows[i]) {
-            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, LinkedIDs=${rows[i][2]}, Balance=${rows[i][4]}`);
+            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, UserID=${rows[i][0]}, Balance=${rows[i][4]}`);
           }
         }
       }
@@ -2851,40 +2860,20 @@ async function getPlayerBalance(userId, userName) {
       // ค้นหาผู้เล่นจาก ชื่อ LINE เป็นหลัก
       console.log(`   🔍 Searching by LINE name: "${userName}"`);
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i] && rows[i][1] === userName) {
-          balance = parseFloat(rows[i][4]) || 0;
+        if (rows[i] && rows[i][1] === userName) {  // ✅ Column B (index 1) = ชื่อ
+          balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
           console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
           found = true;
           break;
         }
       }
       
-      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID ในรายการ Linked IDs
+      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID
       if (!found) {
-        console.log(`   ℹ️  Not found by LINE name, searching in Linked IDs...`);
+        console.log(`   ℹ️  Not found by LINE name, searching by User ID...`);
         for (let i = 1; i < rows.length; i++) {
-          if (rows[i] && rows[i][2]) {
-            try {
-              const linkedIds = JSON.parse(rows[i][2]);
-              if (Array.isArray(linkedIds) && linkedIds.includes(userId)) {
-                balance = parseFloat(rows[i][4]) || 0;
-                console.log(`   ✅ Found player by Linked ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
-                found = true;
-                break;
-              }
-            } catch (e) {
-              // ถ้า parse JSON ไม่ได้ ให้ข้ามไป
-            }
-          }
-        }
-      }
-      
-      // ถ้าไม่พบ ให้ลองค้นหาจาก User ID ตรง (backup)
-      if (!found) {
-        console.log(`   ℹ️  Not found in Linked IDs, trying by User ID directly...`);
-        for (let i = 1; i < rows.length; i++) {
-          if (rows[i] && rows[i][0] === userId) {
-            balance = parseFloat(rows[i][4]) || 0;
+          if (rows[i] && rows[i][0] === userId) {  // ✅ Column A (index 0) = User ID
+            balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
             console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
             found = true;
             break;

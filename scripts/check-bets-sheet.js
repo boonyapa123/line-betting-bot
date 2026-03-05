@@ -76,13 +76,13 @@ async function checkBetsSheet() {
         console.log(`   [I] ผลที่ออก: ${colMap.I}`);
         console.log(`   [J] ผลแพ้ชนะ A: ${colMap.J}`);
         console.log(`   [K] ผลแพ้ชนะ B: ${colMap.K}`);
-        console.log(`   [L] User B ID: ${colMap.L}`);
-        console.log(`   [M] ชื่อ User B: ${colMap.M}`);
-        console.log(`   [N] รายการแทง B: ${colMap.N}`);
-        console.log(`   [O] ชื่อกลุ่มแชท: ${colMap.O}`);
-        console.log(`   [P] User A Token: ${colMap.P ? '✅ (present)' : '❌ (empty)'}`);
+        console.log(`   [L] ชื่อ User B: ${colMap.L}`);
+        console.log(`   [M] รายการแทง B: ${colMap.M}`);
+        console.log(`   [N] ชื่อกลุ่มแชท: ${colMap.N}`);
+        console.log(`   [O] ชื่อกลุ่ม: ${colMap.O}`);
+        console.log(`   [P] Token A: ${colMap.P ? '✅ (present)' : '❌ (empty)'}`);
         console.log(`   [Q] Group ID: ${colMap.Q}`);
-        console.log(`   [R] User B Token: ${colMap.R ? '✅ (present)' : '❌ (empty)'}`);
+        console.log(`   [R] User B ID: ${colMap.R ? '✅ (present)' : '❌ (empty)'}`);
         console.log();
       }
     } else {
