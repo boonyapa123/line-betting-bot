@@ -353,13 +353,13 @@ class BettingResultService {
 
     if (isDraw) {
       // ออกกลาง (เสมอ)
-      return `${slipName} ${score}⛔️${bet1.displayName} ⛔️${bet2.displayName}`;
+      return `${slipName} ${score}${bet1.displayName}⛔️${bet2.displayName}⛔️`;
     } else {
       // ชนะ-แพ้
       const winnerName = winner.displayName;
       const loserName = loser.displayName;
 
-      return `${slipName} ${score}✅️${winnerName} ❌️${loserName}`;
+      return `${slipName} ${score}${winnerName}✅${loserName}❌`;
     }
   }
 
