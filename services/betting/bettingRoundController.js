@@ -234,7 +234,12 @@ class BettingRoundController {
       // ส่งข้อความแจ้งเตือนส่วนตัวและกลุ่ม
       try {
         const { LineNotificationService } = require('../line/lineNotificationService');
-        const notificationService = new LineNotificationService(1); // ใช้ Account 1
+        
+        // ดึง Account Number จากกลุ่ม
+        const groupAccountNumber = await this.getGroupAccountNumber(source.groupId);
+        const accountNumber = groupAccountNumber || 1; // ใช้ Account 1 เป็น default
+        
+        const notificationService = new LineNotificationService(accountNumber);
         
         // ส่งข้อความส่วนตัวให้ผู้เล่น A (ผู้เล่นเดิม)
         console.log(`   📤 Sending private message to ${matchedPair.existingBet.displayName}`);
@@ -371,6 +376,10 @@ class BettingRoundController {
       // คำนวณผลลัพธ์และค่าธรรมเนียม
       const results = [];
       
+      // ดึง Account Number จากกลุ่ม (ใช้ Account 1 เป็น default)
+      const groupAccountNumber = await this.getGroupAccountNumber(source.groupId);
+      const accountNumber = groupAccountNumber || 1;
+      
       // ประมวลผลการเล่นปกติ (คู่ที่จับได้)
       for (const pair of pairs) {
         const result = bettingResultService.calculateResultWithFees(
@@ -397,8 +406,8 @@ class BettingRoundController {
           result,
           slipName,
           score,
-          null, // groupId - ต้องส่งมาจากที่อื่น
-          1 // Account 1
+          source.groupId || null, // groupId
+          accountNumber // ใช้ Account ของกลุ่ม
         );
 
         results.push(result);
@@ -436,9 +445,10 @@ class BettingRoundController {
             score
           );
           
-          // ส่งข้อความส่วนตัว
-          const lineNotificationService = require('../line/lineNotificationService');
-          await lineNotificationService.sendPrivateMessage(
+          // ส่งข้อความส่วนตัว (ใช้ Account ของกลุ่ม)
+          const { LineNotificationService } = require('../line/lineNotificationService');
+          const selfBetNotificationService = new LineNotificationService(accountNumber);
+          await selfBetNotificationService.sendPrivateMessage(
             selfBet.lineName,
             selfBettingMessage
           );
@@ -522,6 +532,36 @@ class BettingRoundController {
     }
 
     return report;
+  }
+
+  /**
+   * ดึง Account Number จาก groupId
+   * @private
+   */
+  async getGroupAccountNumber(groupId) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // อ่านไฟล์ groups.json
+      const groupsFilePath = path.join(__dirname, '../../data/groups.json');
+      
+      if (!fs.existsSync(groupsFilePath)) {
+        console.warn(`Groups data file not found at ${groupsFilePath}`);
+        return null;
+      }
+      
+      const groupsData = JSON.parse(fs.readFileSync(groupsFilePath, 'utf8'));
+      
+      if (groupsData[groupId]) {
+        return groupsData[groupId].account;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error getting group account number: ${error.message}`);
+      return null;
+    }
   }
 }
 
