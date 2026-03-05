@@ -460,20 +460,19 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     
     console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${resultSymbol} | User B: ${oppositeResult}`);
     
-    // อัปเดตยอดเงินของ User A
+    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
+    console.log(`   📤 Sending result messages to players...`);
+    
+    // 💰 อัปเดตยอดเงินของผู้เล่น (ต้องทำก่อนดึงยอดเงินใหม่)
     if (userAId && userAName) {
       await updatePlayerBalance(userAId, userAName, userAWinnings);
     }
     
-    // อัปเดตยอดเงินของ User B
     if (userBId && userBName) {
       await updatePlayerBalance(userBId, userBName, userBWinnings);
     }
     
-    // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
-    console.log(`   📤 Sending result messages to players...`);
-    
-    // ดึงยอดเงินคงเหลือใหม่ของผู้เล่น
+    // ดึงยอดเงินคงเหลือใหม่ของผู้เล่น (หลังจากอัปเดตแล้ว)
     let userANewBalance = 0;
     let userBNewBalance = 0;
     
