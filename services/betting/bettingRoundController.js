@@ -40,7 +40,7 @@ class BettingRoundController {
     // ตรวจสอบคำสั่งแอดมิน
     const adminCommand = BettingMessageParserService.parseAdminCommand(message.text);
     if (adminCommand.isCommand) {
-      return await this.handleAdminCommand(adminCommand, userId);
+      return await this.handleAdminCommand(adminCommand, userId, source);
     }
 
     // ตรวจสอบสถานะ
@@ -301,7 +301,7 @@ class BettingRoundController {
    * จัดการคำสั่งแอดมิน
    * @private
    */
-  async handleAdminCommand(command, userId) {
+  async handleAdminCommand(command, userId, source) {
     switch (command.command) {
       case 'START':
         return await this.handleStartCommand(command.slipName);
@@ -310,7 +310,7 @@ class BettingRoundController {
         return await this.handleStopCommand();
 
       case 'CALCULATE':
-        return await this.handleCalculateCommand(command.slipName, command.score);
+        return await this.handleCalculateCommand(command.slipName, command.score, source);
 
       default:
         return {
@@ -364,7 +364,7 @@ class BettingRoundController {
    * จัดการคำสั่ง :สรุป
    * @private
    */
-  async handleCalculateCommand(slipName, score) {
+  async handleCalculateCommand(slipName, score, source) {
     try {
       const bettingResultService = require('./bettingResultService');
 
@@ -391,7 +391,7 @@ class BettingRoundController {
       const results = [];
       
       // ดึง Account Number จากกลุ่ม (ใช้ Account 1 เป็น default)
-      const groupAccountNumber = await this.getGroupAccountNumber(source.groupId);
+      const groupAccountNumber = await this.getGroupAccountNumber(source?.groupId);
       const accountNumber = groupAccountNumber || 1;
       
       // ประมวลผลการเล่นปกติ (คู่ที่จับได้)
@@ -420,7 +420,7 @@ class BettingRoundController {
           result,
           slipName,
           score,
-          source.groupId || null, // groupId
+          source?.groupId || null, // groupId
           accountNumber // ใช้ Account ของกลุ่ม
         );
 

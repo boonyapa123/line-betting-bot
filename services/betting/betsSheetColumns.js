@@ -125,7 +125,7 @@ class BetsSheetColumns {
       amountB: parseInt(row[this.COLUMNS.AMOUNT_B]) || 0,
       result: row[this.COLUMNS.RESULT],
       resultWinLose: row[this.COLUMNS.RESULT_WIN_LOSE],
-      userBId: row[this.COLUMNS.USER_B_ID],
+      userBId: row[this.COLUMNS.TOKEN_B], // ✅ ดึง User B ID จาก Column R (TOKEN_B) แทน Column K
       userBName: row[this.COLUMNS.USER_B_NAME],
       sideBCode: row[this.COLUMNS.SIDE_B],
       groupChatName: row[this.COLUMNS.GROUP_CHAT_NAME],
@@ -225,7 +225,8 @@ class BetsSheetColumns {
     const row = [...currentRow]; // Copy แถวปัจจุบัน
 
     // อัปเดตข้อมูล User B
-    if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
+    // ✅ บันทึก User B ID ที่คอลัมน์ R (TOKEN_B) แทนคอลัมน์ K (USER_B_ID)
+    if (userBData.userId) row[this.COLUMNS.TOKEN_B] = userBData.userId;
     if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
     if (userBData.sideCode) row[this.COLUMNS.SIDE_B] = userBData.sideCode;
     if (userBData.amount !== undefined && userBData.amount !== null) {
@@ -237,7 +238,6 @@ class BetsSheetColumns {
       // ไม่ได้เก็บ messageB ในชีท แต่เก็บข้อมูลแยกกัน
     }
     if (userBData.groupName) row[this.COLUMNS.GROUP_NAME] = userBData.groupName;
-    if (userBData.tokenB) row[this.COLUMNS.TOKEN_B] = userBData.tokenB;
 
     // ทำเครื่องหมาย MATCHED Auto ใน Column U
     row[this.COLUMNS.MATCHED_AUTO] = 'AUTO';

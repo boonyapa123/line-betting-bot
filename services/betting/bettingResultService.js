@@ -3,6 +3,9 @@
  * จัดการผลลัพธ์การเล่น คำนวณค่าธรรมเนียม และแจ้งเตือน LINE
  */
 
+const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
 const { LineNotificationService } = require('../line/lineNotificationService');
 const bettingPairingService = require('./bettingPairingService');
 
@@ -13,8 +16,50 @@ class BettingResultService {
       1: new LineNotificationService(1),
       2: new LineNotificationService(2),
     };
+    this.sheets = null;
+    this.spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    this.betsSheetName = process.env.GOOGLE_WORKSHEET_NAME || 'Bets';
     this.FEE_PERCENTAGE = 0.10; // 10% ค่าธรรมเนียมจากยอดเล่น
     this.DRAW_FEE_PERCENTAGE = 0.05; // 5% ค่าธรรมเนียมออกกลาง
+  }
+
+  /**
+   * Initialize Google Sheets API
+   */
+  async initialize() {
+    try {
+      let credentials;
+
+      if (process.env.GOOGLE_CREDENTIALS_JSON) {
+        credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+      } else {
+        const credentialsPath = path.join(
+          __dirname,
+          '../../',
+          process.env.GOOGLE_SERVICE_ACCOUNT_KEY || 'credentials.json'
+        );
+        credentials = JSON.parse(fs.readFileSync(credentialsPath));
+      }
+
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      this.sheets = google.sheets({ version: 'v4', auth });
+    } catch (error) {
+      console.error('Error initializing BettingResultService:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ensure initialization is complete
+   */
+  async ensureInitialized() {
+    if (!this.sheets) {
+      await this.initialize();
+    }
   }
 
   /**
@@ -118,47 +163,96 @@ class BettingResultService {
   }
 
   /**
-   * บันทึกผลลัพธ์ลงชีท Results
+   * บันทึกผลลัพธ์ลงชีท Bets (อัปเดตแถวที่จับคู่ไปแล้ว)
    * @param {object} result - ผลลัพธ์
    * @param {string} slipName - ชื่อบั้งไฟ
    * @param {number} score - คะแนนที่ออก
    */
   async recordResult(result, slipName, score) {
     try {
+      await this.ensureInitialized();
+
       const { bet1, bet2 } = result.pair;
+      const { winner, loser, isDraw } = result;
 
-      const row = [
-        new Date().toISOString(), // Timestamp
-        slipName,
-        score,
-        bet1.userId, // Player 1 ID
-        bet1.displayName, // Player 1 Name
-        bet1.lineName || '', // Player 1 LINE Name
-        bet1.side, // Player 1 Side
-        bet1.amount || 0, // Player 1 Amount
-        bet2.userId, // Player 2 ID
-        bet2.displayName, // Player 2 Name
-        bet2.lineName || '', // Player 2 LINE Name
-        bet2.side, // Player 2 Side
-        bet2.amount || 0, // Player 2 Amount
-        result.winner.userId, // Winner ID
-        result.winner.displayName, // Winner Name
-        result.winner.lineName || '', // Winner LINE Name
-        result.winner.grossAmount, // Winner Gross Amount
-        result.winner.fee, // Winner Fee
-        result.winner.netAmount, // Winner Net Amount
-        result.loser.userId, // Loser ID
-        result.loser.displayName, // Loser Name
-        result.loser.lineName || '', // Loser LINE Name
-        result.loser.grossAmount, // Loser Gross Amount
-        result.loser.fee, // Loser Fee
-        result.loser.netAmount, // Loser Net Amount
-        result.isDraw ? 'DRAW' : 'WIN', // Result Type
-      ];
+      // ค้นหาแถวที่จับคู่ไปแล้ว
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.betsSheetName}!A2:U`,
+      });
 
-      // เพิ่มแถวใหม่ (ต้องสร้างชีท Results ก่อน)
-      // await this.sheets.spreadsheets.values.append({...})
+      const values = response.data.values || [];
+      let matchedRowIndex = -1;
 
+      // ค้นหาแถวที่มี User A + User B ของบั้งไฟนี้
+      for (let i = 0; i < values.length; i++) {
+        const row = values[i];
+        const userAName = row[2]; // Column C
+        const userBName = row[11]; // Column L
+        const rowSlipName = row[4]; // Column E
+        const userBAmount = row[7]; // Column H (ถ้ามีค่า = MATCHED)
+
+        if (
+          rowSlipName === slipName &&
+          userBAmount !== undefined &&
+          userBAmount !== '' &&
+          ((userAName === bet1.displayName && userBName === bet2.displayName) ||
+            (userAName === bet2.displayName && userBName === bet1.displayName))
+        ) {
+          matchedRowIndex = i + 2; // +2 เพราะ header + 0-indexed
+          break;
+        }
+      }
+
+      if (matchedRowIndex === -1) {
+        console.warn(`No matched row found for slip: ${slipName}`);
+        return { success: false, error: 'No matched row found' };
+      }
+
+      // อัปเดตผลลัพธ์
+      const updates = [];
+
+      // Column I: ผลที่ออก
+      updates.push({
+        range: `${this.betsSheetName}!I${matchedRowIndex}`,
+        values: [[score]],
+      });
+
+      // Column J: ผลแพ้ชนะ (ชนะ/แพ้/เสมอ)
+      const resultStatus = isDraw ? 'เสมอ' : (winner.displayName === bet1.displayName ? 'ชนะ' : 'แพ้');
+      updates.push({
+        range: `${this.betsSheetName}!J${matchedRowIndex}`,
+        values: [[resultStatus]],
+      });
+
+      // Column S: ผลลัพธ์ A
+      const resultA = winner.displayName === bet1.displayName
+        ? `ชนะ ${winner.netAmount} บาท`
+        : `แพ้ ${Math.abs(loser.netAmount)} บาท`;
+      updates.push({
+        range: `${this.betsSheetName}!S${matchedRowIndex}`,
+        values: [[resultA]],
+      });
+
+      // Column T: ผลลัพธ์ B
+      const resultB = winner.displayName === bet2.displayName
+        ? `ชนะ ${winner.netAmount} บาท`
+        : `แพ้ ${Math.abs(loser.netAmount)} บาท`;
+      updates.push({
+        range: `${this.betsSheetName}!T${matchedRowIndex}`,
+        values: [[resultB]],
+      });
+
+      // บันทึกทั้งหมด
+      await this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: {
+          data: updates,
+          valueInputOption: 'USER_ENTERED',
+        },
+      });
+
+      console.log(`✅ Result recorded for row ${matchedRowIndex}`);
       return { success: true };
     } catch (error) {
       console.error('Error recording result:', error);
@@ -220,40 +314,23 @@ class BettingResultService {
   }
 
   /**
-   * สร้างข้อความผลลัพธ์สำหรับกลุ่ม
+   * สร้างข้อความผลลัพธ์สำหรับกลุ่ม (รูปแบบใหม่ด้วย emoji)
+   * ตัวอย่าง: แอด 460✅️เทวดา 300❌️เทพพนม 350⛔️ฟ้าหลังฝน
    * @private
    */
   buildResultMessage(result, slipName, score, isDraw) {
     const { winner, loser, bet1, bet2 } = result;
 
-    let message = `📊 ผลการเล่น บั้งไฟ: ${slipName}\n`;
-    message += `คะแนนที่ออก: ${score}\n`;
-    message += `${'='.repeat(50)}\n\n`;
-
     if (isDraw) {
-      message += `🤝 ออกกลาง\n\n`;
-      message += `👤 ${bet1.displayName} (${bet1.lineName})\n`;
-      message += `   ฝั่ง: ${bet1.side} | เดิมพัน: ${bet1.amount} บาท\n`;
-      message += `   หัก: ${winner.fee} บาท (5%)\n\n`;
-
-      message += `👤 ${bet2.displayName} (${bet2.lineName})\n`;
-      message += `   ฝั่ง: ${bet2.side} | เดิมพัน: ${bet2.amount} บาท\n`;
-      message += `   หัก: ${loser.fee} บาท (5%)\n`;
+      // ออกกลาง (เสมอ)
+      return `${slipName} ${score}⛔️${bet1.displayName} ⛔️${bet2.displayName}`;
     } else {
-      message += `🏆 ชนะ: ${winner.displayName} (${winner.lineName})\n`;
-      message += `   ฝั่ง: ${bet1.side === winner.side ? bet1.side : bet2.side}\n`;
-      message += `   เดิมพัน: ${winner.grossAmount} บาท\n`;
-      message += `   หัก: ${winner.fee} บาท (10%)\n`;
-      message += `   ได้รับ: ${winner.netAmount} บาท\n\n`;
+      // ชนะ-แพ้
+      const winnerName = winner.displayName;
+      const loserName = loser.displayName;
 
-      message += `❌ แพ้: ${loser.displayName} (${loser.lineName})\n`;
-      message += `   ฝั่ง: ${bet1.side === loser.side ? bet1.side : bet2.side}\n`;
-      message += `   เดิมพัน: ${Math.abs(loser.grossAmount)} บาท\n`;
+      return `${slipName} ${score}✅️${winnerName} ❌️${loserName}`;
     }
-
-    message += `\n${'='.repeat(50)}`;
-
-    return message;
   }
 
   /**
@@ -266,10 +343,11 @@ class BettingResultService {
     message += `คะแนนที่ออก: ${score}\n`;
 
     if (isDraw) {
-      message += `\n🤝 ออกกลาง\n`;
+      message += `\n⛔️ ออกกลาง (เสมอ)\n`;
       message += `หัก: ${winner.fee} บาท (5%)\n`;
     } else {
-      message += `\nเดิมพัน: ${winner.grossAmount} บาท\n`;
+      message += `\n✅️ ชนะ\n`;
+      message += `เดิมพัน: ${winner.grossAmount} บาท\n`;
       message += `หัก: ${winner.fee} บาท (10%)\n`;
       message += `ได้รับ: ${winner.netAmount} บาท\n`;
     }
@@ -287,14 +365,30 @@ class BettingResultService {
     message += `คะแนนที่ออก: ${score}\n`;
 
     if (isDraw) {
-      message += `\n🤝 ออกกลาง\n`;
+      message += `\n⛔️ ออกกลาง (เสมอ)\n`;
       message += `หัก: ${loser.fee} บาท (5%)\n`;
     } else {
-      message += `\nเดิมพัน: ${Math.abs(loser.grossAmount)} บาท\n`;
+      message += `\n❌️ แพ้\n`;
+      message += `เดิมพัน: ${Math.abs(loser.grossAmount)} บาท\n`;
     }
 
     return message;
   }
 }
 
-module.exports = new BettingResultService();
+const instance = new BettingResultService();
+
+// Initialize immediately
+let initPromise = instance.initialize().catch(error => {
+  console.error('Failed to auto-initialize BettingResultService:', error);
+});
+
+// Add a method to ensure initialization is complete
+instance.ensureInitialized = async function() {
+  await initPromise;
+  if (!this.sheets) {
+    throw new Error('BettingResultService failed to initialize');
+  }
+};
+
+module.exports = instance;
