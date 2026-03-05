@@ -1,0 +1,139 @@
+📊 === BETS SHEET - ALL COLUMNS DETAILED ===
+
+Export Date: 2026-03-05T04:24:40.033Z
+Total Rows: 1
+
+📋 === HEADER ===
+[A] A - Timestamp
+    Header: Timestamp
+
+[B] B - User A ID
+    Header: User A ID
+
+[C] C - ชื่อ User A
+    Header: ชื่อ User A
+
+[D] D - ข้อความ A
+    Header: ข้อความ A
+
+[E] E - ชื่อบั้งไฟ
+    Header: ชื่อบั้งไฟ
+
+[F] F - รายการเล่น (ฝั่ง A)
+    Header: รายการเล่น
+
+[G] G - ยอดเงิน
+    Header: ยอดเงิน
+
+[H] H - ยอดเงิน B
+    Header: ยอดเงิน B
+
+[I] I - ผลที่ออก
+    Header: ผลที่ออก
+
+[J] J - ผลแพ้ชนะ
+    Header: ผลแพ้ชนะ
+
+[K] K - User B ID
+    Header: User B ID
+
+[L] L - ชื่อ User B
+    Header: ชื่อ User B
+
+[M] M - รายการแทง (ฝั่ง B)
+    Header: รายการแทง
+
+[N] N - ชื่อกลุ่มแชท
+    Header: ชื่อกลุ่มแชท
+
+[O] O - ชื่อกลุ่ม
+    Header: ชื่อกลุ่มแชท
+
+[P] P - Token A
+    Header: Token A
+
+[Q] Q - ID กลุ่ม
+    Header: ID กลุ่ม
+
+[R] R - Token B (User B ID)
+    Header: User B ID
+
+[S] S - ผลลัพธ์ A
+    Header: ผลลัพธ์ A
+
+[T] T - ผลลัพธ์ B
+    Header: ผลลัพธ์ B
+
+[U] U - MATCHED Auto
+    Header: สถานะคู่
+
+
+📊 === DATA ROWS ===
+
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ROW 2
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[A] A - Timestamp
+    05/03/2569 04:18:09
+
+[B] B - User A ID
+    Ua01232445a58162e1518b510fcaf01b5
+
+[C] C - ชื่อ User A
+    paa"BOY"
+
+[D] D - ข้อความ A
+    350-370 ล 300 ฟ้า
+
+[E] E - ชื่อบั้งไฟ
+    ฟ้า
+
+[F] F - รายการเล่น (ฝั่ง A)
+    ล
+
+[G] G - ยอดเงิน
+    300
+
+[H] H - ยอดเงิน B
+    300
+
+[I] I - ผลที่ออก
+    370
+
+[J] J - ผลแพ้ชนะ
+    ⛔️
+
+[K] K - User B ID
+    ⛔️
+
+[L] L - ชื่อ User B
+    💓Noon💓
+
+[M] M - รายการแทง (ฝั่ง B)
+    ย
+
+[N] N - ชื่อกลุ่มแชท
+    (ว่างเปล่า)
+
+[O] O - ชื่อกลุ่ม
+    (ว่างเปล่า)
+
+[P] P - Token A
+    (ว่างเปล่า)
+
+[Q] Q - ID กลุ่ม
+    C4e522277480703e5eddbf658666ba6a9
+
+[R] R - Token B (User B ID)
+    Uc2a009fe53d51946657363bdbb7d1374
+
+[S] S - ผลลัพธ์ A
+    (ว่างเปล่า)
+
+[T] T - ผลลัพธ์ B
+    (ว่างเปล่า)
+
+[U] U - MATCHED Auto
+    AUTO
+

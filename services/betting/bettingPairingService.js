@@ -449,8 +449,9 @@ class BettingPairingService {
           result: 'WIN',
         },
         loser: {
-          // ✅ ใช้ userBId จาก bet1 (ดึงจาก Column R) แทน bet2.userId
+          // ✅ ใช้ userBId จาก bet1 (ดึงจาก Column R) เป็น userId
           userId: bet1.userBId || bet2.userId,
+          // ✅ ใช้ userBName จาก bet1 (ดึงจาก Column L) เป็น displayName
           displayName: bet1.userBName || bet2.displayName,
           amount: 0, // REPLY method ไม่มีจำนวนเงิน
           result: 'LOSE',
@@ -487,9 +488,15 @@ class BettingPairingService {
       betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
     }
 
-    // ✅ ถ้า loser คือ bet2 ให้ใช้ userBId จาก bet1 แทน
-    const loserUserId = loser === bet2 ? (bet1.userBId || bet2.userId) : loser.userId;
-    const loserDisplayName = loser === bet2 ? (bet1.userBName || bet2.displayName) : loser.displayName;
+    // ✅ ถ้า loser คือ bet2 ให้ใช้ userBId และ userBName จาก bet1
+    let loserUserId, loserDisplayName;
+    if (loser === bet2) {
+      loserUserId = bet1.userBId || bet2.userId;
+      loserDisplayName = bet1.userBName || bet2.displayName;
+    } else {
+      loserUserId = loser.userId;
+      loserDisplayName = loser.displayName;
+    }
 
     return {
       winner: {
@@ -654,6 +661,11 @@ class BettingPairingService {
       // ถ้าเป็น 1-indexed แล้ว ให้ใช้ตรงๆ
       const actualRowIndex = rowIndex < 2 ? rowIndex + 2 : rowIndex;
 
+      console.log(`\n📝 === Updating Row with User B Data ===`);
+      console.log(`   Row Index: ${actualRowIndex}`);
+      console.log(`   User B ID: ${userBData.userId}`);
+      console.log(`   User B Name: ${userBData.displayName}`);
+
       // ดึงข้อมูลแถวปัจจุบัน
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
@@ -661,9 +673,12 @@ class BettingPairingService {
       });
 
       const currentRow = response.data.values?.[0] || [];
+      console.log(`   Current Row Length: ${currentRow.length}`);
 
       // สร้างแถวใหม่ด้วยข้อมูล User B
       const updatedRow = BetsSheetColumns.updateRowWithUserB(currentRow, userBData);
+      console.log(`   Updated Row Length: ${updatedRow.length}`);
+      console.log(`   Column R (TOKEN_B): ${updatedRow[17]}`);
 
       // อัปเดตแถวในชีท
       await this.sheets.spreadsheets.values.update({
@@ -678,7 +693,7 @@ class BettingPairingService {
       console.log(`✅ Row ${actualRowIndex} updated with User B data`);
       return { success: true, message: 'อัปเดตแถวสำเร็จ' };
     } catch (error) {
-      console.error('Error updating row with User B:', error);
+      console.error('❌ Error updating row with User B:', error);
       return { success: false, message: 'เกิดข้อผิดพลาดในการอัปเดต' };
     }
   }

@@ -402,22 +402,36 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[11] || '';  // L = User B ID (index 11)
-    const userBName = row[12] || '';  // M = ชื่อ User B (index 12)
+    const userBId = row[17] || '';  // ✅ R = User B ID (index 17) - ดึงจาก Column R (TOKEN_B)
+    const userBName = row[11] || '';  // L = ชื่อ User B (index 11)
     const betAmount = parseFloat(row[6]) || 0;
     const fireworkName = row[4] || '';
-    const userAToken = row[15] || '';  // P = User A Token (index 15)
-    const userBToken = row[17] || '';  // R = User B Token (index 17)
+    // ✅ ใช้ LINE Channel Access Token จาก environment variables แทนที่จะดึงจากชีท
+    const userAToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+    const userBToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
     const groupId = row[16] || '';     // Q = Group ID (index 16)
     
     // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:K${rowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:T${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[resultNumber, resultSymbol, oppositeResult]],
+        values: [[
+          resultNumber,           // I: ผลที่ออก
+          resultSymbol,           // J: ผลแพ้ชนะ
+          oppositeResult,         // K: ผลแพ้ชนะ B
+          '',                     // L: ชื่อ User B (ไม่เปลี่ยน)
+          '',                     // M: รายการแทง B (ไม่เปลี่ยน)
+          '',                     // N: ชื่อกลุ่มแชท (ไม่เปลี่ยน)
+          '',                     // O: ชื่อกลุ่ม (ไม่เปลี่ยน)
+          '',                     // P: Token A (ไม่เปลี่ยน)
+          '',                     // Q: ID กลุ่ม (ไม่เปลี่ยน)
+          '',                     // R: Token B (ไม่เปลี่ยน)
+          resultSymbol === '✅' ? `ชนะ ${userAWinnings.toFixed(0)} บาท` : resultSymbol === '❌' ? `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`,  // S: ผลลัพธ์ A
+          oppositeResult === '✅' ? `ชนะ ${userBWinnings.toFixed(0)} บาท` : oppositeResult === '❌' ? `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`,  // T: ผลลัพธ์ B
+        ]],
       },
     });
     
@@ -551,6 +565,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
+    }
+    
+    // ✅ ส่งข้อความแจ้งเตือนกลุ่ม
+    if (groupId) {
+      console.log(`   📢 Sending group notification...`);
+      const groupMessage = `${fireworkName} ${score}${resultSymbol}${userAName} ${resultSymbol === '✅' ? '✅' : resultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
+      await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
     
     console.log(`   ✅ Result messages sent successfully`);
