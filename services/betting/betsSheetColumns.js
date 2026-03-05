@@ -58,9 +58,10 @@ class BetsSheetColumns {
   /**
    * สร้างแถวข้อมูลสำหรับบันทึกลงชีท Bets
    * @param {object} data - ข้อมูลที่ต้องบันทึก
-   * @returns {array} แถวข้อมูล (20 คอลัมน์)
+   * @returns {array} แถวข้อมูล (21 คอลัมน์)
    */
   static createRow(data) {
+    // สร้างแถวที่มี 21 คอลัมน์ (A-U) พร้อมค่าว่างเปล่า
     const row = new Array(21).fill('');
 
     // ตั้งค่าข้อมูลตามคอลัมน์
@@ -137,7 +138,7 @@ class BetsSheetColumns {
       matchedAuto: row[this.COLUMNS.MATCHED_AUTO],
       price: price,
       method: price ? 2 : 1,
-      status: row[this.COLUMNS.RESULT_WIN_LOSE] ? 'MATCHED' : '',
+      status: row[this.COLUMNS.MATCHED_AUTO] ? 'MATCHED' : '', // ✅ ตั้งค่าจาก Column U (MATCHED_AUTO)
     };
   }
 

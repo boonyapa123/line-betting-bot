@@ -161,25 +161,7 @@ class BettingRoundController {
       };
     }
 
-    // บันทึกการเล่น
-    const recordResult = await bettingPairingService.recordBet(
-      parsedBet,
-      userId,
-      displayName,
-      lineName,
-      '', // groupName (ยังไม่มีข้อมูล)
-      '', // userToken (ยังไม่มีข้อมูล)
-      source.groupId || '' // groupId
-    );
-
-    if (!recordResult.success) {
-      return {
-        type: 'text',
-        text: recordResult.message,
-      };
-    }
-
-    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน)
+    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน) ก่อนบันทึก
     const PriceRangeMatchingService = require('./priceRangeMatchingService');
     
     console.log(`🔍 Fetching bets for group: ${source.groupId || 'NO_GROUP'}`);
@@ -203,6 +185,7 @@ class BettingRoundController {
     console.log(`   Matching result:`, matchedPair ? 'FOUND' : 'NOT FOUND');
     
     if (matchedPair) {
+      // 🎯 พบคู่ - อัปเดตแถว User A โดยตรง (ไม่บันทึก User B ลงแถวใหม่)
       console.log(`🎯 Auto-matched price range pair found!`);
       console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
       console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
@@ -220,12 +203,22 @@ class BettingRoundController {
       };
 
       const updateResult = await bettingPairingService.updateRowWithUserB(
-        matchedPair.existingBet.index,
+        matchedPair.existingBet.rowIndex,
         userBData
       );
 
       if (!updateResult.success) {
         console.error(`❌ Failed to update row: ${updateResult.message}`);
+        // ถ้าอัปเดตไม่สำเร็จ ให้บันทึก User B ลงแถวใหม่แทน
+        const recordResult = await bettingPairingService.recordBet(
+          parsedBet,
+          userId,
+          displayName,
+          lineName,
+          '',
+          '',
+          source.groupId || ''
+        );
       }
       
       // สร้างข้อความแจ้งการจับคู่
@@ -273,6 +266,26 @@ class BettingRoundController {
           `💹 ราคาคู่แข่ง: ${matchedPair.existingBet.price}\n` +
           `💰 ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
           `⏳ รอการประกาศผล...`,
+      };
+    }
+
+    // ⏳ ไม่พบคู่ - บันทึก User A ลงแถวใหม่และรอการจับคู่
+    console.log(`⏳ No match found - recording bet and waiting for opponent`);
+    
+    const recordResult = await bettingPairingService.recordBet(
+      parsedBet,
+      userId,
+      displayName,
+      lineName,
+      '', // groupName (ยังไม่มีข้อมูล)
+      '', // userToken (ยังไม่มีข้อมูล)
+      source.groupId || '' // groupId
+    );
+
+    if (!recordResult.success) {
+      return {
+        type: 'text',
+        text: recordResult.message,
       };
     }
 

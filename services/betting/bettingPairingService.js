@@ -110,7 +110,7 @@ class BettingPairingService {
       
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A:T`,
+        range: `${this.transactionsSheetName}!A:U`,
         valueInputOption: 'RAW',
         resource: {
           values: [row],
@@ -138,11 +138,16 @@ class BettingPairingService {
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A2:T`,
+        range: `${this.transactionsSheetName}!A2:U`,
       });
 
       const values = response.data.values || [];
-      return values.map((row) => BetsSheetColumns.parseRow(row));
+      // เก็บ Row Index ที่แท้จริง (เริ่มจาก 2 เพราะ Header อยู่ที่ Row 1)
+      return values.map((row, index) => {
+        const parsed = BetsSheetColumns.parseRow(row);
+        parsed.rowIndex = index + 2; // Row Index ที่แท้จริง (1-indexed)
+        return parsed;
+      });
     } catch (error) {
       console.error('Error getting all bets:', error);
       return [];
@@ -640,10 +645,14 @@ class BettingPairingService {
 
       const BetsSheetColumns = require('./betsSheetColumns');
 
+      // ถ้า rowIndex เป็น 0-indexed ให้แปลงเป็น 1-indexed
+      // ถ้าเป็น 1-indexed แล้ว ให้ใช้ตรงๆ
+      const actualRowIndex = rowIndex < 2 ? rowIndex + 2 : rowIndex;
+
       // ดึงข้อมูลแถวปัจจุบัน
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A${rowIndex + 2}:T${rowIndex + 2}`,
+        range: `${this.transactionsSheetName}!A${actualRowIndex}:U${actualRowIndex}`,
       });
 
       const currentRow = response.data.values?.[0] || [];
@@ -654,14 +663,14 @@ class BettingPairingService {
       // อัปเดตแถวในชีท
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A${rowIndex + 2}:T${rowIndex + 2}`,
+        range: `${this.transactionsSheetName}!A${actualRowIndex}:U${actualRowIndex}`,
         valueInputOption: 'RAW',
         resource: {
           values: [updatedRow],
         },
       });
 
-      console.log(`✅ Row ${rowIndex + 2} updated with User B data`);
+      console.log(`✅ Row ${actualRowIndex} updated with User B data`);
       return { success: true, message: 'อัปเดตแถวสำเร็จ' };
     } catch (error) {
       console.error('Error updating row with User B:', error);
