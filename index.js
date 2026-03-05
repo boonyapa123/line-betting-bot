@@ -1354,13 +1354,13 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       '',                  // [8] = I: ผลที่ออก (ว่าง - อัปเดตเมื่อประกาศผล)
       '',                  // [9] = J: ผลแพ้ชนะ A (ว่าง - อัปเดตเมื่อประกาศผล)
       '',                  // [10] = K: ผลแพ้ชนะ B (ว่าง - อัปเดตเมื่อประกาศผล)
-      pair.userB,          // [11] = L: User B ID
-      userBName,           // [12] = M: ชื่อ User B
-      oppositeBetType,     // [13] = N: รายการแทง B
-      groupName,           // [14] = O: ชื่อกลุ่มแชท
-      userAToken || '',    // [15] = P: User A Token
+      userBName,           // [11] = L: ชื่อ User B
+      oppositeBetType,     // [12] = M: รายการแทง B
+      '',                  // [13] = N: ชื่อกลุ่มแชท (ว่าง)
+      groupName,           // [14] = O: ชื่อกลุ่ม
+      userAToken || '',    // [15] = P: Token A
       pair.groupId || '',  // [16] = Q: Group ID
-      userBToken || ''     // [17] = R: User B Token
+      pair.userB           // [17] = R: User B ID
     ];
     
     console.log(`   📊 Row data (18 columns):`);
