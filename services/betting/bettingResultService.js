@@ -287,6 +287,11 @@ class BettingResultService {
       console.log(`   Loser: ${loser.displayName} (${loser.userId})`);
       console.log(`   Group ID: ${groupId}`);
 
+      // ดึงยอดเงินใหม่ของผู้ชนะและผู้แพ้
+      const balanceUpdateService = require('./balanceUpdateService');
+      const winnerNewBalance = await balanceUpdateService.getUserBalance(winner.displayName);
+      const loserNewBalance = await balanceUpdateService.getUserBalance(loser.displayName);
+
       // สร้างข้อความแจ้งเตือน
       const resultMessage = this.buildResultMessage(
         result,
@@ -300,7 +305,7 @@ class BettingResultService {
         console.log(`\n   📤 Sending winner message to ${winner.displayName}...`);
         const winnerResult = await notificationService.sendPrivateMessage(
           winner.userId,
-          this.buildWinnerMessage(winner, slipName, score, isDraw)
+          this.buildWinnerMessage(winner, slipName, score, isDraw, winnerNewBalance)
         );
         if (!winnerResult.success) {
           console.error(`   ❌ Failed to send winner message: ${winnerResult.error}`);
@@ -311,7 +316,7 @@ class BettingResultService {
         console.log(`\n   📤 Sending loser message to ${loser.displayName}...`);
         const loserResult = await notificationService.sendPrivateMessage(
           loser.userId,
-          this.buildLoserMessage(loser, slipName, score, isDraw)
+          this.buildLoserMessage(loser, slipName, score, isDraw, loserNewBalance)
         );
         if (!loserResult.success) {
           console.error(`   ❌ Failed to send loser message: ${loserResult.error}`);
@@ -362,19 +367,24 @@ class BettingResultService {
    * สร้างข้อความสำหรับผู้ชนะ (ส่วนตัว)
    * @private
    */
-  buildWinnerMessage(winner, slipName, score, isDraw) {
+  buildWinnerMessage(winner, slipName, score, isDraw, newBalance = 0) {
     let message = `🎉 ยินดีด้วย! คุณชนะ\n\n`;
-    message += `บั้งไฟ: ${slipName}\n`;
-    message += `คะแนนที่ออก: ${score}\n`;
+    message += `🎆 บั้งไฟ: ${slipName}\n`;
+    message += `📊 คะแนนที่ออก: ${score}\n`;
 
     if (isDraw) {
       message += `\n⛔️ ออกกลาง (เสมอ)\n`;
-      message += `หัก: ${winner.fee} บาท (5%)\n`;
+      message += `💰 เดิมพัน: ${winner.grossAmount || 0} บาท\n`;
+      message += `💸 ค่าธรรมเนียม: ${winner.fee} บาท (5%)\n`;
     } else {
       message += `\n✅️ ชนะ\n`;
-      message += `เดิมพัน: ${winner.grossAmount} บาท\n`;
-      message += `หัก: ${winner.fee} บาท (10%)\n`;
-      message += `ได้รับ: ${winner.netAmount} บาท\n`;
+      message += `💰 เดิมพัน: ${winner.grossAmount} บาท\n`;
+      message += `💸 ค่าธรรมเนียม: ${winner.fee} บาท (10%)\n`;
+      message += `🏆 ได้รับ: ${winner.netAmount} บาท\n`;
+    }
+
+    if (newBalance > 0) {
+      message += `\n💵 ยอดเงินคงเหลือ: ${newBalance} บาท\n`;
     }
 
     return message;
@@ -384,17 +394,23 @@ class BettingResultService {
    * สร้างข้อความสำหรับผู้แพ้ (ส่วนตัว)
    * @private
    */
-  buildLoserMessage(loser, slipName, score, isDraw) {
+  buildLoserMessage(loser, slipName, score, isDraw, newBalance = 0) {
     let message = `😔 เสียใจด้วย คุณแพ้\n\n`;
-    message += `บั้งไฟ: ${slipName}\n`;
-    message += `คะแนนที่ออก: ${score}\n`;
+    message += `🎆 บั้งไฟ: ${slipName}\n`;
+    message += `📊 คะแนนที่ออก: ${score}\n`;
 
     if (isDraw) {
       message += `\n⛔️ ออกกลาง (เสมอ)\n`;
-      message += `หัก: ${loser.fee} บาท (5%)\n`;
+      message += `💰 เดิมพัน: ${Math.abs(loser.grossAmount) || 0} บาท\n`;
+      message += `💸 ค่าธรรมเนียม: ${loser.fee} บาท (5%)\n`;
     } else {
       message += `\n❌️ แพ้\n`;
-      message += `เดิมพัน: ${Math.abs(loser.grossAmount)} บาท\n`;
+      message += `💰 เดิมพัน: ${Math.abs(loser.grossAmount)} บาท\n`;
+      message += `💸 เสีย: ${Math.abs(loser.netAmount)} บาท\n`;
+    }
+
+    if (newBalance > 0) {
+      message += `\n💵 ยอดเงินคงเหลือ: ${newBalance} บาท\n`;
     }
 
     return message;
