@@ -411,6 +411,29 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const userBToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_2 || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
     const groupId = row[16] || '';     // Q = Group ID (index 16)
     
+    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
+    console.log(`   💰 Calculating winnings and updating balances...`);
+    
+    let userAWinnings = 0;
+    let userBWinnings = 0;
+    
+    if (resultSymbol === '✅') {
+      // User A ชนะ
+      const commission = betAmount * 0.1; // 10% commission
+      userAWinnings = betAmount - commission;
+      userBWinnings = -betAmount;
+    } else if (resultSymbol === '❌') {
+      // User A แพ้
+      userAWinnings = -betAmount;
+      const commission = betAmount * 0.1; // 10% commission
+      userBWinnings = betAmount - commission;
+    } else {
+      // เสมอ
+      const commission = betAmount * 0.05; // 5% commission
+      userAWinnings = -commission;
+      userBWinnings = -commission;
+    }
+
     // อัปเดตผลลัพธ์ในชีท
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
@@ -436,29 +459,6 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     });
     
     console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${resultSymbol} | User B: ${oppositeResult}`);
-    
-    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
-    console.log(`   💰 Calculating winnings and updating balances...`);
-    
-    let userAWinnings = 0;
-    let userBWinnings = 0;
-    
-    if (resultSymbol === '✅') {
-      // User A ชนะ
-      const commission = betAmount * 0.1; // 10% commission
-      userAWinnings = betAmount - commission;
-      userBWinnings = -betAmount;
-    } else if (resultSymbol === '❌') {
-      // User A แพ้
-      userAWinnings = -betAmount;
-      const commission = betAmount * 0.1; // 10% commission
-      userBWinnings = betAmount - commission;
-    } else {
-      // เสมอ
-      const commission = betAmount * 0.05; // 5% commission
-      userAWinnings = -commission;
-      userBWinnings = -commission;
-    }
     
     // อัปเดตยอดเงินของ User A
     if (userAId && userAName) {
