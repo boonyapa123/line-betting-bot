@@ -349,11 +349,11 @@ class BettingResultService {
    * @private
    */
   buildResultMessage(result, slipName, score, isDraw) {
-    const { winner, loser, bet1, bet2 } = result;
+    const { winner, loser } = result;
 
     if (isDraw) {
       // ออกกลาง (เสมอ)
-      return `${slipName} ${score}${bet1.displayName}⛔️${bet2.displayName}⛔️`;
+      return `${slipName} ${score}${winner.displayName}⛔️${loser.displayName}⛔️`;
     } else {
       // ชนะ-แพ้
       const winnerName = winner.displayName;
