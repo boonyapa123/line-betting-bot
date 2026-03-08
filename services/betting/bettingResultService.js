@@ -149,17 +149,13 @@ class BettingResultService {
     if (bet1.method === 2 && bet2.method === 2) {
       // ตรวจสอบเฉพาะ bet1.price ที่มี '-' (ช่วงราคา)
       const hasPriceRange1 = bet1.price && bet1.price.includes('-');
-      const hasPriceRange2 = bet2.price && bet2.price.includes('-');
       
-      if (hasPriceRange1 || hasPriceRange2) {
-        const priceRange1 = hasPriceRange1 ? bettingPairingService.constructor.parsePriceRange(bet1.price) : null;
-        const priceRange2 = hasPriceRange2 ? bettingPairingService.constructor.parsePriceRange(bet2.price) : null;
+      if (hasPriceRange1) {
+        const priceRange1 = bettingPairingService.constructor.parsePriceRange(bet1.price);
+        const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
 
-        // ถ้าคะแนนอยู่ในเกณฑ์ของทั้งสองฝั่ง ให้ถือว่าออกกลาง
-        const isInRange1 = priceRange1 ? (score >= priceRange1.min && score <= priceRange1.max) : false;
-        const isInRange2 = priceRange2 ? (score >= priceRange2.min && score <= priceRange2.max) : false;
-
-        return isInRange1 && isInRange2;
+        // ถ้าคะแนนอยู่ในช่วง ให้ถือว่าออกกลาง
+        return isInRange1;
       }
     }
 

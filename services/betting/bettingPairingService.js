@@ -474,34 +474,20 @@ class BettingPairingService {
       // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
       // ตรวจสอบเฉพาะ bet1.price ที่มี '-' (ช่วงราคา)
       const hasPriceRange1 = bet1.price && bet1.price.includes('-');
-      const hasPriceRange2 = bet2.price && bet2.price.includes('-');
       
-      if (hasPriceRange1 || hasPriceRange2) {
-        // ถ้ามีช่วงราคา ให้ตรวจสอบตามช่วง
-        const priceRange1 = hasPriceRange1 ? this.parsePriceRange(bet1.price) : null;
-        const priceRange2 = hasPriceRange2 ? this.parsePriceRange(bet2.price) : null;
-        
-        const isInRange1 = priceRange1 ? (score >= priceRange1.min && score <= priceRange1.max) : false;
-        const isInRange2 = priceRange2 ? (score >= priceRange2.min && score <= priceRange2.max) : false;
+      if (hasPriceRange1) {
+        // bet1 มีช่วงราคา → ตรวจสอบตามช่วง
+        const priceRange1 = this.parsePriceRange(bet1.price);
+        const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
 
-        // ตรวจสอบผลลัพธ์ตามราคาของแต่ละฝั่ง
-        if (isInRange1 && !isInRange2) {
-          // คะแนนอยู่ในเกณฑ์ของ bet1 เท่านั้น -> bet1 ชนะ
-          winner = bet1;
-          loser = bet2;
-        } else if (!isInRange1 && isInRange2) {
-          // คะแนนอยู่ในเกณฑ์ของ bet2 เท่านั้น -> bet2 ชนะ
-          winner = bet2;
-          loser = bet1;
-        } else if (isInRange1 && isInRange2) {
-          // คะแนนอยู่ในเกณฑ์ของทั้งสองฝั่ง -> เสมอ (ไม่มีผู้ชนะ)
-          // ให้ bet1 เป็น winner และ bet2 เป็น loser เพื่อให้ระบบรู้ว่าเป็นเสมอ
+        if (isInRange1) {
+          // คะแนนอยู่ในช่วง → เสมอ
           winner = bet1;
           loser = bet2;
         } else {
-          // คะแนนไม่อยู่ในเกณฑ์ของทั้งสองฝั่ง -> ฝั่ง "ยั้ง" ชนะ
-          winner = bet1.side === 'ยั้ง' ? bet1 : bet2;
-          loser = bet1.side === 'ยั้ง' ? bet2 : bet1;
+          // คะแนนไม่อยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
+          winner = bet1.side === 'ย' ? bet2 : bet1;
+          loser = bet1.side === 'ย' ? bet1 : bet2;
         }
       } else {
         // ถ้าไม่มีช่วงราคา ให้ใช้ Direct Method 1 (ตรวจสอบ side)

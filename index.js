@@ -438,31 +438,21 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       };
       
       const rangeA = parsePriceRange(priceA);
-      const rangeB = parsePriceRange(priceB);
       const score = resultNumber;
       
       const isInRangeA = score >= rangeA.min && score <= rangeA.max;
-      const isInRangeB = score >= rangeB.min && score <= rangeB.max;
       
-      console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}, Range B: ${rangeB.min}-${rangeB.max}`);
-      console.log(`   📊 In Range A: ${isInRangeA}, In Range B: ${isInRangeB}`);
+      console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
+      console.log(`   📊 In Range A: ${isInRangeA}`);
       
-      if (isInRangeA && isInRangeB) {
-        // ทั้งสองฝั่งอยู่ในช่วง → เสมอ
-        console.log(`   ⛔️ Both in range → Draw`);
+      if (isInRangeA) {
+        // คะแนนอยู่ในช่วง → เสมอ
+        console.log(`   ⛔️ Score in range → Draw`);
         finalResultSymbol = '⛔️';
-      } else if (isInRangeA && !isInRangeB) {
-        // User A อยู่ในช่วง → User A ชนะ
-        console.log(`   ✅ User A in range → User A wins`);
-        finalResultSymbol = '✅';
-      } else if (!isInRangeA && isInRangeB) {
-        // User B อยู่ในช่วง → User B ชนะ
-        console.log(`   ❌ User B in range → User B wins`);
-        finalResultSymbol = '❌';
       } else {
-        // ไม่มีใครอยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
-        console.log(`   ❌ Neither in range → Side "ยั้ง" wins`);
-        finalResultSymbol = betTypeA === 'ย' ? '✅' : '❌';
+        // คะแนนไม่อยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
+        console.log(`   ❌ Score not in range → Side "ยั้ง" wins`);
+        finalResultSymbol = betTypeA === 'ย' ? '❌' : '✅';
       }
     } else {
       // ✅ ตรวจสอบการเล่นแบบเดิม (Direct Method 1 - ไม่มีราคา)
