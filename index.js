@@ -559,7 +559,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     if (groupId) {
       console.log(`   📢 Sending group notification...`);
-      const groupMessage = `${fireworkName} ${resultNumber}${finalResultSymbol}${userAName} ${finalResultSymbol === '✅' ? '✅' : finalResultSymbol === '❌' ? '❌' : '⛔️'}${userBName}`;
+      const groupMessage = `${fireworkName} ${resultNumber}${userAName}${finalResultSymbol === '✅' ? '✅' : finalResultSymbol === '❌' ? '❌' : '⛔️'}${userBName}${finalResultSymbol === '✅' ? '❌' : finalResultSymbol === '❌' ? '✅' : '⛔️'}`;
       await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
   } catch (error) {
