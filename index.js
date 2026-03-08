@@ -870,10 +870,11 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         console.log(`   ✅ Found group name: ${currentGroupName}`);
       }
       
-      // Column S (index 18) = ผลลัพธ์ A
-      // Column T (index 19) = ผลลัพธ์ B
-      const resultA = row[18] || '';
-      const resultB = row[19] || '';
+      // Column S (index 18) = ผลลัพธ์ A (ข้อความ)
+      // Column T (index 19) = ผลลัพธ์ B (ข้อความ)
+      // Column J (index 9) = ผลแพ้ชนะ (สัญลักษณ์ ✅/❌/⛔️)
+      const resultA = row[9] || '';
+      const resultB = row[9] ? (row[9] === '✅' ? '❌' : row[9] === '❌' ? '✅' : '⛔️') : '';
       
       // Only include bets with results
       if (!resultA && !resultB) continue;
