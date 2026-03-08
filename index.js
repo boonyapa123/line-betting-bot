@@ -345,7 +345,7 @@ async function findMatchingBets(fireworkName, resultNumber) {
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A:N`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A:U`,
     });
     
     const rows = response.data.values || [];
@@ -428,31 +428,40 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     if (priceA && priceA.includes('-')) {
       console.log(`   🎯 Detected price range betting (Direct Method 2)`);
       
-      // ดึงช่วงราคา
-      const parsePriceRange = (priceStr) => {
-        const match = priceStr.match(/(\d+)-(\d+)/);
-        if (match) {
-          return { min: parseInt(match[1]), max: parseInt(match[2]) };
-        }
-        return { min: 0, max: 999 };
-      };
+      // ตรวจสอบว่า priceA เป็นรูปแบบข้อความการเล่นแบบร้องราคา (เช่น "370-410 ย 20 แอด")
+      const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(priceA);
       
-      const rangeA = parsePriceRange(priceA);
-      const score = resultNumber;
-      
-      const isInRangeA = score >= rangeA.min && score <= rangeA.max;
-      
-      console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
-      console.log(`   📊 In Range A: ${isInRangeA}`);
-      
-      if (isInRangeA) {
-        // คะแนนอยู่ในช่วง → เสมอ
-        console.log(`   ⛔️ Score in range → Draw`);
+      if (isPriceRangeFormat) {
+        // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → บันทึกผลเป็นเสมอ
+        console.log(`   ⛔️ Price range format detected → Always Draw`);
         finalResultSymbol = '⛔️';
       } else {
-        // คะแนนไม่อยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
-        console.log(`   ❌ Score not in range → Side "ยั้ง" wins`);
-        finalResultSymbol = betTypeA === 'ย' ? '❌' : '✅';
+        // ดึงช่วงราคา
+        const parsePriceRange = (priceStr) => {
+          const match = priceStr.match(/(\d+)-(\d+)/);
+          if (match) {
+            return { min: parseInt(match[1]), max: parseInt(match[2]) };
+          }
+          return { min: 0, max: 999 };
+        };
+        
+        const rangeA = parsePriceRange(priceA);
+        const score = resultNumber;
+        
+        const isInRangeA = score >= rangeA.min && score <= rangeA.max;
+        
+        console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
+        console.log(`   📊 In Range A: ${isInRangeA}`);
+        
+        if (isInRangeA) {
+          // คะแนนอยู่ในช่วง → เสมอ
+          console.log(`   ⛔️ Score in range → Draw`);
+          finalResultSymbol = '⛔️';
+        } else {
+          // คะแนนไม่อยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
+          console.log(`   ❌ Score not in range → Side "ยั้ง" wins`);
+          finalResultSymbol = betTypeA === 'ย' ? '❌' : '✅';
+        }
       }
     } else {
       // ✅ ตรวจสอบการเล่นแบบเดิม (Direct Method 1 - ไม่มีราคา)
@@ -822,7 +831,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     const response = await sheets.spreadsheets.values.get({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A:N`,
+      range: `${GOOGLE_WORKSHEET_NAME}!A:U`,
     });
     
     const rows = response.data.values || [];
@@ -830,12 +839,6 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     let currentGroupName = 'Unknown Group';
     
     console.log(`📊 Total rows: ${rows.length}`);
-    if (rows.length > 0) {
-      console.log(`   Header (${rows[0].length} cols): ${JSON.stringify(rows[0])}`);
-    }
-    if (rows.length > 1) {
-      console.log(`   Row 1 (${rows[1].length} cols): ${JSON.stringify(rows[1])}`);
-    }
     
     // Get groups for this account
     const accountGroups = getGroupsForAccount(accountNumber);
@@ -853,15 +856,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
-      // Column O (index 14) = ชื่อกลุ่มแชท
-      let rowGroupName = '';
-      if (row.length > 14) {
-        rowGroupName = row[14] || '';
-      }
-      
-      if (i <= 3) {
-        console.log(`   Row ${i}: length=${row.length}, col14="${rowGroupName}"`);
-      }
+      // Column N (index 13) = ชื่อกลุ่มแชท
+      let rowGroupName = row[13] || '';
       
       // Only include bets from groups in this account (or all if no groups registered)
       if (!useAllBets && !accountGroupNames.includes(rowGroupName)) {
@@ -874,35 +870,39 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         console.log(`   ✅ Found group name: ${currentGroupName}`);
       }
       
-      // Column J (index 9) = ผลแพ้ชนะ User A
-      // Column K (index 10) = ผลแพ้ชนะ User B
-      const resultA = row[9] || '';
-      const resultB = row[10] || '';
+      // Column S (index 18) = ผลลัพธ์ A
+      // Column T (index 19) = ผลลัพธ์ B
+      const resultA = row[18] || '';
+      const resultB = row[19] || '';
       
       // Only include bets with results
       if (!resultA && !resultB) continue;
       
       bets.push({
         timestamp: row[0],
-        userA: row[1],
+        userAId: row[1],
         userAName: row[2],
         messageA: row[3],
         fireworkName: row[4],
         betTypeA: row[5],
-        amount: row[6],
+        amountA: row[6],
+        amountB: row[7],
         resultNumber: row[8],
         resultA: resultA,
         resultB: resultB,
-        userB: row[11],
+        userBId: row[10],
         userBName: row[11],
-        betTypeB: row[13],
+        betTypeB: row[12],
         groupName: rowGroupName
       });
     }
     
     if (bets.length === 0) {
+      console.log('📊 ยังไม่มีการแทงที่มีผลลัพธ์');
       return '📊 ยังไม่มีการแทงที่มีผลลัพธ์';
     }
+    
+    console.log(`✅ Found ${bets.length} bets with results`);
     
     // Group by pairs
     const pairs = {};
@@ -923,7 +923,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     summary += '═══════════════════\n\n';
     
     // Add group names if available
-    const uniqueGroups = [...new Set(bets.map(b => b.groupName))];
+    const uniqueGroups = [...new Set(bets.map(b => b.groupName).filter(g => g))];
     if (uniqueGroups.length > 0) {
       summary += `🏘️  กลุ่มแชท: ${uniqueGroups.join(', ')}\n`;
       summary += '═══════════════════\n\n';
@@ -942,7 +942,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       summary += `🎯 ${pairData.userAName} vs ${pairData.userBName}\n`;
       
       for (const bet of pairData.bets) {
-        const betAmount = parseInt(bet.amount) || 0;
+        const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
         totalAmount += betAmount;
         
         // Show bet details
@@ -1005,6 +1005,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     return summary;
   } catch (error) {
     console.error('❌ Error generating summary:', error.message);
+    console.error('   Stack:', error.stack);
     return 'เกิดข้อผิดพลาดในการสรุปยอด';
   }
 }

@@ -151,6 +151,15 @@ class BettingResultService {
       const hasPriceRange1 = bet1.price && bet1.price.includes('-');
       
       if (hasPriceRange1) {
+        // ตรวจสอบว่า bet1.price เป็นรูปแบบข้อความการเล่นแบบร้องราคา (เช่น "370-410 ย 20 แอด")
+        const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(bet1.price);
+        
+        if (isPriceRangeFormat) {
+          // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → เสมอ
+          return true;
+        }
+        
+        // ตรวจสอบตามช่วง
         const priceRange1 = bettingPairingService.constructor.parsePriceRange(bet1.price);
         const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
 
