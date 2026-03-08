@@ -424,8 +424,8 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     let finalResultSymbol = resultSymbol;
 
-    // ✅ ตรวจสอบการเล่นแบบร้องราคา (Direct Method 2)
-    if (priceA && priceB && priceA.includes('-') && priceB.includes('-')) {
+    // ✅ ตรวจสอบการเล่นแบบร้องราคา (Direct Method 2) - ตรวจสอบเฉพาะ priceA ที่มี '-'
+    if (priceA && priceA.includes('-')) {
       console.log(`   🎯 Detected price range betting (Direct Method 2)`);
       
       // ดึงช่วงราคา
