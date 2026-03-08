@@ -472,15 +472,28 @@ class BettingPairingService {
       betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
     } else if (bet1.method === 2) {
       // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
-      const priceRange = this.parsePriceRange(bet1.price);
-      const isInRange = score >= priceRange.min && score <= priceRange.max;
+      const priceRange1 = this.parsePriceRange(bet1.price);
+      const priceRange2 = this.parsePriceRange(bet2.price);
+      
+      const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
+      const isInRange2 = score >= priceRange2.min && score <= priceRange2.max;
 
-      if (isInRange) {
-        // คะแนนอยู่ในเกณฑ์ -> ฝั่ง "ไล่" (ล) ชนะ
-        winner = bet1.side === 'ไล่' ? bet1 : bet2;
-        loser = bet1.side === 'ไล่' ? bet2 : bet1;
+      // ตรวจสอบผลลัพธ์ตามราคาของแต่ละฝั่ง
+      if (isInRange1 && !isInRange2) {
+        // คะแนนอยู่ในเกณฑ์ของ bet1 เท่านั้น -> bet1 ชนะ
+        winner = bet1;
+        loser = bet2;
+      } else if (!isInRange1 && isInRange2) {
+        // คะแนนอยู่ในเกณฑ์ของ bet2 เท่านั้น -> bet2 ชนะ
+        winner = bet2;
+        loser = bet1;
+      } else if (isInRange1 && isInRange2) {
+        // คะแนนอยู่ในเกณฑ์ของทั้งสองฝั่ง -> เสมอ (ไม่มีผู้ชนะ)
+        // ให้ bet1 เป็น winner และ bet2 เป็น loser เพื่อให้ระบบรู้ว่าเป็นเสมอ
+        winner = bet1;
+        loser = bet2;
       } else {
-        // คะแนนไม่อยู่ในเกณฑ์ -> ฝั่ง "ยั้ง" (ย) ชนะ
+        // คะแนนไม่อยู่ในเกณฑ์ของทั้งสองฝั่ง -> ฝั่ง "ยั้ง" ชนะ
         winner = bet1.side === 'ยั้ง' ? bet1 : bet2;
         loser = bet1.side === 'ยั้ง' ? bet2 : bet1;
       }
