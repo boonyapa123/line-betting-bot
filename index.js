@@ -428,39 +428,51 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     if (priceA && priceA.includes('-')) {
       console.log(`   🎯 Detected price range betting (Direct Method 2)`);
       
-      // ตรวจสอบว่า priceA เป็นรูปแบบข้อความการเล่นแบบร้องราคา (เช่น "370-410 ย 20 แอด")
-      const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(priceA);
+      // ดึงช่วงราคา
+      const parsePriceRange = (priceStr) => {
+        const match = priceStr.match(/(\d+)-(\d+)/);
+        if (match) {
+          return { min: parseInt(match[1]), max: parseInt(match[2]) };
+        }
+        return { min: 0, max: 999 };
+      };
       
-      if (isPriceRangeFormat) {
-        // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → บันทึกผลเป็นเสมอ
-        console.log(`   ⛔️ Price range format detected → Always Draw`);
+      const rangeA = parsePriceRange(priceA);
+      const score = resultNumber;
+      
+      const isInRangeA = score >= rangeA.min && score <= rangeA.max;
+      
+      console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
+      console.log(`   📊 In Range A: ${isInRangeA}`);
+      
+      if (isInRangeA) {
+        // คะแนนอยู่ในช่วง → เสมอ ⛔️
+        console.log(`   ⛔️ Score in range → Draw`);
         finalResultSymbol = '⛔️';
       } else {
-        // ดึงช่วงราคา
-        const parsePriceRange = (priceStr) => {
-          const match = priceStr.match(/(\d+)-(\d+)/);
-          if (match) {
-            return { min: parseInt(match[1]), max: parseInt(match[2]) };
+        // คะแนนนอกช่วง → ตรวจสอบประเภทการเดิมพัน
+        console.log(`   📊 Score outside range → Check bet type`);
+        
+        // ตรวจสอบประเภทการเดิมพัน
+        if (betTypeA === 'ชถ' || betTypeA === 'ย' || betTypeA === 'ล') {
+          // ต่ำ: ❌ → ✅, ✅ → ❌
+          console.log(`   📋 Bet type: ${betTypeA} (ต่ำ) - Flip result`);
+          if (resultSymbol === '❌') {
+            finalResultSymbol = '✅';
+            console.log(`   🔄 ❌ → ✅`);
+          } else if (resultSymbol === '✅') {
+            finalResultSymbol = '❌';
+            console.log(`   🔄 ✅ → ❌`);
           }
-          return { min: 0, max: 999 };
-        };
-        
-        const rangeA = parsePriceRange(priceA);
-        const score = resultNumber;
-        
-        const isInRangeA = score >= rangeA.min && score <= rangeA.max;
-        
-        console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
-        console.log(`   📊 In Range A: ${isInRangeA}`);
-        
-        if (isInRangeA) {
-          // คะแนนอยู่ในช่วง → เสมอ
-          console.log(`   ⛔️ Score in range → Draw`);
-          finalResultSymbol = '⛔️';
+        } else if (betTypeA === 'ชล' || betTypeA === 'บน') {
+          // สูง: ✅ → ✅, ❌ → ❌ (ไม่เปลี่ยน)
+          console.log(`   📋 Bet type: ${betTypeA} (สูง) - Keep result`);
+          finalResultSymbol = resultSymbol;
+          console.log(`   ✅ Keep: ${resultSymbol}`);
         } else {
-          // คะแนนไม่อยู่ในช่วง → ฝั่ง "ยั้ง" ชนะ
-          console.log(`   ❌ Score not in range → Side "ยั้ง" wins`);
-          finalResultSymbol = betTypeA === 'ย' ? '❌' : '✅';
+          // ประเภทอื่น ใช้ resultSymbol ตามปกติ
+          console.log(`   📋 Bet type: ${betTypeA} (อื่น) - Use original result`);
+          finalResultSymbol = resultSymbol;
         }
       }
     } else {
@@ -856,8 +868,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
-      // Column N (index 13) = ชื่อกลุ่มแชท
-      let rowGroupName = row[13] || '';
+      // Column O (index 14) = ชื่อกลุ่ม (ตามโครงสร้างปัจจุบัน)
+      let rowGroupName = row[14] || row[13] || ''; // Try column O first, then N as fallback
       
       // Only include bets from groups in this account (or all if no groups registered)
       if (!useAllBets && !accountGroupNames.includes(rowGroupName)) {
@@ -870,14 +882,17 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         console.log(`   ✅ Found group name: ${currentGroupName}`);
       }
       
+      // Column J (index 9) = ผลแพ้ชนะ (สัญลักษณ์ ✅/❌/⛔️)
       // Column S (index 18) = ผลลัพธ์ A (ข้อความ)
       // Column T (index 19) = ผลลัพธ์ B (ข้อความ)
-      // Column J (index 9) = ผลแพ้ชนะ (สัญลักษณ์ ✅/❌/⛔️)
-      const resultA = row[9] || '';
-      const resultB = row[9] ? (row[9] === '✅' ? '❌' : row[9] === '❌' ? '✅' : '⛔️') : '';
+      const resultSymbol = row[9] || ''; // ⛔️, ✅, or ❌
       
       // Only include bets with results
-      if (!resultA && !resultB) continue;
+      if (!resultSymbol) continue;
+      
+      // Determine result for User A and User B based on symbol
+      let resultA = resultSymbol;
+      let resultB = resultSymbol === '✅' ? '❌' : resultSymbol === '❌' ? '✅' : '⛔️';
       
       bets.push({
         timestamp: row[0],
@@ -891,7 +906,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         resultNumber: row[8],
         resultA: resultA,
         resultB: resultB,
-        userBId: row[10],
+        userBId: row[17], // Column R (index 17)
         userBName: row[11],
         betTypeB: row[12],
         groupName: rowGroupName
@@ -1276,7 +1291,7 @@ function detectPair(currentMessage) {
 }
 
 // ===== GOOGLE SHEETS =====
-async function appendToGoogleSheets(pair, userAName, userBName, groupName, matchType = 'reply') {
+async function appendToGoogleSheets(pair, userAName, userBName, groupName, matchType = 'reply', accessToken = '') {
   if (!googleAuth) {
     console.log('⚠️  Google Sheets not initialized');
     console.log('   googleAuth:', googleAuth);
@@ -2409,7 +2424,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`   📝 Recording bet to Bets sheet...`);
                   
                   try {
-                    await appendToGoogleSheets(pair, userAName, userBName, groupName, 'reply');
+                    await appendToGoogleSheets(pair, userAName, userBName, groupName, 'reply', accessToken);
                     console.log(`✅ Pair recorded successfully`);
                     
                     // 📢 ส่งข้อความแจ้งเตือนเมื่อจับคู่เล่นสำเร็จ
