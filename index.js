@@ -296,21 +296,26 @@ async function getLineGroupName(groupId, accessToken) {
 
 // Get opposite bet type
 function getOppositeBetType(betType) {
+  // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
+  // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
+  
   const opposites = {
-    'ชล': 'ถอย',
-    'ถอย': 'ชล',
-    'ชถ': 'ถอย',
-    'ยั้ง': 'ล่าง',
-    'ล่าง': 'ยั้ง',
-    'บน': 'ล่าง',
+    // ต่ำ → สูง
+    'ชถ': 'ชล',
+    'ย': 'ล',
     'ล่าง': 'บน',
-    'สูง': 'ต่ำ',
-    'ต่ำ': 'สูง',
+    'ถอย': 'ชล',
+    'ต่ำ/ยั่ง': 'สูง/ไล่',
+    'ยั้ง': 'บน',
     'ถ': 'ชล',
-    'ช': 'ถอย',
-    'ย': 'ล่าง',
-    'ล': 'ยั้ง',
-    'บ': 'ล่าง',
+    
+    // สูง → ต่ำ
+    'ชล': 'ชถ',
+    'บน': 'ล่าง',
+    'สูง/ไล่': 'ต่ำ/ยั่ง',
+    'ล': 'ย',
+    'บ': 'ถ',
+    'ส': 'ถ',
   };
   return opposites[betType] || '';
 }
@@ -359,9 +364,17 @@ async function findMatchingBets(fireworkName, resultNumber) {
       // Column E (index 4) = ชื่อบั้งไฟ
       const rowFireworkName = row[4] || '';
       
-      // Check if firework name matches
-      if (rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) ||
-          fireworkName.toLowerCase().includes(rowFireworkName.toLowerCase())) {
+      // Column H (index 7) = ยอดเงิน B (ต้องมีค่า = จับคู่สำเร็จแล้ว)
+      const userBAmount = row[7] || '';
+      
+      // Column J (index 9) = ผลแพ้ชนะ (ต้องว่าง = ยังไม่มีผลลัพธ์)
+      const resultSymbol = row[9] || '';
+      
+      // Check if firework name matches AND bet is already paired AND no result yet
+      if ((rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) ||
+          fireworkName.toLowerCase().includes(rowFireworkName.toLowerCase())) &&
+          userBAmount && // มี User B = จับคู่สำเร็จแล้ว
+          !resultSymbol) { // ยังไม่มีผลลัพธ์
         matchingRows.push({
           rowIndex: i + 1,
           data: row,
@@ -454,17 +467,22 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         console.log(`   📊 Score outside range → Check bet type`);
         
         // ตรวจสอบประเภทการเดิมพัน
-        if (betTypeA === 'ชถ' || betTypeA === 'ย' || betTypeA === 'ล') {
+        // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
+        const lowBetTypes = ['ชถ', 'ย', 'ล่าง', 'ถอย', 'ต่ำ/ยั่ง', 'ยั้ง', 'ถ'];
+        // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
+        const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
+        
+        if (lowBetTypes.includes(betTypeA)) {
           // ต่ำ: ❌ → ✅, ✅ → ❌
-          console.log(`   📋 Bet type: ${betTypeA} (ต่ำ) - Flip result`);
+          console.log(`   � Bet type: ${betTypeA} (ต่ำ) - Flip result`);
           if (resultSymbol === '❌') {
             finalResultSymbol = '✅';
-            console.log(`   🔄 ❌ → ✅`);
+            console.log(`   � ❌ → ✅`);
           } else if (resultSymbol === '✅') {
             finalResultSymbol = '❌';
             console.log(`   🔄 ✅ → ❌`);
           }
-        } else if (betTypeA === 'ชล' || betTypeA === 'บน') {
+        } else if (highBetTypes.includes(betTypeA)) {
           // สูง: ✅ → ✅, ❌ → ❌ (ไม่เปลี่ยน)
           console.log(`   📋 Bet type: ${betTypeA} (สูง) - Keep result`);
           finalResultSymbol = resultSymbol;
@@ -2237,18 +2255,18 @@ app.post('/webhook', async (req, res) => {
                 
                 // ตรวจสอบว่าประเภทตรงข้ามกัน (✅ vs ❌ หรือ ต่ำ vs สูง)
                 const isOpposite = (typeA, typeB) => {
-                  const opposites = {
-                    '✅': '❌',
-                    '❌': '✅',
-                    'ต่ำ/ยั่ง': 'สูง/ไล่',
-                    'สูง/ไล่': 'ต่ำ/ยั่ง',
-                    'ถอย': 'ยั้ง',
-                    'ยั้ง': 'ถอย',
-                    'ล่าง': 'บน',
-                    'บน': 'ล่าง',
-                    'ชล': 'ชล'
-                  };
-                  return opposites[typeA] === typeB;
+                  // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
+                  // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
+                  const lowBetTypes = ['ชถ', 'ย', 'ล่าง', 'ถอย', 'ต่ำ/ยั่ง', 'ยั้ง', 'ถ'];
+                  const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
+                  
+                  const typeAIsLow = lowBetTypes.includes(typeA);
+                  const typeAIsHigh = highBetTypes.includes(typeA);
+                  const typeBIsLow = lowBetTypes.includes(typeB);
+                  const typeBIsHigh = highBetTypes.includes(typeB);
+                  
+                  // ต่ำ vs สูง = ตรงข้าม
+                  return (typeAIsLow && typeBIsHigh) || (typeAIsHigh && typeBIsLow);
                 };
                 
                 // 🎯 REPLY MATCHING: ถ้า User B ไม่ระบุประเภท ให้ถือว่า User B เล่นฝั่งตรงข้าม
@@ -2256,15 +2274,22 @@ app.post('/webhook', async (req, res) => {
                 if (!userBBetType) {
                   // ถ้า User B ไม่ระบุประเภท ให้ใช้ประเภทตรงข้ามกับ User A
                   const opposites = {
-                    '✅': '❌',
-                    '❌': '✅',
-                    'ต่ำ/ยั่ง': 'สูง/ไล่',
-                    'สูง/ไล่': 'ต่ำ/ยั่ง',
-                    'ถอย': 'ยั้ง',
-                    'ยั้ง': 'ถอย',
+                    // ต่ำ → สูง
+                    'ชถ': 'ชล',
+                    'ย': 'ล',
                     'ล่าง': 'บน',
+                    'ถอย': 'ชล',
+                    'ต่ำ/ยั่ง': 'สูง/ไล่',
+                    'ยั้ง': 'บน',
+                    'ถ': 'ชล',
+                    
+                    // สูง → ต่ำ
+                    'ชล': 'ชถ',
                     'บน': 'ล่าง',
-                    'ชล': 'ชล'
+                    'สูง/ไล่': 'ต่ำ/ยั่ง',
+                    'ล': 'ย',
+                    'บ': 'ถ',
+                    'ส': 'ถ',
                   };
                   userBBetType = opposites[betDetailsA.betType];
                   console.log(`   ℹ️  User B didn't specify bet type, assuming opposite: ${userBBetType}`);
