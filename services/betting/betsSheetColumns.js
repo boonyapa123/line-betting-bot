@@ -216,6 +216,23 @@ class BetsSheetColumns {
   }
 
   /**
+   * ดึง opposite side code
+   * @param {string} sideCode - side code ของ User A
+   * @returns {string} opposite side code
+   */
+  static getOppositeSide(sideCode) {
+    const opposites = {
+      'ต': 'ล',
+      'ล': 'ต',
+      'ย': 'ล',
+      'ส': 'ย',
+      'ชล': 'ชถ',
+      'ชถ': 'ชล',
+    };
+    return opposites[sideCode] || sideCode;
+  }
+
+  /**
    * อัปเดตแถวด้วยข้อมูล User B (เมื่อจับคู่สำเร็จ)
    * @param {array} currentRow - แถวปัจจุบัน
    * @param {object} userBData - ข้อมูล User B
@@ -228,15 +245,18 @@ class BetsSheetColumns {
     // ✅ บันทึก User B ID ที่คอลัมน์ R (index 17)
     if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
     if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
-    if (userBData.sideCode) row[this.COLUMNS.SIDE_B] = userBData.sideCode;
+    
+    // ✅ บันทึก opposite side ของ User B
+    if (userBData.sideCode) {
+      const oppositeSide = this.getOppositeSide(userBData.sideCode);
+      row[this.COLUMNS.SIDE_B] = oppositeSide;
+    }
+    
+    // ✅ บันทึก amount B
     if (userBData.amount !== undefined && userBData.amount !== null) {
       row[this.COLUMNS.AMOUNT_B] = userBData.amount;
     }
-    if (userBData.price) {
-      // สร้างข้อความ User B
-      const messageB = `${userBData.price} ${userBData.sideCode}${userBData.amount ? ' ' + userBData.amount : ''} ${userBData.slipName}`;
-      // ไม่ได้เก็บ messageB ในชีท แต่เก็บข้อมูลแยกกัน
-    }
+    
     if (userBData.groupName) row[this.COLUMNS.GROUP_NAME] = userBData.groupName;
 
     // ทำเครื่องหมาย MATCHED Auto ใน Column U
