@@ -114,21 +114,7 @@ class BettingRoundController {
     const parsedBet = BettingMessageParserService.parseMessage(message.text);
 
     if (!parsedBet.success) {
-      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
-      const errorMessage = `❌ ${displayName} พิมพ์ผิดรูปแบบ\n\n${parsedBet.error}\n\n📝 ตัวอย่างการเล่นร้องราคาที่ถูกต้อง:\n\n✅ 360-400 ล 40 แอด\n✅ 300-330 ย 50 ฟ้า\n✅ 0/3(400-420) ล 100 บั้งไฟ`;
-      
-      if (source.groupId) {
-        try {
-          const { LineNotificationService } = require('../line/lineNotificationService');
-          const groupAccountNumber = await this.getGroupAccountNumber(source.groupId);
-          const accountNumber = groupAccountNumber || 1;
-          const notificationService = new LineNotificationService(accountNumber);
-          await notificationService.sendGroupMessage(source.groupId, errorMessage);
-        } catch (notifyError) {
-          console.error(`❌ Failed to send group error message: ${notifyError.message}`);
-        }
-      }
-      
+      // ไม่ส่งข้อความแจ้งเตือนในกลุ่ม
       return {
         type: 'text',
         text: `${parsedBet.error}\n\n${parsedBet.hint}`,
