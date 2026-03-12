@@ -2276,18 +2276,20 @@ app.post('/webhook', async (req, res) => {
                 
                 // Extract bet details
                 const betDetailsA = {
+                  priceRange: extractPriceRange(pair.messageA),
                   fireworkName: extractFireworkName(pair.messageA),
                   betType: extractBetType(pair.messageA),
                   betAmount: extractBetAmount(pair.messageA)
                 };
                 
                 const betDetailsB = {
+                  priceRange: extractPriceRange(pair.messageB),
                   fireworkName: extractFireworkName(pair.messageB),
                   betType: extractBetType(pair.messageB),
                   betAmount: extractBetAmount(pair.messageB)
                 };
                 
-                console.log(`   🎯 Bet Details A: firework=${betDetailsA.fireworkName}, type=${betDetailsA.betType}, amount=${betDetailsA.betAmount}`);
+                console.log(`   🎯 Bet Details A: price=${betDetailsA.priceRange}, firework=${betDetailsA.fireworkName}, type=${betDetailsA.betType}, amount=${betDetailsA.betAmount}`);
                 console.log(`   🎯 Bet Details B: firework=${betDetailsB.fireworkName}, type=${betDetailsB.betType}, amount=${betDetailsB.betAmount}`);
                 
                 // ตรวจสอบว่า User A มีประเภทเดิมพันหรือไม่
@@ -2347,26 +2349,43 @@ app.post('/webhook', async (req, res) => {
                 console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${userBBetType}"`);
                 
                 // 🎯 REPLY MATCHING: ตรวจสอบช่วงราคาตรงกัน
-                const priceRangeA = extractPriceRange(pair.messageA);
-                const priceRangeB = extractPriceRange(pair.messageB);
+                const priceRangeA = betDetailsA.priceRange;
+                const priceRangeB = betDetailsB.priceRange;
                 
-                if (priceRangeA && priceRangeB && priceRangeA !== priceRangeB) {
+                console.log(`   Price Range A: ${priceRangeA}`);
+                console.log(`   Price Range B: ${priceRangeB}`);
+                
+                if (!priceRangeA || !priceRangeB) {
+                  console.log(`❌ Missing price range: A="${priceRangeA}" B="${priceRangeB}"`);
+                  return;
+                }
+                
+                if (priceRangeA !== priceRangeB) {
                   console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${priceRangeB}"`);
                   return;
                 }
                 
                 console.log(`✅ Price ranges match: "${priceRangeA}"`);
                 
-                // 🎯 REPLY MATCHING: ตรวจสอบชื่อบั้งไฟตรงกัน
-                const fireworkNameA = extractFireworkName(pair.messageA);
-                const fireworkNameB = extractFireworkName(pair.messageB);
+                // 🎯 REPLY MATCHING: ตรวจสอบชื่อบั้งไฟตรงกัน (ถ้ามี)
+                const fireworkNameA = betDetailsA.fireworkName;
+                const fireworkNameB = betDetailsB.fireworkName;
                 
-                if (fireworkNameA && fireworkNameB && fireworkNameA !== fireworkNameB) {
-                  console.log(`❌ Firework names don't match: "${fireworkNameA}" vs "${fireworkNameB}"`);
+                // ถ้าทั้งสองมีชื่อบั้งไฟ ต้องตรงกัน
+                if (fireworkNameA && fireworkNameB) {
+                  if (fireworkNameA !== fireworkNameB) {
+                    console.log(`❌ Firework names don't match: "${fireworkNameA}" vs "${fireworkNameB}"`);
+                    return;
+                  }
+                  console.log(`✅ Firework names match: "${fireworkNameA}"`);
+                } else if (fireworkNameA || fireworkNameB) {
+                  // ถ้าเพียงอันเดียวมีชื่อบั้งไฟ ไม่จับคู่
+                  console.log(`❌ Only one has firework name: "${fireworkNameA}" vs "${fireworkNameB}"`);
                   return;
+                } else {
+                  // ถ้าทั้งสองไม่มีชื่อบั้งไฟ ใช้ได้ (เล่นแบบร้องราคา)
+                  console.log(`✅ No firework names (price range betting)`);
                 }
-                
-                console.log(`✅ Firework names match: "${fireworkNameA}"`);
                 
                 // 🎯 REPLY MATCHING: ยึด User A เป็นหลัก ไม่ต้องตรวจชื่อบั้งไฟ
                 // ใช้ยอดเงินของ User A เป็นหลัก
