@@ -368,6 +368,8 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
     const rows = response.data.values || [];
     const matchingRows = [];
     
+    console.log(`   🔍 findMatchingBets: priceRange="${priceRange}", fireworkName="${fireworkName}"`);
+    
     // Skip header row
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -382,13 +384,23 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
       // Column J (index 9) = ผลแพ้ชนะ (ต้องว่าง = ยังไม่มีผลลัพธ์)
       const resultSymbol = row[9] || '';
       
-      // ตรวจสอบว่าช่วงราคาตรงกัน AND ชื่อบั้งไฟตรงกัน
-      const priceMatch = rowPriceAndName.startsWith(priceRange);
+      console.log(`      Row ${i + 1}: priceAndName="${rowPriceAndName}", userBAmount="${userBAmount}", resultSymbol="${resultSymbol}"`);
+      
+      // ตรวจสอบชื่อบั้งไฟ
       const nameMatch = fireworkName && rowPriceAndName.includes(fireworkName);
+      
+      // ตรวจสอบช่วงราคา (ถ้ามี)
+      let priceMatch = true;
+      if (priceRange) {
+        priceMatch = rowPriceAndName.startsWith(priceRange);
+      }
+      
+      console.log(`      nameMatch=${nameMatch}, priceMatch=${priceMatch}, hasUserB=${!!userBAmount}, noResult=${!resultSymbol}`);
       
       if (priceMatch && nameMatch &&
           userBAmount && // มี User B = จับคู่สำเร็จแล้ว
           !resultSymbol) { // ยังไม่มีผลลัพธ์
+        console.log(`      ✅ MATCH FOUND!`);
         matchingRows.push({
           rowIndex: i + 1,
           data: row,
@@ -398,6 +410,7 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
       }
     }
     
+    console.log(`   Found ${matchingRows.length} matching bet(s)`);
     return matchingRows;
   } catch (error) {
     console.error('❌ Error finding matching bets:', error.message);
