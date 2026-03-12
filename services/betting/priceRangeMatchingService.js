@@ -31,8 +31,8 @@ class PriceRangeMatchingService {
     // 3. ทั้งคู่ต้องมีราคา (Direct Method ที่มีราคา)
     if (!bet1.price || !bet2.price) return false;
 
-    // 4. ราคาสามารถต่างกันได้ (ไม่ต้องตรวจสอบว่าเท่ากัน)
-    // ระบบจะใช้ยอดเงินน้อยกว่าเป็นหลัก
+    // 4. ช่วงราคาต้องตรงกันพอดี (360-400 = 360-400)
+    if (bet1.price !== bet2.price) return false;
 
     return true;
   }
