@@ -2346,6 +2346,28 @@ app.post('/webhook', async (req, res) => {
                 
                 console.log(`✅ Bet types are opposite: "${betDetailsA.betType}" vs "${userBBetType}"`);
                 
+                // 🎯 REPLY MATCHING: ตรวจสอบช่วงราคาตรงกัน
+                const priceRangeA = extractPriceRange(pair.messageA);
+                const priceRangeB = extractPriceRange(pair.messageB);
+                
+                if (priceRangeA && priceRangeB && priceRangeA !== priceRangeB) {
+                  console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${priceRangeB}"`);
+                  return;
+                }
+                
+                console.log(`✅ Price ranges match: "${priceRangeA}"`);
+                
+                // 🎯 REPLY MATCHING: ตรวจสอบชื่อบั้งไฟตรงกัน
+                const fireworkNameA = extractFireworkName(pair.messageA);
+                const fireworkNameB = extractFireworkName(pair.messageB);
+                
+                if (fireworkNameA && fireworkNameB && fireworkNameA !== fireworkNameB) {
+                  console.log(`❌ Firework names don't match: "${fireworkNameA}" vs "${fireworkNameB}"`);
+                  return;
+                }
+                
+                console.log(`✅ Firework names match: "${fireworkNameA}"`);
+                
                 // 🎯 REPLY MATCHING: ยึด User A เป็นหลัก ไม่ต้องตรวจชื่อบั้งไฟ
                 // ใช้ยอดเงินของ User A เป็นหลัก
                 const betAmount = betDetailsA.betAmount || 0;
