@@ -329,13 +329,25 @@ function getOppositeResult(betType) {
 
 // ===== RESULT PARSER =====
 function parseResultMessage(message) {
-  // Format: "ชื่อบั้งไฟ เลขที่ออก ✅/❌/⛔️"
-  // Example: "อาจารย์อั๋น 310✅"
+  // Format: "ช่วงราคา ชื่อบั้งไฟ เลขที่ออก ✅/❌/⛔️"
+  // Example: "360-410 อาจารย์อั๋น 310✅" หรือ "อาจารย์อั๋น 310✅"
   
-  const resultMatch = message.match(/(.+?)\s+(\d+)\s*(✅|❌|⛔️)/);
+  // ลองแยกช่วงราคา (เช่น 360-410, 370-410)
+  const priceRangeMatch = message.match(/(\d+[\-\.\/\*]\d+)/);
+  let priceRange = null;
+  let messageWithoutPrice = message;
+  
+  if (priceRangeMatch) {
+    priceRange = priceRangeMatch[1];
+    messageWithoutPrice = message.replace(priceRange, '').trim();
+  }
+  
+  // แยกชื่อบั้งไฟ เลขที่ออก และผลลัพธ์
+  const resultMatch = messageWithoutPrice.match(/(.+?)\s+(\d+)\s*(✅|❌|⛔️)/);
   if (!resultMatch) return null;
   
   return {
+    priceRange: priceRange,
     fireworkName: resultMatch[1].trim(),
     resultNumber: resultMatch[2],
     result: resultMatch[3]
@@ -343,7 +355,7 @@ function parseResultMessage(message) {
 }
 
 // Find matching bets in Google Sheets
-async function findMatchingBets(fireworkName, resultNumber) {
+async function findMatchingBets(priceRange, fireworkName, resultNumber) {
   if (!googleAuth) return [];
   
   try {
@@ -361,8 +373,8 @@ async function findMatchingBets(fireworkName, resultNumber) {
       const row = rows[i];
       if (!row || row.length < 5) continue;
       
-      // Column E (index 4) = ชื่อบั้งไฟ
-      const rowFireworkName = row[4] || '';
+      // Column E (index 4) = ชื่อบั้งไฟ + ช่วงราคา
+      const rowPriceAndName = row[4] || '';
       
       // Column H (index 7) = ยอดเงิน B (ต้องมีค่า = จับคู่สำเร็จแล้ว)
       const userBAmount = row[7] || '';
@@ -370,15 +382,18 @@ async function findMatchingBets(fireworkName, resultNumber) {
       // Column J (index 9) = ผลแพ้ชนะ (ต้องว่าง = ยังไม่มีผลลัพธ์)
       const resultSymbol = row[9] || '';
       
-      // Check if firework name matches AND bet is already paired AND no result yet
-      if ((rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) ||
-          fireworkName.toLowerCase().includes(rowFireworkName.toLowerCase())) &&
+      // ตรวจสอบว่าช่วงราคาตรงกัน AND ชื่อบั้งไฟตรงกัน
+      const priceMatch = rowPriceAndName.startsWith(priceRange);
+      const nameMatch = fireworkName && rowPriceAndName.includes(fireworkName);
+      
+      if (priceMatch && nameMatch &&
           userBAmount && // มี User B = จับคู่สำเร็จแล้ว
           !resultSymbol) { // ยังไม่มีผลลัพธ์
         matchingRows.push({
           rowIndex: i + 1,
           data: row,
-          fireworkName: rowFireworkName
+          priceRange: priceRange,
+          fireworkName: fireworkName
         });
       }
     }
@@ -645,21 +660,34 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     if (groupId) {
       console.log(`   📢 Sending group notification...`);
       
-      // Determine winner and loser based on result symbol
-      let winnerName, loserName;
+      // Build detailed group message
+      let groupMessage = `📊 ประกาศผลแทง\n`;
+      groupMessage += `🎆 บั้งไฟ: ${fireworkName}\n`;
+      groupMessage += `ผลที่ออก: ${resultNumber}\n`;
+      groupMessage += `═══════════════════\n\n`;
+      
       if (finalResultSymbol === '✅') {
-        winnerName = userAName;
-        loserName = userBName;
+        groupMessage += `✅ ${userAName} ชนะ\n`;
+        groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
+        groupMessage += `   ได้รับ: ${userAWinnings.toFixed(0)} บาท\n\n`;
+        groupMessage += `❌ ${userBName} แพ้\n`;
+        groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
+        groupMessage += `   เสีย: ${Math.abs(userBWinnings).toFixed(0)} บาท\n`;
       } else if (finalResultSymbol === '❌') {
-        winnerName = userBName;
-        loserName = userAName;
+        groupMessage += `❌ ${userAName} แพ้\n`;
+        groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
+        groupMessage += `   เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n\n`;
+        groupMessage += `✅ ${userBName} ชนะ\n`;
+        groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
+        groupMessage += `   ได้รับ: ${userBWinnings.toFixed(0)} บาท\n`;
       } else {
-        // Draw: both get ⛔️
-        winnerName = userAName;
-        loserName = userBName;
+        groupMessage += `🤝 เสมอ\n`;
+        groupMessage += `${userAName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userAWinnings).toFixed(0)} บาท\n`;
+        groupMessage += `${userBName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userBWinnings).toFixed(0)} บาท\n`;
       }
       
-      const groupMessage = `${fireworkName} ${resultNumber}${winnerName}${finalResultSymbol}${loserName}${oppositeResult}`;
+      groupMessage += `═══════════════════`;
+      
       await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
   } catch (error) {
@@ -1141,7 +1169,7 @@ function extractBetType(message) {
     'ต่ำ': 'ต่ำ',
     'ถ': 'ถอย',
     'ย': 'ยั้ง',
-    'ล': 'ล่าง',
+    'ล': 'สูง/ไล่',
     'บ': 'บน',
   };
   
@@ -1153,6 +1181,19 @@ function extractBetType(message) {
   }
   
   console.log(`      ❌ No bet type found`);
+  return null;
+}
+
+function extractPriceRange(message) {
+  // แยกช่วงราคา เช่น 360-410, 370-410
+  const priceRangeMatch = message.match(/(\d+[\-\.\/\*]\d+)/);
+  if (priceRangeMatch) {
+    const priceRange = priceRangeMatch[1];
+    console.log(`      ✅ Price range: ${priceRange}`);
+    return priceRange;
+  }
+  
+  console.log(`      ❌ No price range found`);
   return null;
 }
 
@@ -1357,12 +1398,14 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
     // Extract bet details
     const betDetailsA = {
       fireworkName: extractFireworkName(pair.messageA),
+      priceRange: extractPriceRange(pair.messageA),
       betType: extractBetType(pair.messageA),
       betAmount: extractBetAmount(pair.messageA)
     };
     
     const betDetailsB = {
       fireworkName: extractFireworkName(pair.messageB),
+      priceRange: extractPriceRange(pair.messageB),
       betType: extractBetType(pair.messageB),
       betAmount: extractBetAmount(pair.messageB)
     };
@@ -1410,7 +1453,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       pair.userA,          // [1] = B: User A ID
       userAName,           // [2] = C: ชื่อ User A
       pair.messageA,       // [3] = D: ข้อความ A
-      betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
+      `${betDetailsA.priceRange || ''} ${betDetailsA.fireworkName || ''}`.trim(),  // [4] = E: ชื่อบั้งไฟ + ช่วงราคา
       betDetailsA.betType || '',       // [5] = F: รายการเล่น
       betAmount,           // [6] = G: ยอดเงิน
       betAmount,           // [7] = H: ยอดเงิน B
@@ -1472,7 +1515,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
           pair.userA,          // [1] = B: User A ID
           userAName,           // [2] = C: ชื่อ User A
           pair.messageA,       // [3] = D: ข้อความ A
-          betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
+          `${betDetailsA.priceRange || ''} ${betDetailsA.fireworkName || ''}`.trim(),  // [4] = E: ชื่อบั้งไฟ + ช่วงราคา
           betDetailsA.betType || '',       // [5] = F: รายการเล่น
           betAmount,           // [6] = G: ยอดเงิน
           betAmount,           // [7] = H: ยอดเงิน B
@@ -2184,7 +2227,7 @@ app.post('/webhook', async (req, res) => {
               }
               
               // Find matching bets (legacy)
-              const matchingBets = await findMatchingBets(resultData.fireworkName, resultData.resultNumber);
+              const matchingBets = await findMatchingBets(resultData.priceRange, resultData.fireworkName, resultData.resultNumber);
               console.log(`   Found ${matchingBets.length} matching bet(s)`);
               
               // Update each matching bet
