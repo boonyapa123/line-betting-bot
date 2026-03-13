@@ -913,11 +913,12 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     
     // Get groups for this account
     const accountGroups = getGroupsForAccount(accountNumber);
+    const accountGroupIds = accountGroups.map(g => g.id);
     const accountGroupNames = accountGroups.map(g => g.name);
     console.log(`   📍 Groups for Account ${accountNumber}: ${accountGroupNames.join(', ') || 'ไม่มีกลุ่มที่ลงทะเบียน'}`);
     
     // If no groups registered, show all bets (fallback)
-    const useAllBets = accountGroupNames.length === 0;
+    const useAllBets = accountGroupIds.length === 0;
     if (useAllBets) {
       console.log(`   ⚠️  ไม่มีกลุ่มที่ลงทะเบียน จะแสดงเบตทั้งหมด`);
     }
@@ -927,11 +928,19 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       const row = rows[i];
       if (!row || row.length < 1) continue;
       
+      // Column Q (index 16) = ID กลุ่ม (ใช้เป็น key สำหรับจับคู่)
+      const groupId = row[16] || '';
+      
       // Column O (index 14) = ชื่อกลุ่ม (ตามโครงสร้างปัจจุบัน)
       let rowGroupName = row[14] || row[13] || ''; // Try column O first, then N as fallback
       
+      // ถ้าไม่มีชื่อกลุ่ม ให้ใช้ ID กลุ่มแทน
+      if (!rowGroupName && groupId) {
+        rowGroupName = groupId;
+      }
+      
       // Only include bets from groups in this account (or all if no groups registered)
-      if (!useAllBets && !accountGroupNames.includes(rowGroupName)) {
+      if (!useAllBets && !accountGroupIds.includes(groupId) && !accountGroupNames.includes(rowGroupName)) {
         continue;
       }
       
@@ -968,7 +977,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         userBId: row[17], // Column R (index 17)
         userBName: row[11],
         betTypeB: row[12],
-        groupName: rowGroupName
+        groupName: rowGroupName,
+        groupId: groupId
       });
     }
     
