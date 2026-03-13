@@ -80,10 +80,8 @@ class BettingResultService {
     // ใช้ยอดเดิมพันที่น้อยกว่า (ยอดที่จับคู่ได้จริง)
     const winAmount = Math.min(bet1.amount || 0, bet2.amount || 0) || bet1.amount || bet2.amount || 0;
 
-    // ตรวจสอบผลลัพธ์ของการเล่นแบบร้องราคา
-    const priceRangeResult = this.checkPriceRangeResult(bet1, bet2, score);
-
-    if (priceRangeResult && priceRangeResult.isDraw) {
+    // ตรวจสอบว่า baseResult มี isDraw หรือไม่
+    if (baseResult.isDraw) {
       // ออกกลาง: หัก 5% ทั้งสองฝั่ง
       const drawFee = Math.round(winAmount * this.DRAW_FEE_PERCENTAGE);
       return {
@@ -105,40 +103,6 @@ class BettingResultService {
           grossAmount: 0,
           fee: drawFee,
           feeType: 'DRAW',
-        },
-      };
-    }
-
-    // ถ้ามีผลลัพธ์จากการเล่นแบบร้องราคา (ชนะ-แพ้)
-    if (priceRangeResult && !priceRangeResult.isDraw) {
-      const winner = priceRangeResult.winner;
-      const loser = priceRangeResult.loser;
-      const fee = Math.round(winAmount * this.FEE_PERCENTAGE);
-      const netWinAmount = winAmount - fee;
-
-      return {
-        ...baseResult,
-        pair,
-        isDraw: false,
-        winAmount,
-        fee,
-        winner: {
-          userId: winner.userId,
-          displayName: winner.displayName,
-          userBName: winner.userBName,
-          grossAmount: winAmount,
-          netAmount: netWinAmount,
-          fee,
-          feeType: 'WIN',
-        },
-        loser: {
-          userId: loser.userId,
-          displayName: loser.displayName,
-          userBName: loser.userBName,
-          grossAmount: -winAmount,
-          netAmount: -winAmount,
-          fee: 0,
-          feeType: 'LOSE',
         },
       };
     }

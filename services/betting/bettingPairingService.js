@@ -435,148 +435,125 @@ class BettingPairingService {
    * @returns {object} ผลลัพธ์
    */
   static calculateResult(pair, slipName, score) {
-    const { bet1, bet2 } = pair;
+      const { bet1, bet2 } = pair;
 
-    // REPLY Method: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
-    if (bet1.method === 'REPLY' && bet2.method === 'REPLY') {
-      // สำหรับ REPLY method ให้ bet1 ชนะ (หรือสามารถกำหนดตามกฎเกมอื่น)
-      // ในที่นี้ให้ bet1 ชนะ
-      return {
-        winner: {
-          userId: bet1.userId,
-          displayName: bet1.displayName,
-          amount: 0, // REPLY method ไม่มีจำนวนเงิน
-          result: 'WIN',
-        },
-        loser: {
-          // ✅ ใช้ userBId จาก bet1 (ดึงจาก Column R) เป็น userId
-          userId: bet1.userBId || bet2.userId,
-          // ✅ ใช้ userBName จาก bet1 (ดึงจาก Column L) เป็น displayName
-          displayName: bet1.userBName || bet2.displayName,
-          amount: 0, // REPLY method ไม่มีจำนวนเงิน
-          result: 'LOSE',
-        },
-      };
-    }
+      // REPLY Method: ทั้งสองฝั่งเป็น REPLY
+      if (bet1.method === 'REPLY' && bet2.method === 'REPLY') {
+        return {
+          winner: {
+            userId: bet1.userId,
+            displayName: bet1.displayName,
+            amount: 0,
+            result: 'WIN',
+          },
+          loser: {
+            userId: bet1.userBId || bet2.userId,
+            displayName: bet1.userBName || bet2.displayName,
+            amount: 0,
+            result: 'LOSE',
+          },
+        };
+      }
 
-    // Direct Method
-    let winner = null;
-    let loser = null;
-    let betAmount = 0; // ใช้ยอดน้อยกว่า
+      // Direct Method
+      let winner = null;
+      let loser = null;
+      let isDraw = false;
+      let betAmount = 0;
 
-    if (bet1.method === 1) {
-      // วิธีที่ 1: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
-      winner = bet1.side === 'ชล' ? bet1 : bet2;
-      loser = bet1.side === 'ชล' ? bet2 : bet1;
-      // ใช้ยอดน้อยกว่า
-      betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
-    } else if (bet1.method === 2) {
-      // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
-      const hasPriceRange1 = bet1.price && bet1.price.includes('-');
-      const hasPriceRange2 = bet2.price && bet2.price.includes('-');
-      
-      // ตรวจสอบ bet1
-      if (hasPriceRange1) {
-        const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(bet1.price);
-        
-        if (isPriceRangeFormat) {
-          // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → เสมอ
-          winner = bet1;
-          loser = bet2;
-        } else {
+      if (bet1.method === 1) {
+        // วิธีที่ 1: ไม่มีราคา ให้ผู้เล่นฝั่ง "ไล่" (ชล) ชนะ
+        winner = bet1.side === 'ชล' ? bet1 : bet2;
+        loser = bet1.side === 'ชล' ? bet2 : bet1;
+        betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
+      } else if (bet1.method === 2) {
+        // วิธีที่ 2: ตรวจสอบว่าคะแนนอยู่ในเกณฑ์ราคาหรือไม่
+        const hasPriceRange1 = bet1.price && bet1.price.includes('-');
+        const hasPriceRange2 = bet2.price && bet2.price.includes('-');
+
+        // ตรวจสอบ bet1 มีช่วงราคา
+        if (hasPriceRange1) {
           // bet1 มีช่วงราคา → ตรวจสอบตามช่วง
           const priceRange1 = this.parsePriceRange(bet1.price);
           const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
 
           if (isInRange1) {
             // คะแนนอยู่ในช่วง → เสมอ
+            isDraw = true;
             winner = bet1;
             loser = bet2;
           } else {
             // คะแนนไม่อยู่ในช่วง → ตัดสินตามผลที่ออก
             if (score < priceRange1.min) {
-              // ผลต่ำกว่าช่วง → ฝั่ง ย (ยั้ง/ต่ำ) ชนะ
-              // ถ้า bet1 เป็น ล (สูง) → bet1 แพ้, bet2 ชนะ
-              // ถ้า bet1 เป็น ย (ต่ำ) → bet1 ชนะ, bet2 แพ้
-              winner = bet1.side === 'ย' || bet1.side === 'ยั้ง' || bet1.side === 'ถ' ? bet1 : bet2;
-              loser = bet1.side === 'ย' || bet1.side === 'ยั้ง' || bet1.side === 'ถ' ? bet2 : bet1;
+              // ผลต่ำกว่าช่วง → ฝั่ง ย (ต่ำ) ชนะ
+              const isLow1 = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ';
+              winner = isLow1 ? bet2 : bet1;
+              loser = isLow1 ? bet1 : bet2;
             } else {
-              // ผลสูงกว่าช่วง → ฝั่ง ล (ไล่/สูง) ชนะ
-              // ถ้า bet1 เป็น ล (สูง) → bet1 ชนะ, bet2 แพ้
-              // ถ้า bet1 เป็น ย (ต่ำ) → bet1 แพ้, bet2 ชนะ
-              winner = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ' ? bet1 : bet2;
-              loser = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ' ? bet2 : bet1;
+              // ผลสูงกว่าช่วง → ฝั่ง ล (สูง) ชนะ
+              const isLow1 = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ';
+              winner = isLow1 ? bet1 : bet2;
+              loser = isLow1 ? bet2 : bet1;
             }
           }
-        }
-      } else if (hasPriceRange2) {
-        // ตรวจสอบ bet2 ถ้า bet1 ไม่มีช่วงราคา
-        const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(bet2.price);
-        
-        if (isPriceRangeFormat) {
-          // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → เสมอ
-          winner = bet1;
-          loser = bet2;
-        } else {
-          // bet2 มีช่วงราคา → ตรวจสอบตามช่วง
+        } else if (hasPriceRange2) {
+          // ตรวจสอบ bet2 มีช่วงราคา
           const priceRange2 = this.parsePriceRange(bet2.price);
           const isInRange2 = score >= priceRange2.min && score <= priceRange2.max;
 
           if (isInRange2) {
             // คะแนนอยู่ในช่วง → เสมอ
+            isDraw = true;
             winner = bet1;
             loser = bet2;
           } else {
             // คะแนนไม่อยู่ในช่วง → ตัดสินตามผลที่ออก
             if (score < priceRange2.min) {
-              // ผลต่ำกว่าช่วง → ฝั่ง ย (ยั้ง/ต่ำ) ชนะ
-              // ถ้า bet2 เป็น ล (สูง) → bet2 แพ้, bet1 ชนะ
-              // ถ้า bet2 เป็น ย (ต่ำ) → bet2 ชนะ, bet1 แพ้
-              winner = bet2.side === 'ย' || bet2.side === 'ยั้ง' || bet2.side === 'ถ' ? bet2 : bet1;
-              loser = bet2.side === 'ย' || bet2.side === 'ยั้ง' || bet2.side === 'ถ' ? bet1 : bet2;
+              // ผลต่ำกว่าช่วง → ฝั่ง ย (ต่ำ) ชนะ
+              const isLow2 = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ';
+              winner = isLow2 ? bet1 : bet2;
+              loser = isLow2 ? bet2 : bet1;
             } else {
-              // ผลสูงกว่าช่วง → ฝั่ง ล (ไล่/สูง) ชนะ
-              // ถ้า bet2 เป็น ล (สูง) → bet2 ชนะ, bet1 แพ้
-              // ถ้า bet2 เป็น ย (ต่ำ) → bet2 แพ้, bet1 ชนะ
-              winner = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ' ? bet2 : bet1;
-              loser = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ' ? bet1 : bet2;
+              // ผลสูงกว่าช่วง → ฝั่ง ล (สูง) ชนะ
+              const isLow2 = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ';
+              winner = isLow2 ? bet2 : bet1;
+              loser = isLow2 ? bet1 : bet2;
             }
           }
+        } else {
+          // ถ้าไม่มีช่วงราคา ให้ใช้ Direct Method 1 (ตรวจสอบ side)
+          winner = bet1.side === 'ชล' ? bet1 : bet2;
+          loser = bet1.side === 'ชล' ? bet2 : bet1;
         }
-      } else {
-        // ถ้าไม่มีช่วงราคา ให้ใช้ Direct Method 1 (ตรวจสอบ side)
-        winner = bet1.side === 'ชล' ? bet1 : bet2;
-        loser = bet1.side === 'ชล' ? bet2 : bet1;
+        betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
       }
-      // ใช้ยอดน้อยกว่า
-      betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
-    }
 
-    // ✅ ถ้า loser คือ bet2 ให้ใช้ userBId และ userBName จาก bet1
-    let loserUserId, loserDisplayName;
-    if (loser === bet2) {
-      loserUserId = bet1.userBId || bet2.userId;
-      loserDisplayName = bet1.userBName || bet2.displayName;
-    } else {
-      loserUserId = loser.userId;
-      loserDisplayName = loser.displayName;
-    }
+      // ✅ ถ้า loser คือ bet2 ให้ใช้ userBId และ userBName จาก bet1
+      let loserUserId, loserDisplayName;
+      if (loser === bet2) {
+        loserUserId = bet1.userBId || bet2.userId;
+        loserDisplayName = bet1.userBName || bet2.displayName;
+      } else {
+        loserUserId = loser.userId;
+        loserDisplayName = loser.displayName;
+      }
 
-    return {
-      winner: {
-        userId: winner.userId,
-        displayName: winner.displayName,
-        amount: betAmount,
-        result: 'WIN',
-      },
-      loser: {
-        userId: loserUserId,
-        displayName: loserDisplayName,
-        amount: betAmount,
-        result: 'LOSE',
-      },
-    };
-  }
+      return {
+        isDraw,
+        winner: {
+          userId: winner.userId,
+          displayName: winner.displayName,
+          amount: betAmount,
+          result: isDraw ? 'DRAW' : 'WIN',
+        },
+        loser: {
+          userId: loserUserId,
+          displayName: loserDisplayName,
+          amount: betAmount,
+          result: isDraw ? 'DRAW' : 'LOSE',
+        },
+      };
+    }
 
   /**
    * Parse ราคาจากรูปแบบ "0/3(300-330)"
