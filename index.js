@@ -2256,11 +2256,12 @@ app.post('/webhook', async (req, res) => {
               console.log(`🎯 Using bettingRoundController for message processing`);
               
               let isHandledByController = false;
+              let controllerResult = null;
               try {
                 const bettingRoundController = require('./services/betting/bettingRoundController');
                 
                 // เตรียมข้อมูลสำหรับ bettingRoundController
-                const result = await bettingRoundController.handleMessage({
+                controllerResult = await bettingRoundController.handleMessage({
                   message: {
                     text: message.content,
                     quotedMessageId: message.quotedMessageId
@@ -2273,12 +2274,44 @@ app.post('/webhook', async (req, res) => {
                 });
                 
                 console.log(`✅ bettingRoundController processed successfully`);
-                console.log(`   Result:`, result);
+                console.log(`   Result:`, controllerResult);
                 
-                // ถ้า bettingRoundController จัดการการจับคู่แล้ว ให้ข้ามการบันทึกซ้ำ
-                if (result && result.text && result.text.includes('จับคู่เล่นสำเร็จ')) {
+                // ส่งข้อความตอบกลับให้ผู้ใช้
+                if (controllerResult && controllerResult.text) {
+                  console.log(`   📤 Sending reply message to user`);
+                  await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
+                  console.log(`   ✅ Reply sent`);
+                }
+                
+                // ถ้า bettingRoundController จัดการการจับคู่แล้ว ให้ส่งข้อความเข้ากลุ่มและแจ้งผู้เล่น A ด้วย
+                if (controllerResult && controllerResult.text && controllerResult.text.includes('จับคู่เล่นสำเร็จ')) {
                   isHandledByController = true;
-                  console.log(`✅ Pair already handled by bettingRoundController - skipping duplicate recording`);
+                  console.log(`✅ Pair matched - sending notifications to both players and group`);
+                  
+                  // ดึงข้อมูลผู้เล่น A จากแถวที่เพิ่งอัปเดต
+                  try {
+                    const bettingPairingService = require('./services/betting/bettingPairingService');
+                    const groupBets = await bettingPairingService.getBetsByGroupId(message.groupId || '');
+                    
+                    // ค้นหาแถวที่เพิ่งอัปเดต (มี User B แล้ว)
+                    const latestBet = groupBets.find(bet => bet.userBId && bet.userBId !== '');
+                    
+                    if (latestBet && latestBet.userId) {
+                      console.log(`   📤 Sending notification to Player A: ${latestBet.displayName}`);
+                      await sendLineMessageToUser(latestBet.userId, controllerResult.text, accessToken);
+                      console.log(`   ✅ Player A notification sent`);
+                    }
+                  } catch (playerAError) {
+                    console.error(`   ⚠️  Failed to send notification to Player A: ${playerAError.message}`);
+                  }
+                  
+                  // ส่งข้อความเข้ากลุ่มเพื่อแจ้งการจับคู่สำเร็จ
+                  if (message.sourceType === 'group') {
+                    const groupNotification = `📢 ${controllerResult.text}`;
+                    console.log(`   📢 Sending group notification`);
+                    await sendLineMessage(message.groupId, groupNotification, accessToken);
+                    console.log(`   ✅ Group notification sent`);
+                  }
                 }
                 
               } catch (controllerError) {
