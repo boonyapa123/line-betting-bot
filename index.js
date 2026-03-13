@@ -454,171 +454,99 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       return;
     }
 
-    // 🔍 ตรวจสอบรายการเล่น (Column F) และปรับผลแพ้ชนะตามเงื่อนไข
-    const betTypeA = row[5] || '';
+    // ใช้ bettingResultService เพื่อคำนวณผลลัพธ์
+    const bettingResultService = require('./services/betting/bettingResultService');
+
     const priceA = row[3] || ''; // Column D: ข้อความ A (มีราคา)
     const priceB = row[12] || ''; // Column M: รายการแทง B (มีราคา)
-    
-    console.log(`   📋 Bet Type A (Column F): ${betTypeA}`);
+
     console.log(`   📋 Price A (Column D): ${priceA}`);
-    console.log(`   � Price B (Column M): ${priceB}`);
+    console.log(`   📋 Price B (Column M): ${priceB}`);
 
-    let finalResultSymbol = resultSymbol;
+    // สร้าง pair object สำหรับ bettingResultService
+    const pair = {
+      bet1: {
+        userId: userAId,
+        displayName: userAName,
+        userBName: userBName,
+        amount: betAmount,
+        price: priceA,
+        method: priceA && priceA.includes('-') ? 2 : 1,
+      },
+      bet2: {
+        userId: userBId,
+        displayName: userBName,
+        userBName: userAName,
+        amount: betAmount,
+        price: priceB,
+        method: priceB && priceB.includes('-') ? 2 : 1,
+      },
+    };
 
-    // ✅ ตรวจสอบการเล่นแบบร้องราคา (Direct Method 2) - ตรวจสอบเฉพาะ priceA
-    if (priceA && priceA.includes('-')) {
-      console.log(`   🎯 Detected price range betting (Direct Method 2)`);
-      
-      // ดึงช่วงราคา
-      const parsePriceRange = (priceStr) => {
-        const match = priceStr.match(/(\d+)-(\d+)/);
-        if (match) {
-          return { min: parseInt(match[1]), max: parseInt(match[2]) };
-        }
-        return { min: 0, max: 999 };
-      };
-      
-      const rangeA = parsePriceRange(priceA);
-      const score = resultNumber;
-      
-      const isInRangeA = score >= rangeA.min && score <= rangeA.max;
-      
-      console.log(`   📊 Score: ${score}, Range A: ${rangeA.min}-${rangeA.max}`);
-      console.log(`   📊 In Range A: ${isInRangeA}`);
-      
-      if (isInRangeA) {
-        // คะแนนอยู่ในช่วง → เสมอ ⛔️
-        console.log(`   ⛔️ Score in range → Draw`);
-        finalResultSymbol = '⛔️';
-      } else {
-        // คะแนนนอกช่วง → ตรวจสอบประเภทการเดิมพัน
-        console.log(`   📊 Score outside range → Determine winner by score position`);
-        
-        // ตรวจสอบประเภทการเดิมพัน
-        // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
-        const lowBetTypes = ['ชถ', 'ย', 'ล่าง', 'ถอย', 'ต่ำ/ยั่ง', 'ยั้ง', 'ถ'];
-        // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
-        const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
-        
-        if (lowBetTypes.includes(betTypeA)) {
-          // ต่ำ (ย/ยั้ง): ตัดสินตามผลที่ออก
-          if (score < rangeA.min) {
-            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ ✅
-            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side (${betTypeA}) wins`);
-            finalResultSymbol = '✅';
-            console.log(`   ✅ Low bet type (${betTypeA}) wins`);
-          } else {
-            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ, ย แพ้ ❌
-            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins, Low side (${betTypeA}) loses`);
-            finalResultSymbol = '❌';
-            console.log(`   ❌ Low bet type (${betTypeA}) loses`);
-          }
-        } else if (highBetTypes.includes(betTypeA)) {
-          // สูง (ล/ไล่): ตัดสินตามผลที่ออก
-          if (score < rangeA.min) {
-            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ, ล แพ้ ❌
-            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins, High side (${betTypeA}) loses`);
-            finalResultSymbol = '❌';
-            console.log(`   ❌ High bet type (${betTypeA}) loses`);
-          } else {
-            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ ✅
-            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side (${betTypeA}) wins`);
-            finalResultSymbol = '✅';
-            console.log(`   ✅ High bet type (${betTypeA}) wins`);
-          }
-        } else {
-          // ประเภทอื่น ใช้ resultSymbol ตามปกติ
-          console.log(`   📋 Bet type: ${betTypeA} (อื่น) - Use original result`);
-          finalResultSymbol = resultSymbol;
-        }
-      }
+    // คำนวณผลลัพธ์ด้วย bettingResultService
+    const result = bettingResultService.calculateResultWithFees(pair, fireworkName, resultNumber);
+
+    console.log(`   📊 Result calculated:`, {
+      isDraw: result.isDraw,
+      winner: result.winner.displayName,
+      loser: result.loser.displayName,
+    });
+
+    // กำหนด finalResultSymbol ตามผลลัพธ์
+    let finalResultSymbol = result.isDraw ? '⛔️' : '✅';
+    let userAResultText = '';
+    let userBResultText = '';
+
+    if (result.isDraw) {
+      userAResultText = '⛔️';
+      userBResultText = '⛔️';
     } else {
-      // ✅ ตรวจสอบการเล่นแบบเดิม (Direct Method 1 - ไม่มีราคา)
-      console.log(`   🎯 Detected traditional betting (Direct Method 1)`);
-      
-      if (resultSymbol === '❌' && (betTypeA === 'ชถ' || betTypeA === 'ย')) {
-        console.log(`   🔄 Adjusting result: ❌️ + ${betTypeA} → ✅️`);
+      // ตรวจสอบว่า User A ชนะหรือแพ้
+      if (result.winner.userId === userAId) {
+        userAResultText = '✅';
+        userBResultText = '❌';
         finalResultSymbol = '✅';
-      } else if (resultSymbol === '✅' && (betTypeA === 'ชล' || betTypeA === 'ล')) {
-        console.log(`   ✅ Result confirmed: ✅️ + ${betTypeA} → ✅️`);
-        finalResultSymbol = '✅';
-      } else if (resultSymbol === '✅' && (betTypeA === 'ชถ' || betTypeA === 'ย')) {
-        console.log(`   🔄 Adjusting result: ✅️ + ${betTypeA} → ❌️`);
-        finalResultSymbol = '❌';
-      } else if (resultSymbol === '❌' && (betTypeA === 'ชล' || betTypeA === 'ล')) {
-        console.log(`   ✅ Result confirmed: ❌️ + ${betTypeA} → ❌️`);
+      } else {
+        userAResultText = '❌';
+        userBResultText = '✅';
         finalResultSymbol = '❌';
       }
     }
 
     console.log(`   📊 Final Result Symbol: ${finalResultSymbol}`);
 
-    // Get opposite result for User B
-    const getOppositeResultSymbol = (symbol) => {
-      if (symbol === '✅') return '❌';
-      if (symbol === '❌') return '✅';
-      return '⛔️'; // เสมอ
-    };
-    
-    const oppositeResult = getOppositeResultSymbol(finalResultSymbol);
-
-    // 💰 คำนวนแพ้ชนะและอัปเดตยอดเงิน
+    // 💰 คำนวนแพ้ชนะ
     console.log(`   💰 Calculating winnings and updating balances...`);
 
     let userAWinnings = 0;
     let userBWinnings = 0;
 
-    if (finalResultSymbol === '✅') {
-      const commission = betAmount * 0.1;
-      userAWinnings = betAmount - commission;
-      userBWinnings = -betAmount;
-    } else if (finalResultSymbol === '❌') {
-      const commission = betAmount * 0.1;
-      userAWinnings = -betAmount;
-      userBWinnings = betAmount - commission;
-    } else if (finalResultSymbol === '⛔️') {
+    if (result.isDraw) {
       // เสมอ: หัก 5% ทั้งสองฝั่ง
-      const commission = betAmount * 0.05;
-      userAWinnings = -commission;
-      userBWinnings = -commission;
+      userAWinnings = -result.winner.fee;
+      userBWinnings = -result.loser.fee;
+    } else {
+      // ชนะ-แพ้
+      if (result.winner.userId === userAId) {
+        userAWinnings = result.winner.netAmount;
+        userBWinnings = result.loser.netAmount;
+      } else {
+        userAWinnings = result.loser.netAmount;
+        userBWinnings = result.winner.netAmount;
+      }
     }
 
-    // ดึงข้อมูลแถวเต็ม
-    const fullRowResponse = await sheets.spreadsheets.values.get({
-      auth: googleAuth,
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
-    });
+    // อัปเดตผลลัพธ์ในชีท
+    // I=ผลที่ออก, J=ผลแพ้ชนะ A, K=ผลแพ้ชนะ B, S=ผลลัพธ์ A, T=ผลลัพธ์ B
 
-    const fullRow = fullRowResponse.data.values?.[0] || [];
-
-    // สร้างข้อความผลลัพธ์ที่ถูกต้อง
-    let userAResultText = '';
-    let userBResultText = '';
-
-    if (finalResultSymbol === '✅') {
-      userAResultText = '✅';
-      userBResultText = '❌';
-    } else if (finalResultSymbol === '❌') {
-      userAResultText = '❌';
-      userBResultText = '✅';
-    } else if (finalResultSymbol === '⛔️') {
-      userAResultText = '⛔️';
-      userBResultText = '⛔️';
-    }
-
-    // อัปเดตผลลัพธ์ในชีท (Column I-U)
-    // I=ผลที่ออก, J=ผลแพ้ชนะ, K=Opposite (ผิด), L-R=ข้อมูลอื่น, S=ผลลัพธ์A, T=ผลลัพธ์B, U=สถานะ
-    // ต้องอัปเดตแยกเพราะ Column K ผิด
-    
-    // อัปเดต Column I-J (ผลที่ออก, ผลแพ้ชนะ)
+    // อัปเดต Column I-K (ผลที่ออก, ผลแพ้ชนะ A, ผลแพ้ชนะ B)
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:J${rowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:K${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[resultNumber, finalResultSymbol]],
+        values: [[resultNumber, userAResultText, userBResultText]],
       },
     });
 
@@ -633,7 +561,12 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       },
     });
 
-    console.log(`   ✅ Updated row ${rowIndex}: ${resultNumber} | User A: ${finalResultSymbol} | User B: ${oppositeResult}`);
+    console.log(`   ✅ Updated row ${rowIndex}:`);
+    console.log(`      Column I: ${resultNumber}`);
+    console.log(`      Column J: ${userAResultText}`);
+    console.log(`      Column K: ${userBResultText}`);
+    console.log(`      Column S: ${userAResultText}`);
+    console.log(`      Column T: ${userBResultText}`);
 
     // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
@@ -700,13 +633,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     if (groupId) {
       console.log(`   📢 Sending group notification...`);
-      
+
       // Build detailed group message
       let groupMessage = `📊 ประกาศผลแทง\n`;
       groupMessage += `🎆 บั้งไฟ: ${fireworkName}\n`;
       groupMessage += `ผลที่ออก: ${resultNumber}\n`;
       groupMessage += `═══════════════════\n\n`;
-      
+
       if (finalResultSymbol === '✅') {
         groupMessage += `✅ ${userAName} ชนะ\n`;
         groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
@@ -726,9 +659,9 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         groupMessage += `${userAName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userAWinnings).toFixed(0)} บาท\n`;
         groupMessage += `${userBName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userBWinnings).toFixed(0)} บาท\n`;
       }
-      
+
       groupMessage += `═══════════════════`;
-      
+
       await sendLineMessageToGroup(groupId, groupMessage, userAToken);
     }
   } catch (error) {

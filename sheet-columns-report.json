@@ -1,0 +1,238 @@
+{
+  "headers": [
+    {
+      "column": "A1",
+      "index": 1,
+      "name": "Timestamp"
+    },
+    {
+      "column": "B2",
+      "index": 2,
+      "name": "User A ID"
+    },
+    {
+      "column": "C3",
+      "index": 3,
+      "name": "ชื่อ User A"
+    },
+    {
+      "column": "D4",
+      "index": 4,
+      "name": "ข้อความ A"
+    },
+    {
+      "column": "E5",
+      "index": 5,
+      "name": "ชื่อบั้งไฟ"
+    },
+    {
+      "column": "F6",
+      "index": 6,
+      "name": "รายการเล่น"
+    },
+    {
+      "column": "G7",
+      "index": 7,
+      "name": "ยอดเงิน"
+    },
+    {
+      "column": "H8",
+      "index": 8,
+      "name": "ยอดเงิน B"
+    },
+    {
+      "column": "I9",
+      "index": 9,
+      "name": "ผลที่ออก"
+    },
+    {
+      "column": "J10",
+      "index": 10,
+      "name": "ผลแพ้ชนะ"
+    },
+    {
+      "column": "K11",
+      "index": 11,
+      "name": "User B ID"
+    },
+    {
+      "column": "L12",
+      "index": 12,
+      "name": "ชื่อ User B"
+    },
+    {
+      "column": "M13",
+      "index": 13,
+      "name": "รายการแทง"
+    },
+    {
+      "column": "N14",
+      "index": 14,
+      "name": "ชื่อกลุ่มแชท"
+    },
+    {
+      "column": "O15",
+      "index": 15,
+      "name": "ชื่อกลุ่มแชท"
+    },
+    {
+      "column": "P16",
+      "index": 16,
+      "name": "Token A"
+    },
+    {
+      "column": "Q17",
+      "index": 17,
+      "name": "ID กลุ่ม"
+    },
+    {
+      "column": "R18",
+      "index": 18,
+      "name": "User B ID"
+    },
+    {
+      "column": "S19",
+      "index": 19,
+      "name": "ผลลัพธ์ A"
+    },
+    {
+      "column": "T20",
+      "index": 20,
+      "name": "ผลลัพธ์ B"
+    },
+    {
+      "column": "U21",
+      "index": 21,
+      "name": "สถานะคู่"
+    }
+  ],
+  "resultColumns": [
+    {
+      "column": "I9",
+      "index": 9,
+      "name": "ผลที่ออก",
+      "currentHeader": "ผลที่ออก",
+      "currentValue": "(ว่าง)"
+    },
+    {
+      "column": "J10",
+      "index": 10,
+      "name": "ผลแพ้ชนะ A",
+      "currentHeader": "ผลแพ้ชนะ",
+      "currentValue": "(ว่าง)"
+    },
+    {
+      "column": "K11",
+      "index": 11,
+      "name": "ผลแพ้ชนะ B (Opposite)",
+      "currentHeader": "User B ID",
+      "currentValue": "(ว่าง)"
+    },
+    {
+      "column": "S19",
+      "index": 19,
+      "name": "ผลลัพธ์ A",
+      "currentHeader": "ผลลัพธ์ A",
+      "currentValue": "(ว่าง)"
+    },
+    {
+      "column": "T20",
+      "index": 20,
+      "name": "ผลลัพธ์ B",
+      "currentHeader": "ผลลัพธ์ B",
+      "currentValue": "(ว่าง)"
+    }
+  ],
+  "sampleRow": [
+    {
+      "column": "A1",
+      "index": 1,
+      "value": "13/03/2569 16:53:31"
+    },
+    {
+      "column": "B2",
+      "index": 2,
+      "value": "Ua01232445a58162e1518b510fcaf01b5"
+    },
+    {
+      "column": "C3",
+      "index": 3,
+      "value": "paa\"BOY\""
+    },
+    {
+      "column": "D4",
+      "index": 4,
+      "value": "ชล 100 ฟ้า"
+    },
+    {
+      "column": "E5",
+      "index": 5,
+      "value": "ฟ้า"
+    },
+    {
+      "column": "F6",
+      "index": 6,
+      "value": "ชล"
+    },
+    {
+      "column": "G7",
+      "index": 7,
+      "value": "100"
+    },
+    {
+      "column": "H8",
+      "index": 8,
+      "value": "100"
+    },
+    {
+      "column": "I9",
+      "index": 9,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "J10",
+      "index": 10,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "K11",
+      "index": 11,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "L12",
+      "index": 12,
+      "value": "💓Noon💓"
+    },
+    {
+      "column": "M13",
+      "index": 13,
+      "value": "ชล"
+    },
+    {
+      "column": "N14",
+      "index": 14,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "O15",
+      "index": 15,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "P16",
+      "index": 16,
+      "value": "(ว่าง)"
+    },
+    {
+      "column": "Q17",
+      "index": 17,
+      "value": "C4e522277480703e5eddbf658666ba6a9"
+    },
+    {
+      "column": "R18",
+      "index": 18,
+      "value": "Uc2a009fe53d51946657363bdbb7d1374"
+    }
+  ]
+}

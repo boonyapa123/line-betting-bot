@@ -77,17 +77,18 @@ class BettingResultService {
     );
 
     const { bet1, bet2 } = pair;
-    const winAmount = bet1.amount || bet2.amount || 0;
+    // ใช้ยอดเดิมพันที่น้อยกว่า (ยอดที่จับคู่ได้จริง)
+    const winAmount = Math.min(bet1.amount || 0, bet2.amount || 0) || bet1.amount || bet2.amount || 0;
 
-    // ตรวจสอบว่าเป็นการออกกลาง (draw) หรือไม่
-    const isDraw = this.isDrawResult(bet1, bet2, score);
+    // ตรวจสอบผลลัพธ์ของการเล่นแบบร้องราคา
+    const priceRangeResult = this.checkPriceRangeResult(bet1, bet2, score);
 
-    if (isDraw) {
+    if (priceRangeResult && priceRangeResult.isDraw) {
       // ออกกลาง: หัก 5% ทั้งสองฝั่ง
       const drawFee = Math.round(winAmount * this.DRAW_FEE_PERCENTAGE);
       return {
         ...baseResult,
-        pair, // ✅ เพิ่ม pair property
+        pair,
         isDraw: true,
         winAmount,
         drawFee,
@@ -108,13 +109,47 @@ class BettingResultService {
       };
     }
 
-    // ชนะ-แพ้: หัก 10% จากยอดเล่น
+    // ถ้ามีผลลัพธ์จากการเล่นแบบร้องราคา (ชนะ-แพ้)
+    if (priceRangeResult && !priceRangeResult.isDraw) {
+      const winner = priceRangeResult.winner;
+      const loser = priceRangeResult.loser;
+      const fee = Math.round(winAmount * this.FEE_PERCENTAGE);
+      const netWinAmount = winAmount - fee;
+
+      return {
+        ...baseResult,
+        pair,
+        isDraw: false,
+        winAmount,
+        fee,
+        winner: {
+          userId: winner.userId,
+          displayName: winner.displayName,
+          userBName: winner.userBName,
+          grossAmount: winAmount,
+          netAmount: netWinAmount,
+          fee,
+          feeType: 'WIN',
+        },
+        loser: {
+          userId: loser.userId,
+          displayName: loser.displayName,
+          userBName: loser.userBName,
+          grossAmount: -winAmount,
+          netAmount: -winAmount,
+          fee: 0,
+          feeType: 'LOSE',
+        },
+      };
+    }
+
+    // ชนะ-แพ้ปกติ: หัก 10% จากยอดเล่น
     const fee = Math.round(winAmount * this.FEE_PERCENTAGE);
     const netWinAmount = winAmount - fee;
 
     return {
       ...baseResult,
-      pair, // ✅ เพิ่ม pair property
+      pair,
       isDraw: false,
       winAmount,
       fee,
@@ -136,6 +171,122 @@ class BettingResultService {
   }
 
   /**
+   * ตรวจสอบผลลัพธ์ของการเล่นแบบร้องราคา
+   * @private
+   * @returns {object} { isDraw, winner, loser } หรือ null ถ้าไม่ใช่ร้องราคา
+   */
+  checkPriceRangeResult(bet1, bet2, score) {
+    // ตรวจสอบว่าเป็นการเล่นแบบร้องราคาหรือไม่
+    const hasPriceRange1 = bet1.price && bet1.price.includes('-');
+    const hasPriceRange2 = bet2.price && bet2.price.includes('-');
+
+    // ถ้าไม่มีช่วงราคาเลย ให้ return null
+    if (!hasPriceRange1 && !hasPriceRange2) {
+      return null;
+    }
+
+    // ถ้าทั้งสองฝั่งมีช่วงราคา
+    if (hasPriceRange1 && hasPriceRange2) {
+      const priceRange1 = bettingPairingService.constructor.parsePriceRange(bet1.price);
+      const priceRange2 = bettingPairingService.constructor.parsePriceRange(bet2.price);
+
+      // ตรวจสอบว่าคะแนนอยู่ในช่วงไหน
+      const inRange1 = score >= priceRange1.min && score <= priceRange1.max;
+      const inRange2 = score >= priceRange2.min && score <= priceRange2.max;
+
+      // ถ้าอยู่ในช่วงทั้งสองฝั่ง → เสมอ
+      if (inRange1 && inRange2) {
+        return { isDraw: true, winner: null, loser: null };
+      }
+
+      // ถ้าอยู่ในช่วง bet1 เท่านั้น
+      if (inRange1 && !inRange2) {
+        return { isDraw: false, winner: bet1, loser: bet2 };
+      }
+
+      // ถ้าอยู่ในช่วง bet2 เท่านั้น
+      if (!inRange1 && inRange2) {
+        return { isDraw: false, winner: bet2, loser: bet1 };
+      }
+
+      // ถ้าไม่อยู่ในช่วงใดเลย → ตรวจสอบตามกฎ ย/ล
+      // ถ้า bet1 เป็น ย (ต่ำ) และคะแนนต่ำกว่าช่วง → bet1 ชนะ
+      const isYang1 = /\s+ย\s+/.test(bet1.price);
+      if (isYang1 && score < priceRange1.min) {
+        return { isDraw: false, winner: bet1, loser: bet2 };
+      }
+
+      // ถ้า bet1 เป็น ล (สูง) และคะแนนสูงกว่าช่วง → bet1 ชนะ
+      const isLow1 = /\s+ล\s+/.test(bet1.price);
+      if (isLow1 && score > priceRange1.max) {
+        return { isDraw: false, winner: bet1, loser: bet2 };
+      }
+
+      // ถ้า bet2 เป็น ย (ต่ำ) และคะแนนต่ำกว่าช่วง → bet2 ชนะ
+      const isYang2 = /\s+ย\s+/.test(bet2.price);
+      if (isYang2 && score < priceRange2.min) {
+        return { isDraw: false, winner: bet2, loser: bet1 };
+      }
+
+      // ถ้า bet2 เป็น ล (สูง) และคะแนนสูงกว่าช่วง → bet2 ชนะ
+      const isLow2 = /\s+ล\s+/.test(bet2.price);
+      if (isLow2 && score > priceRange2.max) {
+        return { isDraw: false, winner: bet2, loser: bet1 };
+      }
+    }
+
+    // ถ้าเฉพาะ bet1 มีช่วงราคา (bet2 เป็น reply)
+    if (hasPriceRange1 && !hasPriceRange2) {
+      const priceRange1 = bettingPairingService.constructor.parsePriceRange(bet1.price);
+      const inRange1 = score >= priceRange1.min && score <= priceRange1.max;
+
+      if (inRange1) {
+        // ผลออกในช่วง → เสมอ
+        return { isDraw: true, winner: null, loser: null };
+      }
+
+      // ผลออกนอกช่วง → ตรวจสอบตามกฎ ย/ล
+      const isYang1 = /\s+ย\s+/.test(bet1.price);
+      if (isYang1 && score < priceRange1.min) {
+        // ผลต่ำกว่าช่วง + ฝ่าย ย → bet1 ชนะ
+        return { isDraw: false, winner: bet1, loser: bet2 };
+      }
+
+      const isLow1 = /\s+ล\s+/.test(bet1.price);
+      if (isLow1 && score > priceRange1.max) {
+        // ผลสูงกว่าช่วง + ฝ่าย ล → bet1 ชนะ
+        return { isDraw: false, winner: bet1, loser: bet2 };
+      }
+    }
+
+    // ถ้าเฉพาะ bet2 มีช่วงราคา (bet1 เป็น reply)
+    if (!hasPriceRange1 && hasPriceRange2) {
+      const priceRange2 = bettingPairingService.constructor.parsePriceRange(bet2.price);
+      const inRange2 = score >= priceRange2.min && score <= priceRange2.max;
+
+      if (inRange2) {
+        // ผลออกในช่วง → เสมอ
+        return { isDraw: true, winner: null, loser: null };
+      }
+
+      // ผลออกนอกช่วง → ตรวจสอบตามกฎ ย/ล
+      const isYang2 = /\s+ย\s+/.test(bet2.price);
+      if (isYang2 && score < priceRange2.min) {
+        // ผลต่ำกว่าช่วง + ฝ่าย ย → bet2 ชนะ
+        return { isDraw: false, winner: bet2, loser: bet1 };
+      }
+
+      const isLow2 = /\s+ล\s+/.test(bet2.price);
+      if (isLow2 && score > priceRange2.max) {
+        // ผลสูงกว่าช่วง + ฝ่าย ล → bet2 ชนะ
+        return { isDraw: false, winner: bet2, loser: bet1 };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * ตรวจสอบว่าเป็นการออกกลาง (draw) หรือไม่
    * @private
    */
@@ -147,24 +298,9 @@ class BettingResultService {
 
     // ถ้าเป็น Direct Method ตรวจสอบตามกฎเกม
     if (bet1.method === 2 && bet2.method === 2) {
-      // ตรวจสอบเฉพาะ bet1.price ที่มี '-' (ช่วงราคา)
-      const hasPriceRange1 = bet1.price && bet1.price.includes('-');
-      
-      if (hasPriceRange1) {
-        // ตรวจสอบว่า bet1.price เป็นรูปแบบข้อความการเล่นแบบร้องราคา (เช่น "370-410 ย 20 แอด")
-        const isPriceRangeFormat = /\d+-\d+\s+[ยลชถ]/.test(bet1.price);
-        
-        if (isPriceRangeFormat) {
-          // เป็นรูปแบบข้อความการเล่นแบบร้องราคา → เสมอ
-          return true;
-        }
-        
-        // ตรวจสอบตามช่วง
-        const priceRange1 = bettingPairingService.constructor.parsePriceRange(bet1.price);
-        const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
-
-        // ถ้าคะแนนอยู่ในช่วง ให้ถือว่าออกกลาง
-        return isInRange1;
+      const priceRangeResult = this.checkPriceRangeResult(bet1, bet2, score);
+      if (priceRangeResult) {
+        return priceRangeResult.isDraw;
       }
     }
 
