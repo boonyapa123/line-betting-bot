@@ -335,7 +335,8 @@ class BettingResultService {
       });
 
       // Column R: User ID B
-      const userBId = bet1.userBId || bet2.userId;
+      // ✅ ใช้ bet2.userId เพราะ bet2 คือ User B ที่มี userId ที่ถูกต้อง
+      const userBId = bet2.userId;
       updates.push({
         range: `${this.betsSheetName}!R${matchedRowIndex}`,
         values: [[userBId]],

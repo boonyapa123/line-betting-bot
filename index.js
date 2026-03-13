@@ -447,7 +447,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[10] || '';  // ✅ Column K (index 10) = User B ID
+    const userBId = row[17] || '';  // ✅ Column R (index 17) = User B ID
     const userBName = row[11] || '';
     const betAmountA = parseFloat(row[6]) || 0;
     const betAmountB = parseFloat(row[7]) || 0;
@@ -691,7 +691,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         groupMessage += `   เดิมพัน: ${betAmount} บาท\n`;
         groupMessage += `   ได้รับ: ${userBWinnings.toFixed(0)} บาท\n`;
       } else {
-        groupMessage += `🤝 เสมอ\n`;
+        groupMessage += `⛔️ เสมอ\n`;
         groupMessage += `${userAName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userAWinnings).toFixed(0)} บาท\n`;
         groupMessage += `${userBName}: เดิมพัน ${betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userBWinnings).toFixed(0)} บาท\n`;
       }
