@@ -372,6 +372,8 @@ class BettingRoundController {
         };
       }
 
+      console.log(`📊 Parsed bet:`, JSON.stringify(parsedBet, null, 2));
+
       // ตรวจสอบความถูกต้อง
       const validation = BettingMessageParserService.validateBet(parsedBet);
       if (!validation.valid) {
@@ -468,14 +470,18 @@ class BettingRoundController {
           console.error(`❌ Failed to update row: ${updateResult.message}`);
           // ถ้าอัปเดตไม่สำเร็จ ให้บันทึก User B ลงแถวใหม่แทน
           const recordResult = await bettingPairingService.recordBet(
+            {
+              price: parsedBet.price,
+              sideCode: parsedBet.sideCode,
+              amount: parsedBet.amount,
+              slipName: parsedBet.slipName
+            },
             userId,
             displayName,
-            message.text,
-            parsedBet.slipName,
-            parsedBet.sideCode,
-            parsedBet.amount,
-            source.groupId || '',
-            ''
+            displayName,
+            '',
+            '',
+            source.groupId || ''
           );
 
           if (!recordResult.success) {
@@ -517,14 +523,18 @@ class BettingRoundController {
       console.log(`❌ No matching pair found - recording as new bet`);
 
       const recordResult = await bettingPairingService.recordBet(
+        {
+          price: parsedBet.price,
+          sideCode: parsedBet.sideCode,
+          amount: parsedBet.amount,
+          slipName: parsedBet.slipName
+        },
         userId,
         displayName,
-        message.text,
-        parsedBet.slipName,
-        parsedBet.sideCode,
-        parsedBet.amount,
-        source.groupId || '',
-        ''
+        displayName,
+        '',
+        '',
+        source.groupId || ''
       );
 
       if (!recordResult.success) {

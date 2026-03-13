@@ -68,6 +68,8 @@ class BettingPairingService {
 
       const BetsSheetColumns = require('./betsSheetColumns');
 
+      console.log(`📊 recordBet received betData:`, JSON.stringify(betData, null, 2));
+
       // สร้างข้อมูลสำหรับบันทึก
       // รูปแบบข้อความ: "320-340 ล 100 คำไผ่" หรือ "ชล 500 ฟ้าหลังฝน"
       const messageText = betData.price 
