@@ -436,7 +436,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[10] || '';
+    const userBId = row[17] || '';  // ✅ Column R (index 17) = User B ID
     const userBName = row[11] || '';
     const betAmountA = parseFloat(row[6]) || 0;
     const betAmountB = parseFloat(row[7]) || 0;
