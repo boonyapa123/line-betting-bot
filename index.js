@@ -2368,13 +2368,16 @@ app.post('/webhook', async (req, res) => {
                 console.log(`   Price Range A: ${priceRangeA}`);
                 console.log(`   Price Range B: ${priceRangeB}`);
                 
-                if (!priceRangeA || !priceRangeB) {
-                  console.log(`❌ Missing price range: A="${priceRangeA}" B="${priceRangeB}"`);
+                // ถ้า User B ไม่มีช่วงราคา ให้ใช้ของ User A
+                const finalPriceRangeB = priceRangeB || priceRangeA;
+                
+                if (!priceRangeA) {
+                  console.log(`❌ Missing price range in User A message`);
                   return;
                 }
                 
-                if (priceRangeA !== priceRangeB) {
-                  console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${priceRangeB}"`);
+                if (priceRangeA !== finalPriceRangeB) {
+                  console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${finalPriceRangeB}"`);
                   return;
                 }
                 
