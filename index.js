@@ -1066,6 +1066,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         }
       }
       
+      console.log(`   📊 Pair summary: ${pairData.userAName} (${userAWins}W-${userBWins}L-${draws}D) vs ${pairData.userBName} (${userBWins}W-${userAWins}L-${draws}D)`);
+      
       summary += `\n   ═══════════════════\n`;
       summary += `   📊 สรุปผลลัพธ์:\n`;
       summary += `   ${pairData.userAName}: ${userAWins} ชนะ | ${userBWins} แพ้ | ${draws} เสมอ\n`;
