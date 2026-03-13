@@ -187,12 +187,15 @@ class BettingRoundController {
       return {
         type: 'text',
         text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-          `👤 คู่แข่ง: ${pendingBet.displayName}\n` +
           `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `ฝั่ง: ${parsedBet.sideCode}\n` +
-          `💰 ยอดเงิน: ${parsedBet.amount} บาท\n` +
-          (parsedBet.price ? `💹 ราคา: ${parsedBet.price}\n` : '') +
-          `\n⏳ รอการประกาศผล...`,
+          `💹 ราคา: ${parsedBet.price}\n\n` +
+          `👤 ${pendingBet.displayName}\n` +
+          `   ฝั่ง: ${pendingBet.sideCode}\n` +
+          `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
+          `👤 ${displayName}\n` +
+          `   ฝั่ง: ${parsedBet.sideCode}\n` +
+          `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+          `⏳ รอการประกาศผล...`,
       };
     }
     
@@ -318,12 +321,15 @@ class BettingRoundController {
       return {
         type: 'text',
         text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-          `👤 คู่แข่ง: ${pendingBet.displayName}\n` +
           `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `ฝั่ง: ${parsedBet.sideCode}\n` +
-          `💰 ยอดเงิน: ${parsedBet.amount} บาท\n` +
-          (parsedBet.price ? `💹 ราคา: ${parsedBet.price}\n` : '') +
-          `\n⏳ รอการประกาศผล...`,
+          `💹 ราคา: ${parsedBet.price}\n\n` +
+          `👤 ${pendingBet.displayName}\n` +
+          `   ฝั่ง: ${pendingBet.sideCode}\n` +
+          `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
+          `👤 ${displayName}\n` +
+          `   ฝั่ง: ${parsedBet.sideCode}\n` +
+          `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+          `⏳ รอการประกาศผล...`,
       };
     }
 
@@ -479,11 +485,15 @@ class BettingRoundController {
       return {
         type: 'text',
         text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-          `👤 คู่แข่ง: ${matchedPair.existingBet.displayName}\n` +
-          `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `💹 ราคาของคุณ: ${parsedBet.price}\n` +
-          `💹 ราคาคู่แข่ง: ${matchedPair.existingBet.price}\n` +
-          `💰 ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
+          `🎆 บั้งไฟ: ${parsedBet.slipName}\n\n` +
+          `👤 ${matchedPair.existingBet.displayName}\n` +
+          `   ฝั่ง: ${matchedPair.existingBet.sideCode}\n` +
+          `   ราคา: ${matchedPair.existingBet.price}\n` +
+          `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
+          `👤 ${displayName}\n` +
+          `   ฝั่ง: ${parsedBet.sideCode}\n` +
+          `   ราคา: ${parsedBet.price}\n` +
+          `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
           `⏳ รอการประกาศผล...`,
       };
     }
@@ -680,23 +690,24 @@ class BettingRoundController {
    */
   buildConfirmationMessage(parsedBet, displayName) {
     let message = `✅ บันทึกการเล่นสำเร็จ\n\n`;
-    message += `ชื่อ: ${displayName}\n`;
-    message += `บั้งไฟ: ${parsedBet.slipName}\n`;
+    message += `🎆 บั้งไฟ: ${parsedBet.slipName}\n`;
+    message += `👤 ชื่อ: ${displayName}\n`;
 
     if (parsedBet.method === 'REPLY') {
       // Reply Method
       message += `ฝั่ง: ตอบ\n`;
     } else if (parsedBet.method === 1) {
-      // Direct Method - วิธีที่ 1
+      // Direct Method - วิธีที่ 1 (ไม่ร้องราคา)
       message += `ฝั่ง: ${parsedBet.side}\n`;
-      message += `จำนวนเงิน: ${parsedBet.amount} บาท`;
+      message += `💰 ยอดเงิน: ${parsedBet.amount} บาท`;
     } else if (parsedBet.method === 2) {
-      // Direct Method - วิธีที่ 2
-      message += `ราคา: ${parsedBet.price}\n`;
+      // Direct Method - วิธีที่ 2 (ร้องราคา)
+      message += `💹 ราคา: ${parsedBet.price}\n`;
       message += `ฝั่ง: ${parsedBet.side}\n`;
-      message += `จำนวนเงิน: ${parsedBet.amount} บาท`;
+      message += `💰 ยอดเงิน: ${parsedBet.amount} บาท`;
     }
 
+    message += `\n\n⏳ รอคู่แข่ง...`;
     return message;
   }
 
