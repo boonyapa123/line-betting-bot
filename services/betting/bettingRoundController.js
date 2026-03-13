@@ -61,10 +61,16 @@ class BettingRoundController {
       const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
       console.log(`   Found ${groupBets.length} bets in group`);
       
-      // ค้นหาเบทที่ยังไม่มี User B (userBId ว่าง หรือ status PENDING)
-      const pendingBet = groupBets.find(bet => 
-        !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
-      );
+      // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
+      // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
+      let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
+      
+      if (!pendingBet) {
+        console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
+        pendingBet = groupBets.find(bet => 
+          !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
+        );
+      }
       
       if (!pendingBet) {
         return {
@@ -208,10 +214,16 @@ class BettingRoundController {
       const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
       console.log(`   Found ${groupBets.length} bets in group`);
       
-      // ค้นหาเบทที่ยังไม่มี User B (userBId ว่าง หรือ status PENDING)
-      const pendingBet = groupBets.find(bet => 
-        !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
-      );
+      // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
+      // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
+      let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
+      
+      if (!pendingBet) {
+        console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
+        pendingBet = groupBets.find(bet => 
+          !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
+        );
+      }
       
       if (!pendingBet) {
         return {

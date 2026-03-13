@@ -941,10 +941,9 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         console.log(`   ✅ Found group name: ${currentGroupName}`);
       }
       
-      // Column J (index 9) = ผลแพ้ชนะ (สัญลักษณ์ ✅/❌/⛔️)
-      // Column S (index 18) = ผลลัพธ์ A (ข้อความ)
-      // Column T (index 19) = ผลลัพธ์ B (ข้อความ)
-      const resultSymbol = row[9] || ''; // ⛔️, ✅, or ❌
+      // Column I (index 8) = ผลที่ออก (RESULT)
+      // Column J (index 9) = ผลแพ้ชนะ A (RESULT_WIN_LOSE)
+      const resultSymbol = row[8] || ''; // ผลที่ออก (Column I)
       
       // Only include bets with results
       if (!resultSymbol) continue;
@@ -2276,11 +2275,20 @@ app.post('/webhook', async (req, res) => {
                 console.log(`✅ bettingRoundController processed successfully`);
                 console.log(`   Result:`, controllerResult);
                 
-                // ส่งข้อความตอบกลับให้ผู้ใช้
+                // ส่งข้อความตอบกลับให้ผู้ใช้ (เฉพาะข้อความจับคู่สำเร็จและการบันทึกสำเร็จเท่านั้น)
                 if (controllerResult && controllerResult.text) {
-                  console.log(`   📤 Sending reply message to user`);
-                  await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
-                  console.log(`   ✅ Reply sent`);
+                  // ตรวจสอบว่าเป็นข้อความสำเร็จหรือข้อความแจ้งเตือนข้อผิดพลาด
+                  const isSuccessMessage = controllerResult.text.includes('จับคู่เล่นสำเร็จ') || 
+                                          controllerResult.text.includes('บันทึกการเล่นสำเร็จ');
+                  
+                  if (isSuccessMessage) {
+                    console.log(`   📤 Sending reply message to user`);
+                    await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
+                    console.log(`   ✅ Reply sent`);
+                  } else {
+                    // ข้อความแจ้งเตือนข้อผิดพลาด - ไม่ส่ง
+                    console.log(`   ⏭️  Skipping error message (not sending to user)`);
+                  }
                 }
                 
                 // ถ้า bettingRoundController จัดการการจับคู่แล้ว ให้ส่งข้อความเข้ากลุ่มและแจ้งผู้เล่น A ด้วย
@@ -2305,7 +2313,7 @@ app.post('/webhook', async (req, res) => {
                     console.error(`   ⚠️  Failed to send notification to Player A: ${playerAError.message}`);
                   }
                   
-                  // ส่งข้อความเข้ากลุ่มเพื่อแจ้งการจับคู่สำเร็จ
+                  // ส่งข้อความเข้ากลุ่มเพื่อแจ้งการจับคู่สำเร็จ (เฉพาะข้อความจับคู่สำเร็จเท่านั้น)
                   if (message.sourceType === 'group') {
                     const groupNotification = `📢 ${controllerResult.text}`;
                     console.log(`   📢 Sending group notification`);
