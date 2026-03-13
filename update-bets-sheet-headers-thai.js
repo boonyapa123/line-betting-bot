@@ -26,16 +26,16 @@ async function updateBetsSheetHeaders() {
       'ฝั่ง A',              // F: Side A
       'เงิน A',              // G: Amount A
       'เงิน B',              // H: Amount B
-      'ผลลัพธ์',             // I: Result
-      'ผู้ชนะ',              // J: Winner
-      'ID ผู้เล่น B',        // K: User B ID
+      'ผลที่ออก',            // I: Result
+      'ผลแพ้ชนะ A',          // J: Result A
+      'ผลแพ้ชนะ B',          // K: Result B
       'ชื่อผู้เล่น B',       // L: User B Name
       'ฝั่ง B',              // M: Side B
       'ฝั่ง A (รหัส)',       // N: Side A Code
       'ชื่อกลุ่ม',           // O: Group Name
       'Token A',             // P: User A Token
       'ID กลุ่ม',            // Q: Group ID
-      'Token B',             // R: User B Token
+      'ID ผู้เล่น B',        // R: User B ID
     ];
 
     console.log('\n📋 อัปเดตชื่อคอลัมน์ในชีท Bets (ภาษาไทย):');

@@ -375,8 +375,11 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
       const row = rows[i];
       if (!row || row.length < 5) continue;
       
-      // Column E (index 4) = ชื่อบั้งไฟ + ช่วงราคา
-      const rowPriceAndName = row[4] || '';
+      // Column D (index 3) = ข้อความ A (มีช่วงราคา เช่น "300-320 ล 20 ฟ้า")
+      const messageA = row[3] || '';
+      
+      // Column E (index 4) = ชื่อบั้งไฟ
+      const rowFireworkName = row[4] || '';
       
       // Column H (index 7) = ยอดเงิน B (ต้องมีค่า = จับคู่สำเร็จแล้ว)
       const userBAmount = row[7] || '';
@@ -384,16 +387,24 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
       // Column I (index 8) = ผลที่ออก (ต้องว่าง = ยังไม่มีผลลัพธ์)
       const resultNumber = row[8] || '';
       
-      console.log(`      Row ${i + 1}: priceAndName="${rowPriceAndName}", userBAmount="${userBAmount}", resultNumber="${resultNumber}"`);
+      // ดึงช่วงราคาจากคอลั่ม D (เช่น "300-320" จาก "300-320 ล 20 ฟ้า")
+      const priceRangeMatch = messageA.match(/(\d+)-(\d+)/);
+      const rowPriceRange = priceRangeMatch ? priceRangeMatch[0] : null;
+      
+      console.log(`      Row ${i + 1}: messageA="${messageA}", fireworkName="${rowFireworkName}", priceRange="${rowPriceRange}", userBAmount="${userBAmount}", resultNumber="${resultNumber}"`);
       
       // ตรวจสอบชื่อบั้งไฟ
-      const nameMatch = fireworkName && rowPriceAndName.includes(fireworkName);
+      const nameMatch = fireworkName && rowFireworkName === fireworkName;
       
-      // ตรวจสอบช่วงราคา (ถ้ามี)
+      // ตรวจสอบช่วงราคา
+      // ถ้า priceRange เป็น null (ไม่ระบุช่วงราคา) ให้ match ทั้งหมด
+      // ถ้า priceRange มีค่า ต้องตรวจสอบว่าตรงกัน
       let priceMatch = true;
-      if (priceRange) {
-        priceMatch = rowPriceAndName.startsWith(priceRange);
+      if (priceRange && priceRange !== 'null') {
+        // ถ้าระบุช่วงราคา ต้องตรวจสอบว่าตรงกัน
+        priceMatch = rowPriceRange === priceRange;
       }
+      // ถ้า priceRange เป็น null ให้ match ทั้งหมด (priceMatch = true)
       
       console.log(`      nameMatch=${nameMatch}, priceMatch=${priceMatch}, hasUserB=${!!userBAmount}, noResult=${!resultNumber}`);
       
@@ -404,7 +415,7 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
         matchingRows.push({
           rowIndex: i + 1,
           data: row,
-          priceRange: priceRange,
+          priceRange: rowPriceRange,
           fireworkName: fireworkName
         });
       }
@@ -511,20 +522,16 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     // กำหนด finalResultSymbol ตามผลลัพธ์
     let finalResultSymbol = result.isDraw ? '⛔️' : '✅';
     let userAResultText = '';
-    let userBResultText = '';
 
     if (result.isDraw) {
       userAResultText = '⛔️';
-      userBResultText = '⛔️';
     } else {
       // ตรวจสอบว่า User A ชนะหรือแพ้
       if (result.winner.userId === userAId) {
         userAResultText = '✅';
-        userBResultText = '❌';
         finalResultSymbol = '✅';
       } else {
         userAResultText = '❌';
-        userBResultText = '✅';
         finalResultSymbol = '❌';
       }
     }
@@ -555,7 +562,19 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     }
 
     // อัปเดตผลลัพธ์ในชีท
-    // I=ผลที่ออก, J=ผลแพ้ชนะ A, K=ผลแพ้ชนะ B, S=ยอดเงิน A, T=ยอดเงิน B
+    // I=ผลที่ออก, J=ผลแพ้ชนะ A, K=ผลแพ้ชนะ B, R=User ID B
+
+    // กำหนด userBResultText
+    let userBResultText = '';
+    if (result.isDraw) {
+      userBResultText = '⛔️';
+    } else {
+      if (result.winner.userId === userAId) {
+        userBResultText = '❌';
+      } else {
+        userBResultText = '✅';
+      }
+    }
 
     // อัปเดต Column I-K (ผลที่ออก, ผลแพ้ชนะ A, ผลแพ้ชนะ B)
     await sheets.spreadsheets.values.update({
@@ -568,14 +587,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       },
     });
 
-    // อัปเดต Column S-T (ยอดเงิน A, ยอดเงิน B)
+    // อัปเดต Column R (User ID B)
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!S${rowIndex}:T${rowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!R${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[userAWinnings, userBWinnings]],
+        values: [[userBId]],
       },
     });
 
@@ -583,8 +602,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     console.log(`      Column I: ${resultNumber}`);
     console.log(`      Column J: ${userAResultText}`);
     console.log(`      Column K: ${userBResultText}`);
-    console.log(`      Column S: ${userAWinnings}`);
-    console.log(`      Column T: ${userBWinnings}`);
+    console.log(`      Column R: ${userBId}`);
 
     // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
