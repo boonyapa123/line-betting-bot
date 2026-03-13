@@ -943,7 +943,8 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       
       // Column I (index 8) = ผลที่ออก (RESULT)
       // Column J (index 9) = ผลแพ้ชนะ A (RESULT_WIN_LOSE)
-      const resultSymbol = row[8] || ''; // ผลที่ออก (Column I)
+      const resultNumber = row[8] || ''; // ผลที่ออก (Column I)
+      const resultSymbol = row[9] || ''; // ผลแพ้ชนะ (Column J)
       
       // Only include bets with results
       if (!resultSymbol) continue;
@@ -961,7 +962,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         betTypeA: row[5],
         amountA: row[6],
         amountB: row[7],
-        resultNumber: row[8],
+        resultNumber: resultNumber,
         resultA: resultA,
         resultB: resultB,
         userBId: row[17], // Column R (index 17)
