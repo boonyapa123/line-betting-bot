@@ -231,30 +231,26 @@ class BettingResultService {
         values: [[score]],
       });
 
-      // Column J: ผลแพ้ชนะ (ชนะ/แพ้/เสมอ)
+      // Column J: ผลแพ้ชนะ (Symbol: ✅/❌/⛔️)
       // ✅ ใช้ winner.userId เพื่อเปรียบเทียบกับ bet1.userId
-      const resultStatus = isDraw ? '⛔️' : (winner.userId === bet1.userId ? 'ชนะ' : 'แพ้');
+      const resultStatus = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
         values: [[resultStatus]],
       });
 
-      // Column S: ผลลัพธ์ A
-      const resultA = winner.userId === bet1.userId
-        ? `ชนะ ${winner.netAmount} บาท`
-        : `แพ้ ${Math.abs(loser.netAmount)} บาท`;
+      // Column S: ผลลัพธ์ A (Symbol)
+      const resultSymbolA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
       updates.push({
         range: `${this.betsSheetName}!S${matchedRowIndex}`,
-        values: [[resultA]],
+        values: [[resultSymbolA]],
       });
 
-      // Column T: ผลลัพธ์ B
-      const resultB = winner.userId === bet1.userId
-        ? `แพ้ ${Math.abs(loser.netAmount)} บาท`
-        : `ชนะ ${winner.netAmount} บาท`;
+      // Column T: ผลลัพธ์ B (Symbol)
+      const resultSymbolB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
       updates.push({
         range: `${this.betsSheetName}!T${matchedRowIndex}`,
-        values: [[resultB]],
+        values: [[resultSymbolB]],
       });
 
       // บันทึกทั้งหมด

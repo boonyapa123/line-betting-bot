@@ -496,12 +496,16 @@ class BettingPairingService {
             // คะแนนไม่อยู่ในช่วง → ตัดสินตามผลที่ออก
             if (score < priceRange1.min) {
               // ผลต่ำกว่าช่วง → ฝั่ง ย (ยั้ง/ต่ำ) ชนะ
-              winner = bet1.side === 'ย' ? bet1 : bet2;
-              loser = bet1.side === 'ย' ? bet2 : bet1;
+              // ถ้า bet1 เป็น ล (สูง) → bet1 แพ้, bet2 ชนะ
+              // ถ้า bet1 เป็น ย (ต่ำ) → bet1 ชนะ, bet2 แพ้
+              winner = bet1.side === 'ย' || bet1.side === 'ยั้ง' || bet1.side === 'ถ' ? bet1 : bet2;
+              loser = bet1.side === 'ย' || bet1.side === 'ยั้ง' || bet1.side === 'ถ' ? bet2 : bet1;
             } else {
               // ผลสูงกว่าช่วง → ฝั่ง ล (ไล่/สูง) ชนะ
-              winner = bet1.side === 'ล' ? bet1 : bet2;
-              loser = bet1.side === 'ล' ? bet2 : bet1;
+              // ถ้า bet1 เป็น ล (สูง) → bet1 ชนะ, bet2 แพ้
+              // ถ้า bet1 เป็น ย (ต่ำ) → bet1 แพ้, bet2 ชนะ
+              winner = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ' ? bet1 : bet2;
+              loser = bet1.side === 'ล' || bet1.side === 'ไล่' || bet1.side === 'บ' ? bet2 : bet1;
             }
           }
         }
@@ -526,12 +530,16 @@ class BettingPairingService {
             // คะแนนไม่อยู่ในช่วง → ตัดสินตามผลที่ออก
             if (score < priceRange2.min) {
               // ผลต่ำกว่าช่วง → ฝั่ง ย (ยั้ง/ต่ำ) ชนะ
-              winner = bet2.side === 'ย' ? bet2 : bet1;
-              loser = bet2.side === 'ย' ? bet1 : bet2;
+              // ถ้า bet2 เป็น ล (สูง) → bet2 แพ้, bet1 ชนะ
+              // ถ้า bet2 เป็น ย (ต่ำ) → bet2 ชนะ, bet1 แพ้
+              winner = bet2.side === 'ย' || bet2.side === 'ยั้ง' || bet2.side === 'ถ' ? bet2 : bet1;
+              loser = bet2.side === 'ย' || bet2.side === 'ยั้ง' || bet2.side === 'ถ' ? bet1 : bet2;
             } else {
               // ผลสูงกว่าช่วง → ฝั่ง ล (ไล่/สูง) ชนะ
-              winner = bet2.side === 'ล' ? bet2 : bet1;
-              loser = bet2.side === 'ล' ? bet1 : bet2;
+              // ถ้า bet2 เป็น ล (สูง) → bet2 ชนะ, bet1 แพ้
+              // ถ้า bet2 เป็น ย (ต่ำ) → bet2 แพ้, bet1 ชนะ
+              winner = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ' ? bet2 : bet1;
+              loser = bet2.side === 'ล' || bet2.side === 'ไล่' || bet2.side === 'บ' ? bet1 : bet2;
             }
           }
         }

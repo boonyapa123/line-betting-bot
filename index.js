@@ -436,7 +436,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[17] || '';
+    const userBId = row[10] || '';
     const userBName = row[11] || '';
     const betAmountA = parseFloat(row[6]) || 0;
     const betAmountB = parseFloat(row[7]) || 0;
@@ -500,34 +500,31 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
         const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
         
-        // ใช้ betType ที่ตรงกับ priceToUse
-        const betTypeToUse = (priceA && priceA.includes('-')) ? betTypeA : betTypeB;
-        
         if (lowBetTypes.includes(betTypeA)) {
-          // ต่ำ: ตัดสินตามผลที่ออก
+          // ต่ำ (ย/ยั้ง): ตัดสินตามผลที่ออก
           if (score < rangeA.min) {
-            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ
-            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins`);
+            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ ✅
+            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side (${betTypeA}) wins`);
             finalResultSymbol = '✅';
-            console.log(`   ✅ Low bet type (${betTypeToUse}) wins`);
+            console.log(`   ✅ Low bet type (${betTypeA}) wins`);
           } else {
-            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ
-            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins`);
+            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ, ย แพ้ ❌
+            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins, Low side (${betTypeA}) loses`);
             finalResultSymbol = '❌';
-            console.log(`   ❌ Low bet type (${betTypeToUse}) loses`);
+            console.log(`   ❌ Low bet type (${betTypeA}) loses`);
           }
         } else if (highBetTypes.includes(betTypeA)) {
-          // สูง: ตัดสินตามผลที่ออก
+          // สูง (ล/ไล่): ตัดสินตามผลที่ออก
           if (score < rangeA.min) {
-            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ
-            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins`);
+            // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ, ล แพ้ ❌
+            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins, High side (${betTypeA}) loses`);
             finalResultSymbol = '❌';
-            console.log(`   ❌ High bet type (${betTypeToUse}) loses`);
+            console.log(`   ❌ High bet type (${betTypeA}) loses`);
           } else {
-            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ
-            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins`);
+            // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ ✅
+            console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side (${betTypeA}) wins`);
             finalResultSymbol = '✅';
-            console.log(`   ✅ High bet type (${betTypeToUse}) wins`);
+            console.log(`   ✅ High bet type (${betTypeA}) wins`);
           }
         } else {
           // ประเภทอื่น ใช้ resultSymbol ตามปกติ
@@ -600,14 +597,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     let userBResultText = '';
 
     if (finalResultSymbol === '✅') {
-      userAResultText = `ชนะ ${Math.abs(userAWinnings).toFixed(0)} บาท`;
-      userBResultText = `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+      userAResultText = '✅';
+      userBResultText = '❌';
     } else if (finalResultSymbol === '❌') {
-      userAResultText = `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท`;
-      userBResultText = `ชนะ ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+      userAResultText = '❌';
+      userBResultText = '✅';
     } else if (finalResultSymbol === '⛔️') {
-      userAResultText = `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`;
-      userBResultText = `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+      userAResultText = '⛔️';
+      userBResultText = '⛔️';
     }
 
     // อัปเดตผลลัพธ์ในชีท (Column I-U)
@@ -1169,6 +1166,16 @@ async function sendLineMessage(groupId, message, accessToken) {
 function extractBetAmount(message) {
   if (!message) return null;
   
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
+  const slashFormatMatch = message.match(/\/(\d+)(?:[ก-๙]|$)/);
+  if (slashFormatMatch) {
+    const amount = parseInt(slashFormatMatch[1]);
+    if (amount >= 10) {
+      console.log(`      ✅ Bet amount (slash format): ${amount}`);
+      return amount;
+    }
+  }
+  
   // รูปแบบใหม่: ต1000, ย1000, ส1000, ล1000
   const newFormatMatch = message.match(/[ตยสล](\d+)/);
   if (newFormatMatch) {
@@ -1196,6 +1203,21 @@ function extractBetAmount(message) {
 }
 
 function extractBetType(message) {
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
+  const slashFormatMatch = message.match(/^([ตยสล])\//);
+  if (slashFormatMatch) {
+    const typeChar = slashFormatMatch[1];
+    const typeMap = {
+      'ต': 'ต่ำ/ยั่ง',
+      'ย': 'ต่ำ/ยั่ง',
+      'ส': 'สูง/ไล่',
+      'ล': 'สูง/ไล่'
+    };
+    const betType = typeMap[typeChar];
+    console.log(`      ✅ Bet type (slash format): ${betType}`);
+    return betType;
+  }
+  
   // รูปแบบใหม่: ต1000, ย1000, ส1000, ล1000
   const newFormatMatch = message.match(/([ตยสล])(\d+)/);
   if (newFormatMatch) {
@@ -1241,6 +1263,14 @@ function extractBetType(message) {
 }
 
 function extractPriceRange(message) {
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
+  const slashFormatMatch = message.match(/\/(\d+[\-\.\/\*]\d+)\//);
+  if (slashFormatMatch) {
+    const priceRange = slashFormatMatch[1];
+    console.log(`      ✅ Price range (slash format): ${priceRange}`);
+    return priceRange;
+  }
+  
   // แยกช่วงราคา เช่น 360-410, 370-410
   const priceRangeMatch = message.match(/(\d+[\-\.\/\*]\d+)/);
   if (priceRangeMatch) {
@@ -1254,6 +1284,14 @@ function extractPriceRange(message) {
 }
 
 function extractFireworkName(message) {
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
+  const slashFormatMatch = message.match(/\/\d+([ก-๙]+)$/);
+  if (slashFormatMatch) {
+    const fireworkName = slashFormatMatch[1];
+    console.log(`      ✅ Firework name (slash format): ${fireworkName}`);
+    return fireworkName;
+  }
+  
   // แยกข้อความเป็นคำ
   const words = message.split(/\s+/);
   
