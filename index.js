@@ -381,10 +381,10 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
       // Column H (index 7) = ยอดเงิน B (ต้องมีค่า = จับคู่สำเร็จแล้ว)
       const userBAmount = row[7] || '';
       
-      // Column J (index 9) = ผลแพ้ชนะ (ต้องว่าง = ยังไม่มีผลลัพธ์)
-      const resultSymbol = row[9] || '';
+      // Column I (index 8) = ผลที่ออก (ต้องว่าง = ยังไม่มีผลลัพธ์)
+      const resultNumber = row[8] || '';
       
-      console.log(`      Row ${i + 1}: priceAndName="${rowPriceAndName}", userBAmount="${userBAmount}", resultSymbol="${resultSymbol}"`);
+      console.log(`      Row ${i + 1}: priceAndName="${rowPriceAndName}", userBAmount="${userBAmount}", resultNumber="${resultNumber}"`);
       
       // ตรวจสอบชื่อบั้งไฟ
       const nameMatch = fireworkName && rowPriceAndName.includes(fireworkName);
@@ -399,7 +399,7 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
       
       if (priceMatch && nameMatch &&
           userBAmount && // มี User B = จับคู่สำเร็จแล้ว
-          !resultSymbol) { // ยังไม่มีผลลัพธ์
+          !resultNumber) { // ยังไม่มีผลลัพธ์
         console.log(`      ✅ MATCH FOUND!`);
         matchingRows.push({
           rowIndex: i + 1,
@@ -436,7 +436,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const row = response.data.values?.[0] || [];
     const userAId = row[1] || '';
     const userAName = row[2] || '';
-    const userBId = row[17] || '';  // ✅ Column R (index 17) = User B ID
+    const userBId = row[10] || '';  // ✅ Column K (index 10) = User B ID
     const userBName = row[11] || '';
     const betAmountA = parseFloat(row[6]) || 0;
     const betAmountB = parseFloat(row[7]) || 0;

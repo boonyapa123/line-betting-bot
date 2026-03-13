@@ -331,26 +331,25 @@ class BettingResultService {
         values: [[score]],
       });
 
-      // Column J: ผลแพ้ชนะ (Symbol: ✅/❌/⛔️)
-      // ✅ ใช้ winner.userId เพื่อเปรียบเทียบกับ bet1.userId
-      const resultStatus = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
+      // Column J: ผลแพ้ชนะ A (Symbol: ✅/❌/⛔️)
+      const resultStatusA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
-        values: [[resultStatus]],
+        values: [[resultStatusA]],
       });
 
-      // Column S: ผลลัพธ์ A (Symbol)
-      const resultSymbolA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
+      // Column K: ผลแพ้ชนะ B (Symbol: ✅/❌/⛔️)
+      const resultStatusB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
       updates.push({
-        range: `${this.betsSheetName}!S${matchedRowIndex}`,
-        values: [[resultSymbolA]],
+        range: `${this.betsSheetName}!K${matchedRowIndex}`,
+        values: [[resultStatusB]],
       });
 
-      // Column T: ผลลัพธ์ B (Symbol)
-      const resultSymbolB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
+      // Column R: User ID B
+      const userBId = bet1.userBId || bet2.userId;
       updates.push({
-        range: `${this.betsSheetName}!T${matchedRowIndex}`,
-        values: [[resultSymbolB]],
+        range: `${this.betsSheetName}!R${matchedRowIndex}`,
+        values: [[userBId]],
       });
 
       // บันทึกทั้งหมด

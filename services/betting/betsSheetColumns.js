@@ -24,7 +24,7 @@ class BetsSheetColumns {
     GROUP_NAME: 14,         // O: ชื่อกลุ่ม
     TOKEN_A: 15,            // P: Token A
     GROUP_ID: 16,           // Q: ID กลุ่ม
-    USER_B_ID: 17,          // R: User B ID
+    USER_B_ID: 17,          // R: User ID B
     RESULT_A: 18,           // S: ผลลัพธ์ A
     RESULT_B: 19,           // T: ผลลัพธ์ B
     MATCHED_AUTO: 20,       // U: MATCHED Auto (จับคู่อัตโนมัติ)
@@ -49,7 +49,7 @@ class BetsSheetColumns {
     14: 'O - ชื่อกลุ่ม',
     15: 'P - Token A',
     16: 'Q - ID กลุ่ม',
-    17: 'R - User B ID',
+    17: 'R - User ID B',
     18: 'S - ผลลัพธ์ A',
     19: 'T - ผลลัพธ์ B',
     20: 'U - MATCHED Auto',
@@ -75,14 +75,14 @@ class BetsSheetColumns {
     if (data.amountB !== undefined && data.amountB !== null) row[this.COLUMNS.AMOUNT_B] = data.amountB;
     if (data.result) row[this.COLUMNS.RESULT] = data.result;
     if (data.resultWinLose) row[this.COLUMNS.RESULT_WIN_LOSE] = data.resultWinLose;
-    if (data.userBId) row[this.COLUMNS.USER_B_ID] = data.userBId;
+    if (data.resultWinLoseB) row[this.COLUMNS.RESULT_WIN_LOSE_B] = data.resultWinLoseB;
     if (data.userBName) row[this.COLUMNS.USER_B_NAME] = data.userBName;
     if (data.sideB) row[this.COLUMNS.SIDE_B] = data.sideB;
     if (data.groupChatName) row[this.COLUMNS.GROUP_CHAT_NAME] = data.groupChatName;
     if (data.groupName) row[this.COLUMNS.GROUP_NAME] = data.groupName;
     if (data.tokenA) row[this.COLUMNS.TOKEN_A] = data.tokenA;
     if (data.groupId) row[this.COLUMNS.GROUP_ID] = data.groupId;
-    if (data.tokenB) row[this.COLUMNS.TOKEN_B] = data.tokenB;
+    if (data.userBId) row[this.COLUMNS.USER_B_ID] = data.userBId;
     if (data.resultA) row[this.COLUMNS.RESULT_A] = data.resultA;
     if (data.resultB) row[this.COLUMNS.RESULT_B] = data.resultB;
     if (data.matchedAuto) row[this.COLUMNS.MATCHED_AUTO] = data.matchedAuto;
