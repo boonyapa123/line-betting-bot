@@ -2387,6 +2387,9 @@ app.post('/webhook', async (req, res) => {
                 const fireworkNameA = betDetailsA.fireworkName;
                 const fireworkNameB = betDetailsB.fireworkName;
                 
+                // ถ้า User B ไม่มีชื่อบั้งไฟ ให้ใช้ของ User A
+                const finalFireworkNameB = fireworkNameB || fireworkNameA;
+                
                 // ถ้าทั้งสองมีชื่อบั้งไฟ ต้องตรงกัน
                 if (fireworkNameA && fireworkNameB) {
                   if (fireworkNameA !== fireworkNameB) {
@@ -2395,9 +2398,8 @@ app.post('/webhook', async (req, res) => {
                   }
                   console.log(`✅ Firework names match: "${fireworkNameA}"`);
                 } else if (fireworkNameA || fireworkNameB) {
-                  // ถ้าเพียงอันเดียวมีชื่อบั้งไฟ ไม่จับคู่
-                  console.log(`❌ Only one has firework name: "${fireworkNameA}" vs "${fireworkNameB}"`);
-                  return;
+                  // ถ้าเพียงอันเดียวมีชื่อบั้งไฟ ใช้ชื่อของ User A
+                  console.log(`✅ Using User A firework name: "${fireworkNameA}"`);
                 } else {
                   // ถ้าทั้งสองไม่มีชื่อบั้งไฟ ใช้ได้ (เล่นแบบร้องราคา)
                   console.log(`✅ No firework names (price range betting)`);
