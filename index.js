@@ -355,7 +355,7 @@ function parseResultMessage(message) {
 }
 
 // Find matching bets in Google Sheets
-async function findMatchingBets(priceRange, fireworkName, resultNumber) {
+async function findMatchingBets(priceRange, fireworkName, resultScore) {
   if (!googleAuth) return [];
   
   try {
@@ -395,7 +395,7 @@ async function findMatchingBets(priceRange, fireworkName, resultNumber) {
         priceMatch = rowPriceAndName.startsWith(priceRange);
       }
       
-      console.log(`      nameMatch=${nameMatch}, priceMatch=${priceMatch}, hasUserB=${!!userBAmount}, noResult=${!resultSymbol}`);
+      console.log(`      nameMatch=${nameMatch}, priceMatch=${priceMatch}, hasUserB=${!!userBAmount}, noResult=${!resultNumber}`);
       
       if (priceMatch && nameMatch &&
           userBAmount && // มี User B = จับคู่สำเร็จแล้ว
@@ -555,7 +555,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     }
 
     // อัปเดตผลลัพธ์ในชีท
-    // I=ผลที่ออก, J=ผลแพ้ชนะ A, K=ผลแพ้ชนะ B, S=ผลลัพธ์ A, T=ผลลัพธ์ B
+    // I=ผลที่ออก, J=ผลแพ้ชนะ A, K=ผลแพ้ชนะ B, S=ยอดเงิน A, T=ยอดเงิน B
 
     // อัปเดต Column I-K (ผลที่ออก, ผลแพ้ชนะ A, ผลแพ้ชนะ B)
     await sheets.spreadsheets.values.update({
@@ -568,14 +568,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       },
     });
 
-    // อัปเดต Column S-T (ผลลัพธ์ A, ผลลัพธ์ B)
+    // อัปเดต Column S-T (ยอดเงิน A, ยอดเงิน B)
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${GOOGLE_WORKSHEET_NAME}!S${rowIndex}:T${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[userAResultText, userBResultText]],
+        values: [[userAWinnings, userBWinnings]],
       },
     });
 
@@ -583,8 +583,8 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     console.log(`      Column I: ${resultNumber}`);
     console.log(`      Column J: ${userAResultText}`);
     console.log(`      Column K: ${userBResultText}`);
-    console.log(`      Column S: ${userAResultText}`);
-    console.log(`      Column T: ${userBResultText}`);
+    console.log(`      Column S: ${userAWinnings}`);
+    console.log(`      Column T: ${userBWinnings}`);
 
     // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
