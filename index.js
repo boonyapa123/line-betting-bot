@@ -542,11 +542,13 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       userAWinnings = -result.winner.fee;
       userBWinnings = -result.loser.fee;
     } else {
-      // ชนะ-แพ้
-      if (result.winner.userId === userAId) {
+      // ชนะ-แพ้: ตรวจสอบจาก pair object
+      if (result.pair.bet1.userId === userAId) {
+        // bet1 (A) ชนะ
         userAWinnings = result.winner.netAmount;
         userBWinnings = result.loser.netAmount;
       } else {
+        // bet2 (B) ชนะ
         userAWinnings = result.loser.netAmount;
         userBWinnings = result.winner.netAmount;
       }
