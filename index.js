@@ -463,23 +463,39 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     console.log(`   📋 Price A (Column D): ${priceA}`);
     console.log(`   📋 Price B (Column M): ${priceB}`);
 
+    // ฟังก์ชันแยก side จาก price string
+    const extractSide = (priceStr) => {
+      if (!priceStr) return null;
+      // ค้นหา ย, ล, ยั้ง, ไล่, ชล, ชถ, บ, ถ
+      const match = priceStr.match(/[ยลยั้งไล่ชลชถบถ]/);
+      return match ? match[0] : null;
+    };
+
+    // ใช้ Column D เป็นหลัก เพราะ B อยู่ตรงข้าม A เสมอ
+    const sideA = extractSide(priceA);
+    const hasPriceRangeA = priceA && priceA.includes('-');
+    const hasPriceRangeB = priceB && priceB.includes('-');
+
     // สร้าง pair object สำหรับ bettingResultService
     const pair = {
       bet1: {
         userId: userAId,
         displayName: userAName,
         userBName: userBName,
+        userBId: userBId,
         amount: betAmount,
         price: priceA,
-        method: priceA && priceA.includes('-') ? 2 : 1,
+        side: sideA,
+        method: hasPriceRangeA ? 2 : 1,
       },
       bet2: {
         userId: userBId,
         displayName: userBName,
         userBName: userAName,
         amount: betAmount,
-        price: priceB,
-        method: priceB && priceB.includes('-') ? 2 : 1,
+        price: hasPriceRangeB ? priceB : null,
+        side: sideA, // B อยู่ตรงข้าม A เสมอ
+        method: hasPriceRangeB ? 2 : 'REPLY',
       },
     };
 
