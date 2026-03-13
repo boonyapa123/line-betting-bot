@@ -216,20 +216,22 @@ class BetsSheetColumns {
   }
 
   /**
-   * ดึง opposite side code
-   * @param {string} sideCode - side code ของ User A
-   * @returns {string} opposite side code
+   * สร้าง Price B จาก Price A โดยเปลี่ยน side เป็น opposite
+   * @param {string} priceA - Price A (เช่น "300-320 ล 20 ฟ้า")
+   * @param {string} sideCodeA - Side code ของ User A (เช่น "ล")
+   * @returns {string} Price B (เช่น "300-320 ต")
    */
-  static getOppositeSide(sideCode) {
-    const opposites = {
-      'ต': 'ล',
-      'ล': 'ต',
-      'ย': 'ล',
-      'ส': 'ย',
-      'ชล': 'ชถ',
-      'ชถ': 'ชล',
-    };
-    return opposites[sideCode] || sideCode;
+  static createPriceB(priceA, sideCodeA) {
+    if (!priceA) return '';
+    
+    // ดึงช่วงราคาจาก Price A
+    const priceMatch = priceA.match(/^(\d+-\d+)/);
+    if (!priceMatch) return '';
+    
+    const priceRange = priceMatch[1];
+    const oppositeSide = this.getOppositeSide(sideCodeA);
+    
+    return `${priceRange} ${oppositeSide}`;
   }
 
   /**
@@ -246,8 +248,12 @@ class BetsSheetColumns {
     if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
     if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
     
-    // ✅ บันทึก opposite side ของ User B
-    if (userBData.sideCode) {
+    // ✅ บันทึก Price B ที่มีช่วงราคาเดียวกับ Price A แต่ฝั่งตรงข้าม
+    if (userBData.priceB) {
+      // ใช้ Price B ที่ส่งมา (มีช่วงราคา)
+      row[this.COLUMNS.SIDE_B] = userBData.priceB;
+    } else if (userBData.sideCode) {
+      // ถ้าไม่มี Price B ให้ใช้ opposite side code
       const oppositeSide = this.getOppositeSide(userBData.sideCode);
       row[this.COLUMNS.SIDE_B] = oppositeSide;
     }

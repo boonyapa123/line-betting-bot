@@ -31,70 +31,222 @@ class BettingRoundController {
    * @param {object} event - LINE webhook event
    * @returns {object} ผลลัพธ์
    */
-  async handleMessage(event) {
-    const { message, source } = event;
-    const userId = source.userId;
-    const displayName = source.displayName || 'Unknown';
-    const lineName = source.displayName || 'Unknown'; // ชื่อ LINE
+  /**
+     * จัดการข้อความจาก LINE
+     * @param {object} event - LINE webhook event
+     * @returns {object} ผลลัพธ์
+     */
+    async handleMessage(event) {
+      const { message, source } = event;
+      const userId = source.userId;
+      const displayName = source.displayName || 'Unknown';
+      const lineName = source.displayName || 'Unknown'; // ชื่อ LINE
+      const BetsSheetColumns = require('./betsSheetColumns');
 
-    // ตรวจสอบคำสั่งแอดมิน
-    const adminCommand = BettingMessageParserService.parseAdminCommand(message.text);
-    if (adminCommand.isCommand) {
-      return await this.handleAdminCommand(adminCommand, userId, source);
-    }
-
-    // ตรวจสอบสถานะ
-    if (!bettingRoundStateService.canAcceptBets()) {
-      return {
-        type: 'text',
-        text: 'รอบนี้ปิดการทายแล้วคะ/ครับ',
-      };
-    }
-
-    // ตรวจสอบว่า User B reply ข้อความของ User A หรือไม่
-    const isReply = message.quotedMessageId !== undefined && message.quotedMessageId !== null;
-    
-    if (isReply) {
-      console.log(`🔍 User B replied to message ID: ${message.quotedMessageId}`);
-      
-      // ค้นหาข้อมูลของ User A ที่ยังรอการจับคู่ในกลุ่มเดียวกัน
-      const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
-      console.log(`   Found ${groupBets.length} bets in group`);
-      
-      // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
-      // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
-      let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
-      
-      if (!pendingBet) {
-        console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
-        pendingBet = groupBets.find(bet => 
-          !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
-        );
+      // ตรวจสอบคำสั่งแอดมิน
+      const adminCommand = BettingMessageParserService.parseAdminCommand(message.text);
+      if (adminCommand.isCommand) {
+        return await this.handleAdminCommand(adminCommand, userId, source);
       }
-      
-      if (!pendingBet) {
+
+      // ตรวจสอบสถานะ
+      if (!bettingRoundStateService.canAcceptBets()) {
         return {
           type: 'text',
-          text: '❌ ไม่พบการเดิมพันที่รอการจับคู่\n\n💡 โปรดรอให้ผู้เล่นคนแรกส่งข้อมูลการเดิมพันก่อน',
+          text: 'รอบนี้ปิดการทายแล้วคะ/ครับ',
         };
       }
-      
-      console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
-      console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
-      
-      // ตรวจสอบว่าข้อความ reply มีรูปแบบ Direct Method หรือไม่
-      const directMethodParsed = BettingMessageParserService.parseMessage(message.text);
-      
-      let parsedBet;
-      
-      if (directMethodParsed.success) {
-        // ถ้า reply มีรูปแบบ Direct Method ให้ใช้ข้อมูลจากข้อความ
-        console.log(`   📊 Reply message has Direct Method format - using parsed data`);
-        parsedBet = directMethodParsed;
-      } else {
-        // ถ้า reply เป็นแค่ "ต" หรือไม่มีรูปแบบ ให้ใช้ข้อมูลของ User A
-        console.log(`   📊 Reply message is simple - using User A data`);
-        
+
+      // ตรวจสอบว่า User B reply ข้อความของ User A หรือไม่
+      const isReply = message.quotedMessageId !== undefined && message.quotedMessageId !== null;
+
+      if (isReply) {
+        console.log(`🔍 User B replied to message ID: ${message.quotedMessageId}`);
+
+        // ค้นหาข้อมูลของ User A ที่ยังรอการจับคู่ในกลุ่มเดียวกัน
+        const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
+        console.log(`   Found ${groupBets.length} bets in group`);
+
+        // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
+        // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
+        let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
+
+        if (!pendingBet) {
+          console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
+          pendingBet = groupBets.find(bet => 
+            !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
+          );
+        }
+
+        if (!pendingBet) {
+          return {
+            type: 'text',
+            text: '❌ ไม่พบการเดิมพันที่รอการจับคู่\n\n💡 โปรดรอให้ผู้เล่นคนแรกส่งข้อมูลการเดิมพันก่อน',
+          };
+        }
+
+        console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
+        console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
+
+        // ตรวจสอบว่าข้อความ reply มีรูปแบบ Direct Method หรือไม่
+        const directMethodParsed = BettingMessageParserService.parseMessage(message.text);
+
+        let parsedBet;
+
+        if (directMethodParsed.success) {
+          // ถ้า reply มีรูปแบบ Direct Method ให้ใช้ข้อมูลจากข้อความ
+          console.log(`   📊 Reply message has Direct Method format - using parsed data`);
+          parsedBet = directMethodParsed;
+        } else {
+          // ถ้า reply เป็นแค่ "ต" หรือไม่มีรูปแบบ ให้ใช้ข้อมูลของ User A
+          console.log(`   📊 Reply message is simple - using User A data`);
+
+          // คำนวณฝั่งตรงข้าม
+          const getOppositeSide = (sideCode) => {
+            const opposites = {
+              'ชล': 'ชถ',
+              'ชถ': 'ชล',
+              'ชย': 'ชล', // ยั้ง → ไล่
+              'ล': 'ย',
+              'ย': 'ล',
+              'ต': 'ล',
+              'ส': 'ย',
+            };
+            return opposites[sideCode] || sideCode;
+          };
+
+          const oppositeSideCode = getOppositeSide(pendingBet.sideCode);
+
+          parsedBet = {
+            success: true,
+            method: 'REPLY',
+            slipName: pendingBet.slipName,
+            side: oppositeSideCode,
+            sideCode: oppositeSideCode,
+            amount: pendingBet.amount,
+            price: pendingBet.price,
+            timestamp: new Date().toISOString(),
+          };
+        }
+
+        console.log(`   📊 Final bet data:`, parsedBet);
+
+        // ตรวจสอบความถูกต้อง
+        const validation = BettingMessageParserService.validateBet(parsedBet);
+        if (!validation.valid) {
+          return {
+            type: 'text',
+            text: validation.error,
+          };
+        }
+
+        // ตรวจสอบยอดเงินคงเหลือของ User B
+        const groupId = source.groupId || null;
+        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+        const accountNumber = groupAccountNumber || 1;
+
+        const balanceCheck = await balanceCheckService.checkAndNotify(
+          lineName,
+          parsedBet.amount,
+          userId,
+          accountNumber,
+          groupId
+        );
+
+        if (!balanceCheck.registered) {
+          return {
+            type: 'text',
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+          };
+        }
+
+        if (!balanceCheck.sufficient) {
+          return {
+            type: 'text',
+            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
+          };
+        }
+
+        // อัปเดตแถวของ User A ด้วยข้อมูล User B
+        console.log(`📝 Updating row with User B data...`);
+
+        // สร้าง Price B จาก Price A
+        const priceB = BetsSheetColumns.createPriceB(pendingBet.message, pendingBet.sideCode);
+
+        const userBData = {
+          userId: userId,
+          displayName: displayName,
+          sideCode: parsedBet.sideCode,
+          amount: parsedBet.amount,
+          price: parsedBet.price,
+          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
+          slipName: parsedBet.slipName,
+          groupName: '', // ยังไม่มีข้อมูล
+          tokenB: '', // ยังไม่มีข้อมูล
+        };
+
+        const updateResult = await bettingPairingService.updateRowWithUserB(
+          pendingBet.rowIndex,
+          userBData
+        );
+
+        if (!updateResult.success) {
+          console.error(`❌ Failed to update row: ${updateResult.message}`);
+          return {
+            type: 'text',
+            text: `❌ เกิดข้อผิดพลาดในการจับคู่: ${updateResult.message}`,
+          };
+        }
+
+        console.log(`✅ Row updated successfully`);
+
+        // ส่งข้อความยืนยัน
+        return {
+          type: 'text',
+          text: `✅ จับคู่เล่นสำเร็จ\n\n` +
+            `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+            `💹 ราคา: ${parsedBet.price}\n\n` +
+            `👤 ${pendingBet.displayName}\n` +
+            `   ฝั่ง: ${pendingBet.sideCode}\n` +
+            `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
+            `👤 ${displayName}\n` +
+            `   ฝั่ง: ${parsedBet.sideCode}\n` +
+            `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+            `⏳ รอการประกาศผล...`,
+        };
+      }
+
+      // ตรวจสอบ REPLY Method (เฉพาะ "ต" หรือ "ต." เท่านั้น)
+      const replyParsed = BettingMessageParserService.parseReplyMessage(message.text);
+      if (replyParsed.success) {
+        // ค้นหาข้อมูลของ User A ที่ยังรอการจับคู่ในกลุ่มเดียวกัน
+        console.log(`🔍 REPLY Method detected (simple "ต") - searching for pending bet in group: ${source.groupId || 'NO_GROUP'}`);
+
+        const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
+        console.log(`   Found ${groupBets.length} bets in group`);
+
+        // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
+        // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
+        let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
+
+        if (!pendingBet) {
+          console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
+          pendingBet = groupBets.find(bet => 
+            !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
+          );
+        }
+
+        if (!pendingBet) {
+          return {
+            type: 'text',
+            text: '❌ ไม่พบการเดิมพันที่รอการจับคู่\n\n💡 โปรดรอให้ผู้เล่นคนแรกส่งข้อมูลการเดิมพันก่อน',
+          };
+        }
+
+        console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
+        console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
+
+        // ใช้ข้อมูลเดียวกับของ User A
         // คำนวณฝั่งตรงข้าม
         const getOppositeSide = (sideCode) => {
           const opposites = {
@@ -108,10 +260,10 @@ class BettingRoundController {
           };
           return opposites[sideCode] || sideCode;
         };
-        
+
         const oppositeSideCode = getOppositeSide(pendingBet.sideCode);
-        
-        parsedBet = {
+
+        const parsedBet = {
           success: true,
           method: 'REPLY',
           slipName: pendingBet.slipName,
@@ -121,10 +273,105 @@ class BettingRoundController {
           price: pendingBet.price,
           timestamp: new Date().toISOString(),
         };
+
+        console.log(`   📊 Reply bet data:`, parsedBet);
+
+        // ตรวจสอบความถูกต้อง
+        const validation = BettingMessageParserService.validateBet(parsedBet);
+        if (!validation.valid) {
+          return {
+            type: 'text',
+            text: validation.error,
+          };
+        }
+
+        // ตรวจสอบยอดเงินคงเหลือของ User B
+        const groupId = source.groupId || null;
+        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+        const accountNumber = groupAccountNumber || 1;
+
+        const balanceCheck = await balanceCheckService.checkAndNotify(
+          lineName,
+          parsedBet.amount,
+          userId,
+          accountNumber,
+          groupId
+        );
+
+        if (!balanceCheck.registered) {
+          return {
+            type: 'text',
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+          };
+        }
+
+        if (!balanceCheck.sufficient) {
+          return {
+            type: 'text',
+            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
+          };
+        }
+
+        // อัปเดตแถวของ User A ด้วยข้อมูล User B
+        console.log(`📝 Updating row with User B data...`);
+
+        // สร้าง Price B จาก Price A
+        const priceB = BetsSheetColumns.createPriceB(pendingBet.message, pendingBet.sideCode);
+
+        const userBData = {
+          userId: userId,
+          displayName: displayName,
+          sideCode: parsedBet.sideCode,
+          amount: parsedBet.amount,
+          price: parsedBet.price,
+          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
+          slipName: parsedBet.slipName,
+          groupName: '', // ยังไม่มีข้อมูล
+          tokenB: '', // ยังไม่มีข้อมูล
+        };
+
+        const updateResult = await bettingPairingService.updateRowWithUserB(
+          pendingBet.rowIndex,
+          userBData
+        );
+
+        if (!updateResult.success) {
+          console.error(`❌ Failed to update row: ${updateResult.message}`);
+          return {
+            type: 'text',
+            text: `❌ เกิดข้อผิดพลาดในการจับคู่: ${updateResult.message}`,
+          };
+        }
+
+        console.log(`✅ Row updated successfully`);
+
+        // ส่งข้อความยืนยัน
+        return {
+          type: 'text',
+          text: `✅ จับคู่เล่นสำเร็จ\n\n` +
+            `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+            `💹 ราคา: ${parsedBet.price}\n\n` +
+            `👤 ${pendingBet.displayName}\n` +
+            `   ฝั่ง: ${pendingBet.sideCode}\n` +
+            `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
+            `👤 ${displayName}\n` +
+            `   ฝั่ง: ${parsedBet.sideCode}\n` +
+            `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+            `⏳ รอการประกาศผล...`,
+        };
       }
-      
-      console.log(`   📊 Final bet data:`, parsedBet);
-      
+
+      // Parse ข้อความเล่น (Direct Method)
+      const parsedBet = BettingMessageParserService.parseMessage(message.text);
+
+      if (!parsedBet.success) {
+        // ไม่ส่งข้อความแจ้งเตือนในกลุ่ม
+        return {
+          type: 'text',
+          text: `${parsedBet.error}\n\n${parsedBet.hint}`,
+        };
+      }
+
       // ตรวจสอบความถูกต้อง
       const validation = BettingMessageParserService.validateBet(parsedBet);
       if (!validation.valid) {
@@ -134,19 +381,22 @@ class BettingRoundController {
         };
       }
 
-      // ตรวจสอบยอดเงินคงเหลือของ User B
-      const groupId = source.groupId || null;
+      // ตรวจสอบยอดเงินคงเหลือและชื่อผู้เล่น (อันดับแรก)
+      const groupId = source.groupId || null; // ดึง groupId จาก source
+
+      // ดึง Account Number จากกลุ่ม (ใช้ Account 1 เป็น default)
       const groupAccountNumber = await this.getGroupAccountNumber(groupId);
       const accountNumber = groupAccountNumber || 1;
-      
+
       const balanceCheck = await balanceCheckService.checkAndNotify(
         lineName,
         parsedBet.amount,
         userId,
-        accountNumber,
-        groupId
+        accountNumber, // ใช้ Account ของกลุ่ม
+        groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
       );
 
+      // ถ้าผู้เล่นไม่พบในระบบ ให้หยุดทันที
       if (!balanceCheck.registered) {
         return {
           type: 'text',
@@ -154,389 +404,146 @@ class BettingRoundController {
         };
       }
 
+      // ถ้ายอดเงินไม่พอ ให้หยุดทันที
       if (!balanceCheck.sufficient) {
+        // ไม่ต้องส่งข้อความแจ้งเตือนเพิ่มเติม เพราะ checkAndNotify ได้ส่งไปแล้ว
         return {
           type: 'text',
           text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
         };
       }
 
-      // อัปเดตแถวของ User A ด้วยข้อมูล User B
-      console.log(`📝 Updating row with User B data...`);
-      const userBData = {
-        userId: userId,
-        displayName: displayName,
-        sideCode: parsedBet.sideCode,
-        amount: parsedBet.amount,
-        price: parsedBet.price,
-        slipName: parsedBet.slipName,
-        groupName: '', // ยังไม่มีข้อมูล
-        tokenB: '', // ยังไม่มีข้อมูล
-      };
+      // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน) ก่อนบันทึก
+      // หมายเหตุ: REPLY Method ได้จัดการการจับคู่แล้ว ส่วนนี้สำหรับ Direct Method เท่านั้น
+      const PriceRangeMatchingService = require('./priceRangeMatchingService');
 
-      const updateResult = await bettingPairingService.updateRowWithUserB(
-        pendingBet.rowIndex,
-        userBData
-      );
-
-      if (!updateResult.success) {
-        console.error(`❌ Failed to update row: ${updateResult.message}`);
-        return {
-          type: 'text',
-          text: `❌ เกิดข้อผิดพลาดในการจับคู่: ${updateResult.message}`,
-        };
-      }
-
-      console.log(`✅ Row updated successfully`);
-      
-      // ส่งข้อความยืนยัน
-      return {
-        type: 'text',
-        text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-          `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `💹 ราคา: ${parsedBet.price}\n\n` +
-          `👤 ${pendingBet.displayName}\n` +
-          `   ฝั่ง: ${pendingBet.sideCode}\n` +
-          `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
-          `👤 ${displayName}\n` +
-          `   ฝั่ง: ${parsedBet.sideCode}\n` +
-          `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
-          `⏳ รอการประกาศผล...`,
-      };
-    }
-    
-    // ตรวจสอบ REPLY Method (เฉพาะ "ต" หรือ "ต." เท่านั้น)
-    const replyParsed = BettingMessageParserService.parseReplyMessage(message.text);
-    if (replyParsed.success) {
-      // ค้นหาข้อมูลของ User A ที่ยังรอการจับคู่ในกลุ่มเดียวกัน
-      console.log(`🔍 REPLY Method detected (simple "ต") - searching for pending bet in group: ${source.groupId || 'NO_GROUP'}`);
-      
+      console.log(`🔍 Fetching bets for group: ${source.groupId || 'NO_GROUP'}`);
       const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
       console.log(`   Found ${groupBets.length} bets in group`);
-      
-      // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
-      // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
-      let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
-      
-      if (!pendingBet) {
-        console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
-        pendingBet = groupBets.find(bet => 
-          !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
+
+      if (groupBets.length > 0) {
+        console.log(`   Bets in group:`, groupBets.map(b => ({
+          displayName: b.displayName,
+          slipName: b.slipName,
+          sideCode: b.sideCode,
+          price: b.price,
+          amount: b.amount,
+          status: b.status
+        })));
+      }
+
+      // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้) เฉพาะในกลุ่มเดียวกัน
+      const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, groupBets);
+
+      console.log(`   Matching result:`, matchedPair ? 'FOUND' : 'NOT FOUND');
+
+      if (matchedPair) {
+        // 🎯 พบคู่ - อัปเดตแถว User A โดยตรง (ไม่บันทึก User B ลงแถวใหม่)
+        console.log(`🎯 Auto-matched price range pair found!`);
+        console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
+        console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
+
+        // สร้าง Price B จาก Price A
+        const priceB = BetsSheetColumns.createPriceB(matchedPair.existingBet.message, matchedPair.existingBet.sideCode);
+
+        // 📝 อัปเดตแถวของ User A ด้วยข้อมูล User B
+        const userBData = {
+          userId: userId,
+          displayName: displayName,
+          sideCode: parsedBet.sideCode,
+          amount: matchedPair.betAmount,
+          price: parsedBet.price,
+          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
+          slipName: parsedBet.slipName,
+          groupName: '', // ยังไม่มีข้อมูล
+          tokenB: '', // ยังไม่มีข้อมูล
+        };
+
+        const updateResult = await bettingPairingService.updateRowWithUserB(
+          matchedPair.existingBet.rowIndex,
+          userBData
         );
-      }
-      
-      if (!pendingBet) {
+
+        if (!updateResult.success) {
+          console.error(`❌ Failed to update row: ${updateResult.message}`);
+          // ถ้าอัปเดตไม่สำเร็จ ให้บันทึก User B ลงแถวใหม่แทน
+          const recordResult = await bettingPairingService.recordBet(
+            userId,
+            displayName,
+            message.text,
+            parsedBet.slipName,
+            parsedBet.sideCode,
+            parsedBet.amount,
+            source.groupId || '',
+            ''
+          );
+
+          if (!recordResult.success) {
+            return {
+              type: 'text',
+              text: `❌ เกิดข้อผิดพลาดในการบันทึก: ${recordResult.message}`,
+            };
+          }
+
+          return {
+            type: 'text',
+            text: `⚠️  ไม่สามารถจับคู่กับการเดิมพันเดิมได้ บันทึกเป็นการเดิมพันใหม่แทน\n\n` +
+              `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+              `💹 ราคา: ${parsedBet.price}\n` +
+              `💰 ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+              `⏳ รอการจับคู่...`,
+          };
+        }
+
+        console.log(`✅ Row updated successfully`);
+
+        // ส่งข้อความยืนยัน
         return {
           type: 'text',
-          text: '❌ ไม่พบการเดิมพันที่รอการจับคู่\n\n💡 โปรดรอให้ผู้เล่นคนแรกส่งข้อมูลการเดิมพันก่อน',
-        };
-      }
-      
-      console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
-      console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
-      
-      // ใช้ข้อมูลเดียวกับของ User A
-      // คำนวณฝั่งตรงข้าม
-      const getOppositeSide = (sideCode) => {
-        const opposites = {
-          'ชล': 'ชถ',
-          'ชถ': 'ชล',
-          'ชย': 'ชล', // ยั้ง → ไล่
-          'ล': 'ย',
-          'ย': 'ล',
-          'ต': 'ล',
-          'ส': 'ย',
-        };
-        return opposites[sideCode] || sideCode;
-      };
-      
-      const oppositeSideCode = getOppositeSide(pendingBet.sideCode);
-      
-      const parsedBet = {
-        success: true,
-        method: 'REPLY',
-        slipName: pendingBet.slipName,
-        side: oppositeSideCode,
-        sideCode: oppositeSideCode,
-        amount: pendingBet.amount,
-        price: pendingBet.price,
-        timestamp: new Date().toISOString(),
-      };
-      
-      console.log(`   📊 Reply bet data:`, parsedBet);
-      
-      // ตรวจสอบความถูกต้อง
-      const validation = BettingMessageParserService.validateBet(parsedBet);
-      if (!validation.valid) {
-        return {
-          type: 'text',
-          text: validation.error,
+          text: `✅ จับคู่เล่นสำเร็จ\n\n` +
+            `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+            `💹 ราคา: ${parsedBet.price}\n\n` +
+            `👤 ${matchedPair.existingBet.displayName}\n` +
+            `   ฝั่ง: ${matchedPair.existingBet.sideCode}\n` +
+            `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
+            `👤 ${displayName}\n` +
+            `   ฝั่ง: ${parsedBet.sideCode}\n` +
+            `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
+            `⏳ รอการประกาศผล...`,
         };
       }
 
-      // ตรวจสอบยอดเงินคงเหลือของ User B
-      const groupId = source.groupId || null;
-      const groupAccountNumber = await this.getGroupAccountNumber(groupId);
-      const accountNumber = groupAccountNumber || 1;
-      
-      const balanceCheck = await balanceCheckService.checkAndNotify(
-        lineName,
-        parsedBet.amount,
+      // ❌ ไม่พบคู่ - บันทึกเป็นการเดิมพันใหม่
+      console.log(`❌ No matching pair found - recording as new bet`);
+
+      const recordResult = await bettingPairingService.recordBet(
         userId,
-        accountNumber,
-        groupId
+        displayName,
+        message.text,
+        parsedBet.slipName,
+        parsedBet.sideCode,
+        parsedBet.amount,
+        source.groupId || '',
+        ''
       );
 
-      if (!balanceCheck.registered) {
+      if (!recordResult.success) {
         return {
           type: 'text',
-          text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+          text: `❌ เกิดข้อผิดพลาดในการบันทึก: ${recordResult.message}`,
         };
       }
 
-      if (!balanceCheck.sufficient) {
-        return {
-          type: 'text',
-          text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
-        };
-      }
-
-      // อัปเดตแถวของ User A ด้วยข้อมูล User B
-      console.log(`📝 Updating row with User B data...`);
-      const userBData = {
-        userId: userId,
-        displayName: displayName,
-        sideCode: parsedBet.sideCode,
-        amount: parsedBet.amount,
-        price: parsedBet.price,
-        slipName: parsedBet.slipName,
-        groupName: '', // ยังไม่มีข้อมูล
-        tokenB: '', // ยังไม่มีข้อมูล
-      };
-
-      const updateResult = await bettingPairingService.updateRowWithUserB(
-        pendingBet.rowIndex,
-        userBData
-      );
-
-      if (!updateResult.success) {
-        console.error(`❌ Failed to update row: ${updateResult.message}`);
-        return {
-          type: 'text',
-          text: `❌ เกิดข้อผิดพลาดในการจับคู่: ${updateResult.message}`,
-        };
-      }
-
-      console.log(`✅ Row updated successfully`);
-      
       // ส่งข้อความยืนยัน
       return {
         type: 'text',
-        text: `✅ จับคู่เล่นสำเร็จ\n\n` +
+        text: `✅ บันทึกการเดิมพันสำเร็จ\n\n` +
           `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `💹 ราคา: ${parsedBet.price}\n\n` +
-          `👤 ${pendingBet.displayName}\n` +
-          `   ฝั่ง: ${pendingBet.sideCode}\n` +
-          `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
-          `👤 ${displayName}\n` +
-          `   ฝั่ง: ${parsedBet.sideCode}\n` +
-          `   ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
-          `⏳ รอการประกาศผล...`,
+          `💹 ราคา: ${parsedBet.price}\n` +
+          `💰 ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
+          `⏳ รอการจับคู่...`,
       };
     }
-
-    // Parse ข้อความเล่น (Direct Method)
-    const parsedBet = BettingMessageParserService.parseMessage(message.text);
-
-    if (!parsedBet.success) {
-      // ไม่ส่งข้อความแจ้งเตือนในกลุ่ม
-      return {
-        type: 'text',
-        text: `${parsedBet.error}\n\n${parsedBet.hint}`,
-      };
-    }
-
-    // ตรวจสอบความถูกต้อง
-    const validation = BettingMessageParserService.validateBet(parsedBet);
-    if (!validation.valid) {
-      return {
-        type: 'text',
-        text: validation.error,
-      };
-    }
-
-    // ตรวจสอบยอดเงินคงเหลือและชื่อผู้เล่น (อันดับแรก)
-    const groupId = source.groupId || null; // ดึง groupId จาก source
-    
-    // ดึง Account Number จากกลุ่ม (ใช้ Account 1 เป็น default)
-    const groupAccountNumber = await this.getGroupAccountNumber(groupId);
-    const accountNumber = groupAccountNumber || 1;
-    
-    const balanceCheck = await balanceCheckService.checkAndNotify(
-      lineName,
-      parsedBet.amount,
-      userId,
-      accountNumber, // ใช้ Account ของกลุ่ม
-      groupId // ส่ง groupId เพื่อแจ้งเตือนในกลุ่มด้วย
-    );
-
-    // ถ้าผู้เล่นไม่พบในระบบ ให้หยุดทันที
-    if (!balanceCheck.registered) {
-      return {
-        type: 'text',
-        text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
-      };
-    }
-
-    // ถ้ายอดเงินไม่พอ ให้หยุดทันที
-    if (!balanceCheck.sufficient) {
-      // ไม่ต้องส่งข้อความแจ้งเตือนเพิ่มเติม เพราะ checkAndNotify ได้ส่งไปแล้ว
-      return {
-        type: 'text',
-        text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
-      };
-    }
-
-    // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน) ก่อนบันทึก
-    // หมายเหตุ: REPLY Method ได้จัดการการจับคู่แล้ว ส่วนนี้สำหรับ Direct Method เท่านั้น
-    const PriceRangeMatchingService = require('./priceRangeMatchingService');
-    
-    console.log(`🔍 Fetching bets for group: ${source.groupId || 'NO_GROUP'}`);
-    const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
-    console.log(`   Found ${groupBets.length} bets in group`);
-    
-    if (groupBets.length > 0) {
-      console.log(`   Bets in group:`, groupBets.map(b => ({
-        displayName: b.displayName,
-        slipName: b.slipName,
-        sideCode: b.sideCode,
-        price: b.price,
-        amount: b.amount,
-        status: b.status
-      })));
-    }
-    
-    // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้) เฉพาะในกลุ่มเดียวกัน
-    const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, groupBets);
-    
-    console.log(`   Matching result:`, matchedPair ? 'FOUND' : 'NOT FOUND');
-    
-    if (matchedPair) {
-      // 🎯 พบคู่ - อัปเดตแถว User A โดยตรง (ไม่บันทึก User B ลงแถวใหม่)
-      console.log(`🎯 Auto-matched price range pair found!`);
-      console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
-      console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
-      
-      // 📝 อัปเดตแถวของ User A ด้วยข้อมูล User B
-      const userBData = {
-        userId: userId,
-        displayName: displayName,
-        sideCode: parsedBet.sideCode,
-        amount: matchedPair.betAmount,
-        price: parsedBet.price,
-        slipName: parsedBet.slipName,
-        groupName: '', // ยังไม่มีข้อมูล
-        tokenB: '', // ยังไม่มีข้อมูล
-      };
-
-      const updateResult = await bettingPairingService.updateRowWithUserB(
-        matchedPair.existingBet.rowIndex,
-        userBData
-      );
-
-      if (!updateResult.success) {
-        console.error(`❌ Failed to update row: ${updateResult.message}`);
-        // ถ้าอัปเดตไม่สำเร็จ ให้บันทึก User B ลงแถวใหม่แทน
-        const recordResult = await bettingPairingService.recordBet(
-          parsedBet,
-          userId,
-          displayName,
-          lineName,
-          '',
-          '',
-          source.groupId || ''
-        );
-      }
-      
-      // สร้างข้อความแจ้งการจับคู่
-      const messages = PriceRangeMatchingService.createAutoMatchMessage(
-        matchedPair,
-        displayName,
-        matchedPair.existingBet.displayName
-      );
-      
-      // ส่งข้อความแจ้งเตือนส่วนตัวและกลุ่ม
-      try {
-        const { LineNotificationService } = require('../line/lineNotificationService');
-        
-        // ดึง Account Number จากกลุ่ม
-        const groupAccountNumber = await this.getGroupAccountNumber(source.groupId);
-        const accountNumber = groupAccountNumber || 1; // ใช้ Account 1 เป็น default
-        
-        const notificationService = new LineNotificationService(accountNumber);
-        
-        // ส่งข้อความส่วนตัวให้ผู้เล่น A (ผู้เล่นเดิม)
-        console.log(`   📤 Sending private message to ${matchedPair.existingBet.displayName}`);
-        await notificationService.sendPrivateMessage(matchedPair.existingBet.userId, messages.messageB);
-        
-        // ส่งข้อความส่วนตัวให้ผู้เล่น B (ผู้เล่นใหม่)
-        console.log(`   📤 Sending private message to ${displayName}`);
-        await notificationService.sendPrivateMessage(userId, messages.messageA);
-        
-        // ส่งข้อความเข้ากลุ่ม (ถ้ามี groupId)
-        if (source.groupId) {
-          console.log(`   📢 Sending group message to group ${source.groupId}`);
-          await notificationService.sendGroupMessage(source.groupId, messages.groupMessage);
-        }
-        
-        console.log(`✅ Auto-match notifications sent successfully`);
-      } catch (notificationError) {
-        console.error(`❌ Failed to send notifications: ${notificationError.message}`);
-      }
-      
-      return {
-        type: 'text',
-        text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-          `🎆 บั้งไฟ: ${parsedBet.slipName}\n\n` +
-          `👤 ${matchedPair.existingBet.displayName}\n` +
-          `   ฝั่ง: ${matchedPair.existingBet.sideCode}\n` +
-          `   ราคา: ${matchedPair.existingBet.price}\n` +
-          `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
-          `👤 ${displayName}\n` +
-          `   ฝั่ง: ${parsedBet.sideCode}\n` +
-          `   ราคา: ${parsedBet.price}\n` +
-          `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
-          `⏳ รอการประกาศผล...`,
-      };
-    }
-
-    // ⏳ ไม่พบคู่ - บันทึก User A ลงแถวใหม่และรอการจับคู่
-    console.log(`⏳ No match found - recording bet and waiting for opponent`);
-    
-    const recordResult = await bettingPairingService.recordBet(
-      parsedBet,
-      userId,
-      displayName,
-      lineName,
-      '', // groupName (ยังไม่มีข้อมูล)
-      '', // userToken (ยังไม่มีข้อมูล)
-      source.groupId || '' // groupId
-    );
-
-    if (!recordResult.success) {
-      return {
-        type: 'text',
-        text: recordResult.message,
-      };
-    }
-
-    // ส่งข้อความยืนยัน
-    const confirmMessage = this.buildConfirmationMessage(parsedBet, displayName);
-    return {
-      type: 'text',
-      text: confirmMessage,
-    };
-  }
 
   /**
    * จัดการคำสั่งแอดมิน

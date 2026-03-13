@@ -242,7 +242,7 @@ class BettingResultService {
       await this.ensureInitialized();
 
       const { bet1, bet2 } = result.pair;
-      const { winner, loser, isDraw } = result;
+      const PriceRangeCalculator = require('./priceRangeCalculator');
 
       // ค้นหาแถวที่จับคู่ไปแล้ว
       const response = await this.sheets.spreadsheets.values.get({
@@ -252,6 +252,7 @@ class BettingResultService {
 
       const values = response.data.values || [];
       let matchedRowIndex = -1;
+      let matchedRow = null;
 
       // ค้นหาแถวที่มี User A + User B ของบั้งไฟนี้
       for (let i = 0; i < values.length; i++) {
@@ -272,6 +273,7 @@ class BettingResultService {
           userBName === expectedUserBName
         ) {
           matchedRowIndex = i + 2; // +2 เพราะ header + 0-indexed
+          matchedRow = row;
           break;
         }
       }
@@ -282,33 +284,82 @@ class BettingResultService {
         return { success: false, error: 'No matched row found' };
       }
 
-      // คำนวณยอดเงิน
-      const FEE_PERCENTAGE = 0.1; // 10%
-      const DRAW_FEE_PERCENTAGE = 0.05; // 5%
+      // ตรวจสอบว่าเป็นการเล่นร้องช่วงราคาหรือไม่
+      const messageA = matchedRow[3] || ''; // Column D
+      const priceRange = PriceRangeCalculator.parsePriceRange(messageA);
+
+      let resultStatusA, resultStatusB, amountA, amountB;
       const betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
 
-      let amountA = 0;
-      let amountB = 0;
+      if (priceRange) {
+        // ✅ การเล่นร้องช่วงราคา - ใช้ priceRangeCalculator
+        console.log(`   📊 Price range betting detected: ${messageA}`);
+        
+        const priceResult = PriceRangeCalculator.calculateResult(score, priceRange);
+        const symbols = PriceRangeCalculator.getResultSymbols(priceResult);
+        
+        resultStatusA = symbols.resultA;
+        resultStatusB = symbols.resultB;
 
-      if (isDraw) {
-        // เสมอ: หัก 5% ทั้งสองฝั่ง
-        const drawFee = Math.round(betAmount * DRAW_FEE_PERCENTAGE);
-        amountA = -drawFee;
-        amountB = -drawFee;
-      } else {
-        // ชนะ-แพ้: หัก 10% จากยอดเล่น
-        const fee = Math.round(betAmount * FEE_PERCENTAGE);
-        const netWinAmount = betAmount - fee;
+        console.log(`   📊 Price range result: ${priceResult.reason}`);
 
-        if (winner.userId === bet1.userId) {
-          // bet1 (A) ชนะ
-          amountA = netWinAmount;
-          amountB = -betAmount;
+        // คำนวณยอดเงิน
+        const FEE_PERCENTAGE = 0.1; // 10%
+        const DRAW_FEE_PERCENTAGE = 0.05; // 5%
+
+        if (priceResult.isDraw) {
+          // เสมอ: หัก 5% ทั้งสองฝั่ง
+          const drawFee = Math.round(betAmount * DRAW_FEE_PERCENTAGE);
+          amountA = -drawFee;
+          amountB = -drawFee;
         } else {
-          // bet2 (B) ชนะ
-          amountA = -betAmount;
-          amountB = netWinAmount;
+          // ชนะ-แพ้: หัก 10% จากยอดเล่น
+          const fee = Math.round(betAmount * FEE_PERCENTAGE);
+          const netWinAmount = betAmount - fee;
+
+          if (priceResult.winner === 'A') {
+            // A ชนะ
+            amountA = netWinAmount;
+            amountB = -betAmount;
+          } else {
+            // B ชนะ
+            amountA = -betAmount;
+            amountB = netWinAmount;
+          }
         }
+      } else {
+        // ❌ การเล่นปกติ - ใช้ result object เดิม
+        console.log(`   📊 Normal betting (no price range)`);
+        
+        const { winner, isDraw } = result;
+
+        // คำนวณยอดเงิน
+        const FEE_PERCENTAGE = 0.1; // 10%
+        const DRAW_FEE_PERCENTAGE = 0.05; // 5%
+
+        if (isDraw) {
+          // เสมอ: หัก 5% ทั้งสองฝั่ง
+          const drawFee = Math.round(betAmount * DRAW_FEE_PERCENTAGE);
+          amountA = -drawFee;
+          amountB = -drawFee;
+        } else {
+          // ชนะ-แพ้: หัก 10% จากยอดเล่น
+          const fee = Math.round(betAmount * FEE_PERCENTAGE);
+          const netWinAmount = betAmount - fee;
+
+          if (winner.userId === bet1.userId) {
+            // bet1 (A) ชนะ
+            amountA = netWinAmount;
+            amountB = -betAmount;
+          } else {
+            // bet2 (B) ชนะ
+            amountA = -betAmount;
+            amountB = netWinAmount;
+          }
+        }
+
+        resultStatusA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
+        resultStatusB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
       }
 
       // อัปเดตผลลัพธ์
@@ -321,14 +372,12 @@ class BettingResultService {
       });
 
       // Column J: ผลแพ้ชนะ A (Symbol: ✅/❌/⛔️)
-      const resultStatusA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
         values: [[resultStatusA]],
       });
 
       // Column K: ผลแพ้ชนะ B (Symbol: ✅/❌/⛔️)
-      const resultStatusB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
       updates.push({
         range: `${this.betsSheetName}!K${matchedRowIndex}`,
         values: [[resultStatusB]],
@@ -367,6 +416,7 @@ class BettingResultService {
       console.log(`   Column I: ${score}`);
       console.log(`   Column J: ${resultStatusA}`);
       console.log(`   Column K: ${resultStatusB}`);
+      console.log(`   Column R: ${userBId}`);
       console.log(`   Column S: ${amountA}`);
       console.log(`   Column T: ${amountB}`);
       return { success: true };
