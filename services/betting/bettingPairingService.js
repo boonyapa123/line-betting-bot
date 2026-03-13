@@ -471,8 +471,14 @@ class BettingPairingService {
         const hasPriceRange1 = bet1.price && bet1.price.includes('-');
         const hasPriceRange2 = bet2.price && bet2.price.includes('-');
 
+        // ถ้าทั้งสองฝั่งมีช่วงราคา → เสมอ
+        if (hasPriceRange1 && hasPriceRange2) {
+          isDraw = true;
+          winner = bet1;
+          loser = bet2;
+        }
         // ตรวจสอบ bet1 มีช่วงราคา
-        if (hasPriceRange1) {
+        else if (hasPriceRange1) {
           // bet1 มีช่วงราคา → ตรวจสอบตามช่วง
           const priceRange1 = this.parsePriceRange(bet1.price);
           const isInRange1 = score >= priceRange1.min && score <= priceRange1.max;
