@@ -465,7 +465,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     let finalResultSymbol = resultSymbol;
 
-    // ✅ ตรวจสอบการเล่นแบบร้องราคา (Direct Method 2) - ตรวจสอบเฉพาะ priceA ที่มี '-'
+    // ✅ ตรวจสอบการเล่นแบบร้องราคา (Direct Method 2) - ตรวจสอบเฉพาะ priceA
     if (priceA && priceA.includes('-')) {
       console.log(`   🎯 Detected price range betting (Direct Method 2)`);
       
@@ -478,7 +478,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         return { min: 0, max: 999 };
       };
       
-      const rangeA = parsePriceRange(priceA);
+      const rangeA = parsePriceRange(priceToUse);
       const score = resultNumber;
       
       const isInRangeA = score >= rangeA.min && score <= rangeA.max;
@@ -500,32 +500,34 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
         const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
         
+        // ใช้ betType ที่ตรงกับ priceToUse
+        const betTypeToUse = (priceA && priceA.includes('-')) ? betTypeA : betTypeB;
+        
         if (lowBetTypes.includes(betTypeA)) {
           // ต่ำ: ตัดสินตามผลที่ออก
           if (score < rangeA.min) {
             // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ
             console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins`);
             finalResultSymbol = '✅';
-            console.log(`   ✅ Low bet type (${betTypeA}) wins`);
+            console.log(`   ✅ Low bet type (${betTypeToUse}) wins`);
           } else {
             // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ
             console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins`);
             finalResultSymbol = '❌';
-            console.log(`   ❌ Low bet type (${betTypeA}) loses`);
+            console.log(`   ❌ Low bet type (${betTypeToUse}) loses`);
           }
         } else if (highBetTypes.includes(betTypeA)) {
           // สูง: ตัดสินตามผลที่ออก
-          console.log(`   📊 Score outside range → Determine winner by score position`);
           if (score < rangeA.min) {
             // ผลต่ำกว่าช่วง → ฝั่ง ย ชนะ
-            console.log(`   � Score ${score} < Range min ${rangeA.min} → Low side wins`);
+            console.log(`   📊 Score ${score} < Range min ${rangeA.min} → Low side wins`);
             finalResultSymbol = '❌';
-            console.log(`   ❌ High bet type (${betTypeA}) loses`);
+            console.log(`   ❌ High bet type (${betTypeToUse}) loses`);
           } else {
             // ผลสูงกว่าช่วง → ฝั่ง ล ชนะ
             console.log(`   📊 Score ${score} > Range max ${rangeA.max} → High side wins`);
             finalResultSymbol = '✅';
-            console.log(`   ✅ High bet type (${betTypeA}) wins`);
+            console.log(`   ✅ High bet type (${betTypeToUse}) wins`);
           }
         } else {
           // ประเภทอื่น ใช้ resultSymbol ตามปกติ
