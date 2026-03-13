@@ -495,7 +495,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         userBName: userBName,
         userBId: userBId,
         amount: betAmount,
-        price: priceA,
+        price: priceA,  // เอาช่วงราคาจาก Column D เท่านั้น
         side: sideA,
         method: hasPriceRangeA ? 2 : 1,
       },
@@ -504,9 +504,9 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         displayName: userBName,
         userBName: userAName,
         amount: betAmount,
-        price: hasPriceRangeB ? priceB : null,
+        price: null,  // ไม่ใช้ Column M - เอาจาก Column D เท่านั้น
         side: sideA, // B อยู่ตรงข้าม A เสมอ
-        method: hasPriceRangeB ? 2 : 'REPLY',
+        method: hasPriceRangeA ? 2 : 'REPLY',  // ตามว่า A มีช่วงราคาหรือไม่
       },
     };
 
