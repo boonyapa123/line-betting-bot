@@ -2371,17 +2371,17 @@ app.post('/webhook', async (req, res) => {
                 // ถ้า User B ไม่มีช่วงราคา ให้ใช้ของ User A
                 const finalPriceRangeB = priceRangeB || priceRangeA;
                 
-                if (!priceRangeA) {
-                  console.log(`❌ Missing price range in User A message`);
-                  return;
+                // ถ้า User A มีช่วงราคา ต้องตรวจสอบ
+                if (priceRangeA) {
+                  if (priceRangeA !== finalPriceRangeB) {
+                    console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${finalPriceRangeB}"`);
+                    return;
+                  }
+                  console.log(`✅ Price ranges match: "${priceRangeA}"`);
+                } else {
+                  // ถ้า User A ไม่มีช่วงราคา ใช้ได้ (เล่นแบบเดิม)
+                  console.log(`✅ No price range (traditional betting)`);
                 }
-                
-                if (priceRangeA !== finalPriceRangeB) {
-                  console.log(`❌ Price ranges don't match: "${priceRangeA}" vs "${finalPriceRangeB}"`);
-                  return;
-                }
-                
-                console.log(`✅ Price ranges match: "${priceRangeA}"`);
                 
                 // 🎯 REPLY MATCHING: ตรวจสอบชื่อบั้งไฟตรงกัน (ถ้ามี)
                 const fireworkNameA = betDetailsA.fireworkName;
