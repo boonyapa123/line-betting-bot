@@ -478,7 +478,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         return { min: 0, max: 999 };
       };
       
-      const rangeA = parsePriceRange(priceToUse);
+      const rangeA = parsePriceRange(priceA);
       const score = resultNumber;
       
       const isInRangeA = score >= rangeA.min && score <= rangeA.max;
@@ -595,27 +595,44 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     const fullRow = fullRowResponse.data.values?.[0] || [];
 
-    // อัปเดตผลลัพธ์ในชีท
+    // สร้างข้อความผลลัพธ์ที่ถูกต้อง
+    let userAResultText = '';
+    let userBResultText = '';
+
+    if (finalResultSymbol === '✅') {
+      userAResultText = `ชนะ ${Math.abs(userAWinnings).toFixed(0)} บาท`;
+      userBResultText = `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+    } else if (finalResultSymbol === '❌') {
+      userAResultText = `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท`;
+      userBResultText = `ชนะ ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+    } else if (finalResultSymbol === '⛔️') {
+      userAResultText = `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`;
+      userBResultText = `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`;
+    }
+
+    // อัปเดตผลลัพธ์ในชีท (Column I-U)
+    // I=ผลที่ออก, J=ผลแพ้ชนะ, K=Opposite (ผิด), L-R=ข้อมูลอื่น, S=ผลลัพธ์A, T=ผลลัพธ์B, U=สถานะ
+    // ต้องอัปเดตแยกเพราะ Column K ผิด
+    
+    // อัปเดต Column I-J (ผลที่ออก, ผลแพ้ชนะ)
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:T${rowIndex}`,
+      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:J${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[
-          resultNumber,
-          finalResultSymbol,
-          oppositeResult,
-          fullRow[11] || '',
-          fullRow[12] || '',
-          fullRow[13] || '',
-          fullRow[14] || '',
-          fullRow[15] || '',
-          fullRow[16] || '',
-          fullRow[17] || '',
-          finalResultSymbol === '✅' ? `ชนะ ${userAWinnings.toFixed(0)} บาท` : finalResultSymbol === '❌' ? `แพ้ ${Math.abs(userAWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userAWinnings).toFixed(0)} บาท`,
-          oppositeResult === '✅' ? `ชนะ ${userBWinnings.toFixed(0)} บาท` : oppositeResult === '❌' ? `แพ้ ${Math.abs(userBWinnings).toFixed(0)} บาท` : `เสมอ หัก ${Math.abs(userBWinnings).toFixed(0)} บาท`,
-        ]],
+        values: [[resultNumber, finalResultSymbol]],
+      },
+    });
+
+    // อัปเดต Column S-T (ผลลัพธ์ A, ผลลัพธ์ B)
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!S${rowIndex}:T${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[userAResultText, userBResultText]],
       },
     });
 
