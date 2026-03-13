@@ -2255,13 +2255,15 @@ app.post('/webhook', async (req, res) => {
               // ✅ ใช้ bettingRoundController ที่ทำงานถูกต้องแล้ว
               console.log(`🎯 Using bettingRoundController for message processing`);
               
+              let isHandledByController = false;
               try {
                 const bettingRoundController = require('./services/betting/bettingRoundController');
                 
                 // เตรียมข้อมูลสำหรับ bettingRoundController
                 const result = await bettingRoundController.handleMessage({
                   message: {
-                    text: message.content
+                    text: message.content,
+                    quotedMessageId: message.quotedMessageId
                   },
                   source: {
                     userId: message.userId,
@@ -2273,11 +2275,21 @@ app.post('/webhook', async (req, res) => {
                 console.log(`✅ bettingRoundController processed successfully`);
                 console.log(`   Result:`, result);
                 
+                // ถ้า bettingRoundController จัดการการจับคู่แล้ว ให้ข้ามการบันทึกซ้ำ
+                if (result && result.text && result.text.includes('จับคู่เล่นสำเร็จ')) {
+                  isHandledByController = true;
+                  console.log(`✅ Pair already handled by bettingRoundController - skipping duplicate recording`);
+                }
+                
               } catch (controllerError) {
                 console.error(`❌ bettingRoundController error: ${controllerError.message}`);
                 console.error(controllerError.stack);
               }
               
+              // ข้ามการบันทึกซ้ำถ้า bettingRoundController ได้จัดการแล้ว
+              if (isHandledByController) {
+                return;
+              }
 
               
               // Detect pair
@@ -2555,7 +2567,13 @@ app.post('/webhook', async (req, res) => {
                     console.log(`✅ Pair recorded successfully`);
                     
                     // 📢 ส่งข้อความแจ้งเตือนเมื่อจับคู่เล่นสำเร็จ
-                    const fireworkName = pair.messageA.split(' ')[0]; // ดึงชื่อบั้งไฟจากข้อความ
+                    // ดึงชื่อบั้งไฟจากข้อความ (สำหรับ Method 2: 370-400 ล 20 แอด → แอด)
+                    let fireworkName = extractFireworkName(pair.messageA);
+                    if (!fireworkName) {
+                      // ถ้าไม่พบ ให้ดึงจากท้ายข้อความ
+                      const parts = pair.messageA.trim().split(/\s+/);
+                      fireworkName = parts[parts.length - 1];
+                    }
                     const betAmount = pair.betAmount || extractBetAmount(pair.messageA);
                     
                     // ข้อความแจ้งเตือนส่วนตัวสำหรับผู้เล่น A
