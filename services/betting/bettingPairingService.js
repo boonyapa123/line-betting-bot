@@ -213,8 +213,8 @@ class BettingPairingService {
           const betAmount = Math.min(bet1.amount || 0, bet2.amount || 0);
 
           pairs.push({
-            bet1: { ...bet1, index: i },
-            bet2: { ...bet2, index: j },
+            bet1: { ...bet1, index: i, price: bet1.price },  // ✅ เพิ่ม price
+            bet2: { ...bet2, index: j, price: bet2.price },  // ✅ เพิ่ม price
             betAmount,
           });
           processed.add(i);

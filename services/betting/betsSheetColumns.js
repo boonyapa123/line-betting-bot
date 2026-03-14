@@ -98,10 +98,20 @@ class BetsSheetColumns {
   static parseRow(row) {
     // Parse price จากข้อความ (column D)
     // ตัวอย่าง: "320-340 ล 100 คำไผ่" → price = "320-340"
+    // ตัวอย่าง: "ไล่/370-410/20เป็ด" → price = "370-410"
+    // ตัวอย่าง: "ไล่/370-400/50/เป็ด" → price = "370-400"
     // ตัวอย่าง: "ชล 500 ฟ้าหลังฝน" → price = null (Method 1)
     const message = row[this.COLUMNS.MESSAGE_A] || '';
-    const priceMatch = message.match(/^(\d+-\d+)/);
-    const price = priceMatch ? priceMatch[1] : null;
+    
+    // ตรวจสอบรูปแบบ slash ก่อน: [ฝั่ง]/[ราคา]/[ยอดเงิน][ชื่อบั้งไฟ] หรือ [ฝั่ง]/[ราคา]/[ยอดเงิน]/[ชื่อบั้งไฟ]
+    let priceMatch = message.match(/\/(\d+[\-\.\/\*]\d+)\//);
+    let price = priceMatch ? priceMatch[1] : null;
+    
+    // ถ้าไม่พบ ให้ตรวจสอบรูปแบบปกติ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+    if (!price) {
+      priceMatch = message.match(/^(\d+[\-\.\/\*]\d+)/);
+      price = priceMatch ? priceMatch[1] : null;
+    }
 
     // ดึง slipName จาก column E (ชื่อบั้งไฟ)
     // ถ้าไม่มี หรือมีค่าผิด (มีราคา) ให้ดึงจากท้ายข้อความ

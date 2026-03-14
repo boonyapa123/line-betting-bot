@@ -210,15 +210,21 @@ class BettingResultService {
     // เอาช่วงราคาจาก bet1.price (ควรเป็นเฉพาะช่วงราคา เช่น "360-400")
     const hasPriceRange = bet1.price && bet1.price.includes('-');
 
+    console.log(`   🔍 checkPriceRangeResult: bet1.price=${bet1.price}, hasPriceRange=${hasPriceRange}, score=${score}`);
+
     if (!hasPriceRange) {
+      console.log(`   ⚠️  No price range found, returning null`);
       return null;
     }
 
     const priceRange = bettingPairingService.constructor.parsePriceRange(bet1.price);
     const inRange = score >= priceRange.min && score <= priceRange.max;
 
+    console.log(`   💹 Price Range: ${priceRange.min}-${priceRange.max}, inRange=${inRange}`);
+
     // ถ้าผลออกในช่วง → เสมอ (คืนเงิน)
     if (inRange) {
+      console.log(`   ✅ Result in range → DRAW`);
       return { isDraw: true, winner: null, loser: null };
     }
 
