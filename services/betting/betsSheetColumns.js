@@ -104,9 +104,15 @@ class BetsSheetColumns {
     const price = priceMatch ? priceMatch[1] : null;
 
     // ดึง slipName จาก column E (ชื่อบั้งไฟ)
-    // ถ้าไม่มี ให้ดึงจากท้ายข้อความ
+    // ถ้าไม่มี หรือมีค่าผิด (มีราคา) ให้ดึงจากท้ายข้อความ
     let slipName = row[this.COLUMNS.SLIP_NAME];
-    if (!slipName) {
+    
+    // ตรวจสอบว่า slipName มีค่าผิด (มีราคา เช่น "360-400 เป็ด")
+    if (slipName && slipName.match(/^\d+-\d+\s+/)) {
+      // ถ้า slipName มีรูปแบบ "ราคา ชื่อบั้งไฟ" ให้ดึงเฉพาะชื่อบั้งไฟ
+      const slipMatch = slipName.match(/\s+(.+)$/);
+      slipName = slipMatch ? slipMatch[1] : slipName;
+    } else if (!slipName) {
       // Parse slipName จากท้ายข้อความ
       // ตัวอย่าง: "320-340 ล 100 คำไผ่" → slipName = "คำไผ่"
       const slipMatch = message.match(/\s+(\S+)$/);
