@@ -558,7 +558,8 @@ class BettingRoundController {
         displayName,
         '',
         '',
-        source.groupId || ''
+        source.groupId || '',
+        message.text  // ส่งข้อความเดิมจาก User A
       );
 
       if (!recordResult.success) {

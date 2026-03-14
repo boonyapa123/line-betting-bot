@@ -61,7 +61,7 @@ class BettingPairingService {
    * @param {string} groupId - Group ID (optional)
    * @returns {object}
    */
-  async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '') {
+  async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '', originalMessage = '') {
     try {
       // Ensure initialization is complete
       await this.ensureInitialized();
@@ -70,11 +70,10 @@ class BettingPairingService {
 
       console.log(`📊 recordBet received betData:`, JSON.stringify(betData, null, 2));
 
-      // สร้างข้อมูลสำหรับบันทึก
-      // รูปแบบข้อความ: "320-340 ล 100 คำไผ่" หรือ "ชล 500 ฟ้าหลังฝน"
-      const messageText = betData.price 
+      // ถ้ามีข้อความเดิม ให้ใช้ข้อความเดิม ไม่ใช่สร้างข้อความใหม่
+      const messageText = originalMessage || (betData.price 
         ? `${betData.price} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`
-        : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`;
+        : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`);
       
       const timestamp = new Date().toLocaleString('th-TH', {
         year: 'numeric',
