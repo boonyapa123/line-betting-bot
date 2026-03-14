@@ -487,6 +487,22 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     const hasPriceRangeA = priceA && priceA.includes('-');
     const hasPriceRangeB = priceB && priceB.includes('-');
 
+    // ✅ แยกช่วงราคาจากข้อความ (เช่น "ไล่/370-410/20เป็ด" → "370-410")
+    const extractPriceRange = (message) => {
+      if (!message) return null;
+      // ตรวจสอบรูปแบบ slash: [ฝั่ง]/[ราคา]/[ยอดเงิน][ชื่อบั้งไฟ] หรือ [ฝั่ง]/[ราคา]/[ยอดเงิน]/[ชื่อบั้งไฟ]
+      let match = message.match(/\/(\d+[\-\.\/\*]\d+)\//);
+      if (match) return match[1];
+      
+      // ตรวจสอบรูปแบบปกติ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+      match = message.match(/^(\d+[\-\.\/\*]\d+)/);
+      if (match) return match[1];
+      
+      return null;
+    };
+
+    const extractedPriceA = extractPriceRange(priceA);
+
     // สร้าง pair object สำหรับ bettingResultService
     const pair = {
       bet1: {
@@ -495,7 +511,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         userBName: userBName,
         userBId: userBId,
         amount: betAmount,
-        price: priceA,  // เอาช่วงราคาจาก Column D เท่านั้น
+        price: extractedPriceA,  // ✅ ใช้ช่วงราคาที่แยกออกมา (เช่น "370-410")
         side: sideA,
         method: hasPriceRangeA ? 2 : 1,
       },
