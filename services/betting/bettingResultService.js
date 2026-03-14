@@ -77,7 +77,7 @@ class BettingResultService {
     
     // ถ้าเป็นการเล่นแบบร้องราคา ให้ใช้ผลจาก checkPriceRangeResult
     if (priceRangeResult) {
-      const { isDraw, winner, loser } = priceRangeResult;
+      const { isDraw, winnerUserId, loserUserId } = priceRangeResult;
       
       // ใช้ยอดเดิมพันที่น้อยกว่า (ยอดที่จับคู่ได้จริง)
       const winAmount = Math.min(bet1.amount || 0, bet2.amount || 0) || bet1.amount || bet2.amount || 0;
@@ -111,6 +111,10 @@ class BettingResultService {
         // ชนะ-แพ้ปกติ: หัก 10% จากยอดเล่น
         const fee = Math.round(winAmount * this.FEE_PERCENTAGE);
         const netWinAmount = winAmount - fee;
+
+        // กำหนด winner และ loser ตามที่ checkPriceRangeResult ส่งกลับ
+        const winner = winnerUserId === bet1.userId ? bet1 : bet2;
+        const loser = loserUserId === bet1.userId ? bet1 : bet2;
 
         return {
           isDraw: false,
@@ -225,7 +229,7 @@ class BettingResultService {
     // ถ้าผลออกในช่วง → เสมอ (คืนเงิน)
     if (inRange) {
       console.log(`   ✅ Result in range → DRAW`);
-      return { isDraw: true, winner: null, loser: null };
+      return { isDraw: true, winnerUserId: null, loserUserId: null };
     }
 
     // ผลออกนอกช่วง → ตรวจสอบตามกฎ ย/ล
@@ -237,10 +241,10 @@ class BettingResultService {
     if (isYang) {
       // ฝ่าย ย (ต่ำ): ชนะเมื่อผลต่ำกว่าช่วง
       if (score < priceRange.min) {
-        return { isDraw: false, winner: bet1, loser: bet2 };
+        return { isDraw: false, winnerUserId: bet1.userId, loserUserId: bet2.userId };
       } else {
         // ผลสูงกว่าช่วง → bet2 ชนะ
-        return { isDraw: false, winner: bet2, loser: bet1 };
+        return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
       }
     }
 
@@ -248,15 +252,15 @@ class BettingResultService {
     if (isLow) {
       // ฝ่าย ล (สูง): ชนะเมื่อผลสูงกว่าช่วง
       if (score > priceRange.max) {
-        return { isDraw: false, winner: bet1, loser: bet2 };
+        return { isDraw: false, winnerUserId: bet1.userId, loserUserId: bet2.userId };
       } else {
         // ผลต่ำกว่าช่วง → bet2 ชนะ
-        return { isDraw: false, winner: bet2, loser: bet1 };
+        return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
       }
     }
 
     // ถ้าไม่มี ย หรือ ล → bet2 ชนะ
-    return { isDraw: false, winner: bet2, loser: bet1 };
+    return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
   }
 
   /**
@@ -341,14 +345,14 @@ class BettingResultService {
       });
 
       // Column J: ผลแพ้ชนะ A (Symbol: ✅/❌/⛔️)
-      const resultStatusA = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '✅' : '❌');
+      const resultStatusA = isDraw ? '⛔️' : (result.winner.userId === bet1.userId ? '✅' : '❌');
       updates.push({
         range: `${this.betsSheetName}!J${matchedRowIndex}`,
         values: [[resultStatusA]],
       });
 
       // Column K: ผลแพ้ชนะ B (Symbol: ✅/❌/⛔️) - ตรงข้ามกับ A
-      const resultStatusB = isDraw ? '⛔️' : (winner.userId === bet1.userId ? '❌' : '✅');
+      const resultStatusB = isDraw ? '⛔️' : (result.winner.userId === bet1.userId ? '❌' : '✅');
       updates.push({
         range: `${this.betsSheetName}!K${matchedRowIndex}`,
         values: [[resultStatusB]],
