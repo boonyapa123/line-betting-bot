@@ -222,6 +222,21 @@ class BetsSheetColumns {
   }
 
   /**
+   * ดึงฝั่งตรงข้าม
+   * @param {string} sideCode - Side code (เช่น "ล", "ต", "ชล", "ชถ")
+   * @returns {string} ฝั่งตรงข้าม
+   */
+  static getOppositeSide(sideCode) {
+    const opposites = {
+      'ชล': 'ชถ',
+      'ชถ': 'ชล',
+      'ล': 'ต',
+      'ต': 'ล',
+    };
+    return opposites[sideCode] || sideCode;
+  }
+
+  /**
    * สร้าง Price B จาก Price A โดยเปลี่ยน side เป็น opposite
    * @param {string} priceA - Price A (เช่น "300-320 ล 20 ฟ้า")
    * @param {string} sideCodeA - Side code ของ User A (เช่น "ล")
@@ -267,6 +282,19 @@ class BetsSheetColumns {
     // ✅ บันทึก amount B
     if (userBData.amount !== undefined && userBData.amount !== null) {
       row[this.COLUMNS.AMOUNT_B] = userBData.amount;
+    }
+    
+    // ✅ บันทึก slip name (ไม่ให้เปลี่ยน)
+    // ถ้า userBData มี slipName ให้ใช้ค่านั้น (ป้องกันการเปลี่ยนแปลง)
+    if (userBData.slipName) {
+      // แก้ไข slip name ถ้ามีรูปแบบ "ราคา ชื่อบั้งไฟ"
+      let slipName = userBData.slipName;
+      if (slipName && slipName.match(/^\d+-\d+\s+/)) {
+        // ถ้า slipName มีรูปแบบ "ราคา ชื่อบั้งไฟ" ให้ดึงเฉพาะชื่อบั้งไฟ
+        const slipMatch = slipName.match(/\s+(.+)$/);
+        slipName = slipMatch ? slipMatch[1] : slipName;
+      }
+      row[this.COLUMNS.SLIP_NAME] = slipName;
     }
     
     if (userBData.groupName) row[this.COLUMNS.GROUP_NAME] = userBData.groupName;

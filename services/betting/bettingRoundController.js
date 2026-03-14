@@ -192,7 +192,7 @@ class BettingRoundController {
           amount: parsedBet.amount,
           price: parsedBet.price,
           priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
-          slipName: parsedBet.slipName,
+          slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
           groupName: '', // ยังไม่มีข้อมูล
           tokenB: '', // ยังไม่มีข้อมูล
         };
@@ -216,7 +216,7 @@ class BettingRoundController {
         return {
           type: 'text',
           text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-            `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
+            `🎆 บั้งไฟ: ${pendingBet.slipName}\n` +
             `💹 ราคา: ${parsedBet.price}\n\n` +
             `👤 ${pendingBet.displayName}\n` +
             `   ฝั่ง: ${pendingBet.sideCode}\n` +
@@ -349,7 +349,7 @@ class BettingRoundController {
           amount: parsedBet.amount,
           price: parsedBet.price,
           priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
-          slipName: parsedBet.slipName,
+          slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
           groupName: '', // ยังไม่มีข้อมูล
           tokenB: '', // ยังไม่มีข้อมูล
         };
@@ -480,7 +480,7 @@ class BettingRoundController {
           amount: matchedPair.betAmount,
           price: parsedBet.price,
           priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
-          slipName: parsedBet.slipName,
+          slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
           groupName: '', // ยังไม่มีข้อมูล
           tokenB: '', // ยังไม่มีข้อมูล
         };
