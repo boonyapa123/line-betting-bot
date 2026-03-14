@@ -34,7 +34,7 @@ class BettingMessageParserService {
   static METHOD2_PATTERN = /^(.+?)\s+([ลย]\.)\s+(\d+)\s+(.+)$/;
   static METHOD2_ALT_PATTERN = /^(.+?)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SIMPLE_PATTERN = /^(\d+[\-\.\/\*]\d+)\s+([ลย])\s+(\d+)\s+(.+)$/;
-  static METHOD2_SLASH_PATTERN = /^([ตยสลไถ][ก-๙]*)\/(\d+[\-\.\/\*]\d+)\/(\d+)([ก-๙]+)$/;
+  static METHOD2_SLASH_PATTERN = /^([ก-๙]+)\/(\d+[\-\.\/\*]\d+)\/(\d+)([ก-๙]+)$/;
 
   /**
    * Parse ข้อความเล่น
@@ -219,6 +219,7 @@ class BettingMessageParserService {
       'ล': 'ไล่',
       'ไล่': 'ไล่',
       'ย': 'ยั้ง',
+      'ยั้ง': 'ยั้ง',
       'ต': 'ต่ำ/ยั่ง',
       'ส': 'สูง/ไล่',
     };
@@ -227,6 +228,7 @@ class BettingMessageParserService {
       'ล': 'ล',
       'ไล่': 'ล',
       'ย': 'ย',
+      'ยั้ง': 'ย',
       'ต': 'ต',
       'ส': 'ส',
     };
