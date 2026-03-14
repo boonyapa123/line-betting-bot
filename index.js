@@ -655,14 +655,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     } else {
-      const messageA = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
+      const messageA = `⛔️ เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userANewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
 
       if (userAId && userAName) {
         await sendLineMessageToUser(userAId, messageA, userAToken);
       }
 
       if (userBId && userBName) {
-        const messageB = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
+        const messageB = `⛔️ เสมอ\n\n🎆 บั้งไฟ: ${fireworkName}\n💰 เดิมพัน: ${betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: ${userBNewBalance.toFixed(0)} บาท\n\nเสมอกันครับ`;
         await sendLineMessageToUser(userBId, messageB, userBToken);
       }
     }
@@ -1068,7 +1068,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
           userACommission += calcA.commission;
           userBCommission += calcB.commission;
           
-          summary += `   🤝 เสมอ\n`;
+          summary += `   ⛔️ เสมอ\n`;
           summary += `      ${pairData.userAName} ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 5%: ${calcA.commission.toFixed(0)} บาท)\n`;
           summary += `      ${pairData.userBName} ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 5%: ${calcB.commission.toFixed(0)} บาท)\n`;
         }
@@ -2268,7 +2268,7 @@ app.post('/webhook', async (req, res) => {
                     resultLine = `❌ ${pair.playerB.userAName} ชนะ vs ${pair.playerA.userAName}\n`;
                     resultLine += `   เดิมพัน: ${betAmount} บาท | ได้รับ: ${winLoss.winningsB.toFixed(0)} บาท\n`;
                   } else {
-                    resultLine = `🤝 ${pair.playerA.userAName} vs ${pair.playerB.userAName} เสมอ\n`;
+                    resultLine = `⛔️ ${pair.playerA.userAName} vs ${pair.playerB.userAName} เสมอ\n`;
                     resultLine += `   เดิมพัน: ${betAmount} บาท | ค่าธรรมเนียม: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n`;
                   }
                   

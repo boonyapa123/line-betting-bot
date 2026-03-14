@@ -85,7 +85,7 @@ async function main() {
       } else if (finalResultSymbol === '❌') {
         messageA = `❌ แพ้แล้ว\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n💸 เสีย: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n👤 ผู้ชนะ: ${testCase.userBName}\n\nลองใหม่นะ 💪`;
       } else {
-        messageA = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n\nเสมอกันครับ`;
+        messageA = `⛔️ เสมอ\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userAWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n\nเสมอกันครับ`;
       }
 
       console.log(`📤 ข้อความให้ ${testCase.userAName}:`);
@@ -99,7 +99,7 @@ async function main() {
       } else if (finalResultSymbol === '❌') {
         messageB = `✅ ชนะแล้ว\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n🏆 ได้รับ: ${userBWinnings.toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n👤 ผู้แพ้: ${testCase.userAName}\n\nยินดีด้วย! 🎉`;
       } else {
-        messageB = `🤝 เสมอ\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n\nเสมอกันครับ`;
+        messageB = `⛔️ เสมอ\n\n🎆 บั้งไฟ: ${testCase.fireworkName}\n💰 เดิมพัน: ${testCase.betAmount} บาท\n💸 ค่าธรรมเนียม: ${Math.abs(userBWinnings).toFixed(0)} บาท\n💵 ยอดคงเหลือ: 1000 บาท\n\nเสมอกันครับ`;
       }
 
       console.log(`📤 ข้อความให้ ${testCase.userBName}:`);
@@ -127,7 +127,7 @@ async function main() {
         groupMessage += `   เดิมพัน: ${testCase.betAmount} บาท\n`;
         groupMessage += `   ได้รับ: ${userBWinnings.toFixed(0)} บาท\n`;
       } else {
-        groupMessage += `🤝 เสมอ\n`;
+        groupMessage += `⛔️ เสมอ\n`;
         groupMessage += `${testCase.userAName}: เดิมพัน ${testCase.betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userAWinnings).toFixed(0)} บาท\n`;
         groupMessage += `${testCase.userBName}: เดิมพัน ${testCase.betAmount} บาท | ค่าธรรมเนียม ${Math.abs(userBWinnings).toFixed(0)} บาท\n`;
       }

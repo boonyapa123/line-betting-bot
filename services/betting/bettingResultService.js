@@ -207,7 +207,7 @@ class BettingResultService {
    * @returns {object} { isDraw, winner, loser } หรือ null ถ้าไม่ใช่ร้องราคา
    */
   checkPriceRangeResult(bet1, bet2, score) {
-    // เอาช่วงราคาจาก Column D (bet1.price) เท่านั้น
+    // เอาช่วงราคาจาก bet1.price (ควรเป็นเฉพาะช่วงราคา เช่น "360-400")
     const hasPriceRange = bet1.price && bet1.price.includes('-');
 
     if (!hasPriceRange) {
@@ -217,7 +217,7 @@ class BettingResultService {
     const priceRange = bettingPairingService.constructor.parsePriceRange(bet1.price);
     const inRange = score >= priceRange.min && score <= priceRange.max;
 
-    // ถ้าผลออกในช่วง → เสมอ
+    // ถ้าผลออกในช่วง → เสมอ (คืนเงิน)
     if (inRange) {
       return { isDraw: true, winner: null, loser: null };
     }
@@ -226,7 +226,8 @@ class BettingResultService {
     // ย = ต่ำ (ยิ่งต่ำยิ่งดี) → ชนะเมื่อผลต่ำกว่าช่วง
     // ล = สูง (ลูกศรขึ้น = สูง) → ชนะเมื่อผลสูงกว่าช่วง
     
-    const isYang = /ย/.test(bet1.price);
+    // ✅ ตรวจสอบ sideCode แทน price
+    const isYang = bet1.sideCode === 'ย';
     if (isYang) {
       // ฝ่าย ย (ต่ำ): ชนะเมื่อผลต่ำกว่าช่วง
       if (score < priceRange.min) {
@@ -237,7 +238,7 @@ class BettingResultService {
       }
     }
 
-    const isLow = /ล/.test(bet1.price);
+    const isLow = bet1.sideCode === 'ล';
     if (isLow) {
       // ฝ่าย ล (สูง): ชนะเมื่อผลสูงกว่าช่วง
       if (score > priceRange.max) {

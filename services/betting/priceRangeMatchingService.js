@@ -320,7 +320,7 @@ class PriceRangeMatchingService {
         `💸 ค่าธรรมเนียม: ${Math.abs(winnings).toFixed(0)} บาท\n` +
         `👤 คู่แข่ง: ${opponentName}\n` +
         `💳 ยอดเงินคงเหลือ: ${balance.toFixed(0)} บาท\n\n` +
-        `ผลเสมอ 🤝`;
+        `ผลเสมอ ⛔️`;
     }
   }
 

@@ -268,7 +268,7 @@ class AutoMatchingService {
           `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsA).toFixed(0)} บาท\n` +
           `👤 คู่แข่ง: ${pair.playerB.userAName}\n` +
           `💳 ยอดเงินคงเหลือ: ${balanceA.toFixed(0)} บาท\n\n` +
-          `ผลเสมอ 🤝`;
+          `ผลเสมอ ⛔️`;
 
         messageB = `⛔️ เสมอ\n\n` +
           `🎆 บั้งไฟ: ${fireworkName}\n` +
@@ -276,7 +276,7 @@ class AutoMatchingService {
           `💸 ค่าธรรมเนียม: ${Math.abs(winLoss.winningsB).toFixed(0)} บาท\n` +
           `👤 คู่แข่ง: ${pair.playerA.userAName}\n` +
           `💳 ยอดเงินคงเหลือ: ${balanceB.toFixed(0)} บาท\n\n` +
-          `ผลเสมอ 🤝`;
+          `ผลเสมอ ⛔️`;
       }
 
       return {

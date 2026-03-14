@@ -192,7 +192,7 @@ async function testSummary() {
           userACommission += calcA.commission;
           userBCommission += calcB.commission;
 
-          summary += `   🤝 เสมอ\n`;
+          summary += `   ⛔️ เสมอ\n`;
           summary += `      ${pairData.userAName} ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 5%: ${calcA.commission.toFixed(0)} บาท)\n`;
           summary += `      ${pairData.userBName} ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 5%: ${calcB.commission.toFixed(0)} บาท)\n`;
         }
