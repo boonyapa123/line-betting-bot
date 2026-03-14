@@ -88,6 +88,18 @@ class BettingRoundController {
         console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
         console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
 
+        // ✅ ตรวจสอบว่า User A ส่งข้อความรูปแบบถูกต้องหรือไม่
+        console.log(`   🔍 Validating User A message format...`);
+        const userAMessageParsed = BettingMessageParserService.parseMessage(pendingBet.message);
+        if (!userAMessageParsed.success) {
+          console.log(`   ❌ User A message format is invalid: ${pendingBet.message}`);
+          return {
+            type: 'text',
+            text: `❌ ข้อมูลการเดิมพันของผู้เล่นคนแรกไม่ถูกต้อง\n\n${userAMessageParsed.error}\n\n${userAMessageParsed.hint}`,
+          };
+        }
+        console.log(`   ✅ User A message format is valid`);
+
         // ตรวจสอบว่าข้อความ reply มีรูปแบบ Direct Method หรือไม่
         const directMethodParsed = BettingMessageParserService.parseMessage(message.text);
 
@@ -245,6 +257,18 @@ class BettingRoundController {
 
         console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
         console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
+
+        // ✅ ตรวจสอบว่า User A ส่งข้อความรูปแบบถูกต้องหรือไม่
+        console.log(`   🔍 Validating User A message format...`);
+        const userAMessageParsed = BettingMessageParserService.parseMessage(pendingBet.message);
+        if (!userAMessageParsed.success) {
+          console.log(`   ❌ User A message format is invalid: ${pendingBet.message}`);
+          return {
+            type: 'text',
+            text: `❌ ข้อมูลการเดิมพันของผู้เล่นคนแรกไม่ถูกต้อง\n\n${userAMessageParsed.error}\n\n${userAMessageParsed.hint}`,
+          };
+        }
+        console.log(`   ✅ User A message format is valid`);
 
         // ใช้ข้อมูลเดียวกับของ User A
         // คำนวณฝั่งตรงข้าม
