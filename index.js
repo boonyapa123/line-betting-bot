@@ -387,18 +387,26 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
       // Column I (index 8) = ผลที่ออก (ต้องว่าง = ยังไม่มีผลลัพธ์)
       const resultNumber = row[8] || '';
       
-      // ดึงช่วงราคาจากคอลั่ม D (เช่น "300-320" จาก "300-320 ล 20 ฟ้า")
-      const priceRangeMatch = messageA.match(/(\d+)-(\d+)/);
-      const rowPriceRange = priceRangeMatch ? priceRangeMatch[0] : null;
+      // ✅ แยกช่วงราคาจากข้อความ (รองรับทั้ง slash format และ standard format)
+      let rowPriceRange = null;
+      // ตรวจสอบรูปแบบ slash: "ไล่/350-360/50/เป็ด" → "350-360"
+      let match = messageA.match(/\/(\d+[\-\.\/\*]\d+)\//);
+      if (match) {
+        rowPriceRange = match[1];
+      } else {
+        // ตรวจสอบรูปแบบปกติ: "350-360 ล 50 เป็ด" → "350-360"
+        match = messageA.match(/^(\d+[\-\.\/\*]\d+)/);
+        if (match) {
+          rowPriceRange = match[1];
+        }
+      }
       
       console.log(`      Row ${i + 1}: messageA="${messageA}", fireworkName="${rowFireworkName}", priceRange="${rowPriceRange}", userBAmount="${userBAmount}", resultNumber="${resultNumber}"`);
       
       // ตรวจสอบชื่อบั้งไฟ
       const nameMatch = fireworkName && rowFireworkName === fireworkName;
       
-      // ตรวจสอบช่วงราคา
-      // ถ้า priceRange เป็น null (ไม่ระบุช่วงราคา) ให้ match ทั้งหมด
-      // ถ้า priceRange มีค่า ต้องตรวจสอบว่าตรงกัน
+      // ✅ ตรวจสอบช่วงราคา
       let priceMatch = true;
       if (priceRange && priceRange !== 'null') {
         // ถ้าระบุช่วงราคา ต้องตรวจสอบว่าตรงกัน
@@ -408,6 +416,7 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
       
       console.log(`      nameMatch=${nameMatch}, priceMatch=${priceMatch}, hasUserB=${!!userBAmount}, noResult=${!resultNumber}`);
       
+      // ✅ ต้องมี User B และ ยังไม่มี Result
       if (priceMatch && nameMatch &&
           userBAmount && // มี User B = จับคู่สำเร็จแล้ว
           !resultNumber) { // ยังไม่มีผลลัพธ์
