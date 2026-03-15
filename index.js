@@ -2248,6 +2248,43 @@ app.post('/webhook', async (req, res) => {
           const rulesMessage = `👇วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\nไล่/325-340/100ฟ้า\n\n📌 วิธีที่ 2 ร้องราคา\n300-330 ล 500 ฟ้าหลังฝน\n300-330 ย 500 ฟ้าหลังฝน\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
           await sendLineMessage(message.groupId, rulesMessage, accessToken);
           console.log(`✅ Rules sent`);
+        } else if (message.content.trim() === 'ถอน') {
+          console.log(`💰 Withdrawal command detected`);
+          
+          try {
+            // ดึงยอดเงินปัจจุบันของผู้ใช้
+            const balanceUpdateService = require('./services/betting/balanceUpdateService');
+            await balanceUpdateService.initialize();
+            
+            // ค้นหาผู้เล่นจาก userId
+            const allBalances = await balanceUpdateService.getAllBalances();
+            const userBalance = allBalances.find(b => b.userId === message.userId);
+            
+            if (!userBalance) {
+              console.log(`⚠️  User not found in balance sheet`);
+              const notFoundMessage = `❌ ไม่พบข้อมูลของคุณในระบบ\nกรุณาติดต่อแอดมิน`;
+              await sendLineMessageToUser(message.userId, notFoundMessage, accessToken);
+              return;
+            }
+            
+            const currentBalance = userBalance.balance;
+            const displayName = userBalance.displayName;
+            
+            // ส่งข้อความไปที่กลุ่ม
+            const groupWithdrawalMessage = `📱 ${displayName} ต้องการถอนเงิน\n📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE`;
+            await sendLineMessage(message.groupId, groupWithdrawalMessage, accessToken);
+            console.log(`✅ Withdrawal notification sent to group`);
+            
+            // ส่งข้อความไปที่ส่วนตัว
+            const personalWithdrawalMessage = `📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE\n\n💰 ยอดเงินปัจจุบัน: ${currentBalance} บาท`;
+            await sendLineMessageToUser(message.userId, personalWithdrawalMessage, accessToken);
+            console.log(`✅ Withdrawal message sent to user`);
+            
+          } catch (error) {
+            console.error(`❌ Error processing withdrawal command: ${error.message}`);
+            const errorMessage = `❌ เกิดข้อผิดพลาด: ${error.message}`;
+            await sendLineMessageToUser(message.userId, errorMessage, accessToken);
+          }
         } else {
           // Check if this is a result announcement
           const resultData = parseResultMessage(message.content);
