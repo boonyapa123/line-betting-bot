@@ -243,7 +243,7 @@ class BettingResultService {
     console.log(`   🔍 Checking sides: bet1=${bet1SideCode}, bet2=${bet2SideCode}`);
 
     // ตรวจสอบ bet1 ก่อน
-    if (bet1SideCode === 'ย' || bet1SideCode === 'ต' || bet1SideCode === 'ชถ' || bet1SideCode === 'ชย') {
+    if (bet1SideCode === 'ย' || bet1SideCode === 'ต' || bet1SideCode === 'ชถ' || bet1SideCode === 'ชย' || bet1SideCode === 'ยั้ง') {
       // ฝ่าย ย/ต (ต่ำ): ชนะเมื่อผลต่ำกว่าช่วง
       console.log(`   📊 bet1 is YANG (ต่ำ)`);
       if (score < priceRange.min) {
@@ -255,7 +255,7 @@ class BettingResultService {
       }
     }
 
-    if (bet1SideCode === 'ล' || bet1SideCode === 'ไล่' || bet1SideCode === 'ชล') {
+    if (bet1SideCode === 'ล' || bet1SideCode === 'ไล่' || bet1SideCode === 'ชล' || bet1SideCode === 'ไล่ว') {
       // ฝ่าย ล/ไล่ (สูง): ชนะเมื่อผลสูงกว่าช่วง
       console.log(`   📊 bet1 is LOW (สูง)`);
       if (score > priceRange.max) {
