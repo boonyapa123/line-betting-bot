@@ -2252,32 +2252,46 @@ app.post('/webhook', async (req, res) => {
           console.log(`💰 Withdrawal command detected`);
           
           try {
-            // ดึงยอดเงินปัจจุบันของผู้ใช้
-            const balanceUpdateService = require('./services/betting/balanceUpdateService');
-            await balanceUpdateService.initialize();
+            // ดึงข้อมูลผู้เล่นจากชีท Players เพื่อตรวจสอบชื่อและเอา Token
+            const playersResponse = await sheets.spreadsheets.values.get({
+              auth: googleAuth,
+              spreadsheetId: GOOGLE_SHEET_ID,
+              range: `Players!A:K`,
+            });
+            
+            const playerRows = playersResponse.data.values || [];
+            let userToken = '';
+            let userDisplayName = '';
+            let userBalance = 0;
+            let foundUser = false;
             
             // ค้นหาผู้เล่นจาก userId
-            const allBalances = await balanceUpdateService.getAllBalances();
-            const userBalance = allBalances.find(b => b.userId === message.userId);
+            for (let i = 1; i < playerRows.length; i++) {
+              const row = playerRows[i];
+              if (row && row[0] === message.userId) {
+                userDisplayName = row[1] || '';
+                userToken = row[10] || ''; // Column K = Token
+                userBalance = parseFloat(row[4]) || 0; // Column E = Balance
+                foundUser = true;
+                break;
+              }
+            }
             
-            if (!userBalance) {
-              console.log(`⚠️  User not found in balance sheet`);
+            if (!foundUser || !userDisplayName) {
+              console.log(`⚠️  User not found in Players sheet`);
               const notFoundMessage = `❌ ไม่พบข้อมูลของคุณในระบบ\nกรุณาติดต่อแอดมิน`;
-              await sendLineMessageToUser(message.userId, notFoundMessage, accessToken);
+              await sendLineMessageToUser(message.userId, notFoundMessage, userToken || accessToken);
               return;
             }
             
-            const currentBalance = userBalance.balance;
-            const displayName = userBalance.displayName;
-            
             // ส่งข้อความไปที่กลุ่ม
-            const groupWithdrawalMessage = `📱 ${displayName} ต้องการถอนเงิน\n📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE`;
-            await sendLineMessage(message.groupId, groupWithdrawalMessage, accessToken);
+            const groupWithdrawalMessage = `📱 ${userDisplayName} ต้องการถอนเงิน\n📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE`;
+            await sendLineMessage(message.groupId, groupWithdrawalMessage, userToken || accessToken);
             console.log(`✅ Withdrawal notification sent to group`);
             
             // ส่งข้อความไปที่ส่วนตัว
-            const personalWithdrawalMessage = `📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE\n\n💰 ยอดเงินปัจจุบัน: ${currentBalance} บาท`;
-            await sendLineMessageToUser(message.userId, personalWithdrawalMessage, accessToken);
+            const personalWithdrawalMessage = `📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE\n\n💰 ยอดเงินปัจจุบัน: ${userBalance} บาท`;
+            await sendLineMessageToUser(message.userId, personalWithdrawalMessage, userToken || accessToken);
             console.log(`✅ Withdrawal message sent to user`);
             
           } catch (error) {
