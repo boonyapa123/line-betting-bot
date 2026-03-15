@@ -237,29 +237,38 @@ class BettingResultService {
     // ล = สูง (ลูกศรขึ้น = สูง) → ชนะเมื่อผลสูงกว่าช่วง
     
     // ✅ ตรวจสอบ sideCode แทน price
-    const isYang = bet1.sideCode === 'ย';
-    if (isYang) {
-      // ฝ่าย ย (ต่ำ): ชนะเมื่อผลต่ำกว่าช่วง
+    const bet1SideCode = bet1.sideCode || bet1.side;
+    const bet2SideCode = bet2.sideCode || bet2.side;
+    
+    console.log(`   🔍 Checking sides: bet1=${bet1SideCode}, bet2=${bet2SideCode}`);
+
+    // ตรวจสอบ bet1 ก่อน
+    if (bet1SideCode === 'ย' || bet1SideCode === 'ต' || bet1SideCode === 'ชถ' || bet1SideCode === 'ชย') {
+      // ฝ่าย ย/ต (ต่ำ): ชนะเมื่อผลต่ำกว่าช่วง
+      console.log(`   📊 bet1 is YANG (ต่ำ)`);
       if (score < priceRange.min) {
+        console.log(`   ✅ Score ${score} < min ${priceRange.min} → bet1 wins`);
         return { isDraw: false, winnerUserId: bet1.userId, loserUserId: bet2.userId };
       } else {
-        // ผลสูงกว่าช่วง → bet2 ชนะ
+        console.log(`   ❌ Score ${score} >= min ${priceRange.min} → bet2 wins`);
         return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
       }
     }
 
-    const isLow = bet1.sideCode === 'ล';
-    if (isLow) {
-      // ฝ่าย ล (สูง): ชนะเมื่อผลสูงกว่าช่วง
+    if (bet1SideCode === 'ล' || bet1SideCode === 'ไล่' || bet1SideCode === 'ชล') {
+      // ฝ่าย ล/ไล่ (สูง): ชนะเมื่อผลสูงกว่าช่วง
+      console.log(`   📊 bet1 is LOW (สูง)`);
       if (score > priceRange.max) {
+        console.log(`   ✅ Score ${score} > max ${priceRange.max} → bet1 wins`);
         return { isDraw: false, winnerUserId: bet1.userId, loserUserId: bet2.userId };
       } else {
-        // ผลต่ำกว่าช่วง → bet2 ชนะ
+        console.log(`   ❌ Score ${score} <= max ${priceRange.max} → bet2 wins`);
         return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
       }
     }
 
     // ถ้าไม่มี ย หรือ ล → bet2 ชนะ
+    console.log(`   ⚠️  Unknown side code: ${bet1SideCode} → bet2 wins`);
     return { isDraw: false, winnerUserId: bet2.userId, loserUserId: bet1.userId };
   }
 

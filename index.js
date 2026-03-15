@@ -486,9 +486,14 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
     // ฟังก์ชันแยก side จาก price string
     const extractSide = (priceStr) => {
       if (!priceStr) return null;
-      // ค้นหา ย, ล, ยั้ง, ไล่, ชล, ชถ, บ, ถ
-      const match = priceStr.match(/[ยลยั้งไล่ชลชถบถ]/);
-      return match ? match[0] : null;
+      // ค้นหา ไล่, ต, ล, ย, ยั้ง, ชล, ชถ, ชย (ตรวจสอบคำทั้งหมดก่อน)
+      const sidePatterns = ['ไล่', 'ยั้ง', 'ชล', 'ชถ', 'ชย', 'ล', 'ย', 'ต', 'บ', 'ถ'];
+      for (const pattern of sidePatterns) {
+        if (priceStr.includes(pattern)) {
+          return pattern;
+        }
+      }
+      return null;
     };
 
     // ใช้ Column D เป็นหลัก เพราะ B อยู่ตรงข้าม A เสมอ
@@ -512,6 +517,17 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
 
     const extractedPriceA = extractPriceRange(priceA);
 
+    // ฟังก์ชันหาฝั่งตรงข้าม
+    const getOppositeSide = (side) => {
+      const oppositeMap = {
+        'ล': 'ย', 'ย': 'ล',
+        'ไล่': 'ต', 'ต': 'ไล่',
+        'ชล': 'ชถ', 'ชถ': 'ชล', 'ชย': 'ชล',
+        'ล.': 'ย.', 'ย.': 'ล.',
+      };
+      return oppositeMap[side] || side;
+    };
+
     // สร้าง pair object สำหรับ bettingResultService
     const pair = {
       bet1: {
@@ -522,6 +538,7 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         amount: betAmount,
         price: extractedPriceA,  // ✅ ใช้ช่วงราคาที่แยกออกมา (เช่น "370-410")
         side: sideA,
+        sideCode: sideA,
         method: hasPriceRangeA ? 2 : 1,
       },
       bet2: {
@@ -530,7 +547,8 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
         userBName: userAName,
         amount: betAmount,
         price: null,  // ไม่ใช้ Column M - เอาจาก Column D เท่านั้น
-        side: sideA, // B อยู่ตรงข้าม A เสมอ
+        side: getOppositeSide(sideA), // ✅ B อยู่ตรงข้าม A เสมอ
+        sideCode: getOppositeSide(sideA),
         method: hasPriceRangeA ? 2 : 'REPLY',  // ตามว่า A มีช่วงราคาหรือไม่
       },
     };
