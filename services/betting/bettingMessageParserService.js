@@ -299,6 +299,24 @@ class BettingMessageParserService {
       };
     }
 
+    // ✅ รูปแบบใหม่: "เป็ด 385" หรือ "เป็ด 385 ✅"
+    // ตรวจสอบว่าเป็นตัวเลข 2-3 หลัก ตามด้วยสัญลักษณ์ (ถ้ามี)
+    const resultMatch = trimmedMessage.match(/^(.+?)\s+(\d{2,3})\s*(✅|❌|⛔️)?$/);
+    if (resultMatch) {
+      const slipName = resultMatch[1].trim();
+      const score = resultMatch[2];
+      
+      // ตรวจสอบว่า slipName ไม่ใช่ตัวเลข (เพื่อหลีกเลี่ยงการจับคู่ผิด)
+      if (!/^\d+$/.test(slipName)) {
+        return {
+          isCommand: true,
+          command: 'CALCULATE',
+          slipName: slipName,
+          score: parseInt(score),
+        };
+      }
+    }
+
     return {
       isCommand: false,
     };

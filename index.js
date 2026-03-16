@@ -1029,106 +1029,160 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     
     console.log(`✅ Found ${bets.length} bets with results`);
     
-    // Group by pairs
-    const pairs = {};
+    // Group by slip name
+    const slipGroups = {};
     for (const bet of bets) {
-      const pairKey = `${bet.userAName} vs ${bet.userBName}`;
-      if (!pairs[pairKey]) {
-        pairs[pairKey] = {
-          userAName: bet.userAName,
-          userBName: bet.userBName,
-          bets: []
-        };
+      const slipName = bet.fireworkName || 'Unknown';
+      if (!slipGroups[slipName]) {
+        slipGroups[slipName] = [];
       }
-      pairs[pairKey].bets.push(bet);
+      slipGroups[slipName].push(bet);
     }
-    
+
     // Generate summary
-    let summary = '📊 สรุปยอดแทง 1on1\n';
-    summary += '═══════════════════\n\n';
-    
+    let summary = '📊 สรุปยอดแทง\n';
+    summary += '═══════════════════════════════════\n\n';
+
     // Add group names if available
     const uniqueGroups = [...new Set(bets.map(b => b.groupName).filter(g => g))];
     if (uniqueGroups.length > 0) {
       summary += `🏘️  กลุ่มแชท: ${uniqueGroups.join(', ')}\n`;
-      summary += '═══════════════════\n\n';
+      summary += '═══════════════════════════════════\n\n';
     }
-    
-    for (const [pairKey, pairData] of Object.entries(pairs)) {
-      let userAWins = 0;
-      let userBWins = 0;
-      let draws = 0;
-      let totalAmount = 0;
-      let userATotal = 0;
-      let userBTotal = 0;
-      let userACommission = 0;
-      let userBCommission = 0;
-      
-      summary += `🎯 ${pairData.userAName} vs ${pairData.userBName}\n`;
-      
-      for (const bet of pairData.bets) {
-        const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
-        totalAmount += betAmount;
-        
-        // Show bet details
-        summary += `\n   📝 ${bet.messageA}\n`;
-        summary += `   ผลที่ออก: ${bet.resultNumber}\n`;
-        summary += `   ยอดเดิมพัน: ${betAmount} บาท\n`;
-        
-        if (bet.resultA === '✅') {
-          userAWins++;
-          const calcA = calculateWinnings(betAmount, '✅');
-          const calcB = calculateWinnings(betAmount, '❌');
-          
-          userATotal += calcA.net;
-          userBTotal += calcB.net;
-          userACommission += calcA.commission;
-          userBCommission += calcB.commission;
-          
-          summary += `   ✅ ${pairData.userAName} ชนะ\n`;
-          summary += `      ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 10%: ${calcA.commission.toFixed(0)} บาท)\n`;
-          summary += `      ${pairData.userBName} เสีย: ${betAmount} บาท\n`;
-        } else if (bet.resultA === '❌') {
-          userBWins++;
-          const calcA = calculateWinnings(betAmount, '❌');
-          const calcB = calculateWinnings(betAmount, '✅');
-          
-          userATotal += calcA.net;
-          userBTotal += calcB.net;
-          userACommission += calcA.commission;
-          userBCommission += calcB.commission;
-          
-          summary += `   ❌ ${pairData.userBName} ชนะ\n`;
-          summary += `      ${pairData.userAName} เสีย: ${betAmount} บาท\n`;
-          summary += `      ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 10%: ${calcB.commission.toFixed(0)} บาท)\n`;
-        } else if (bet.resultA === '⛔️') {
-          draws++;
-          const calcA = calculateWinnings(betAmount, '⛔️');
-          const calcB = calculateWinnings(betAmount, '⛔️');
-          
-          userATotal += calcA.net;
-          userBTotal += calcB.net;
-          userACommission += calcA.commission;
-          userBCommission += calcB.commission;
-          
-          summary += `   ⛔️ เสมอ\n`;
-          summary += `      ${pairData.userAName} ได้รับ: ${calcA.winnings.toFixed(0)} บาท (หัก 5%: ${calcA.commission.toFixed(0)} บาท)\n`;
-          summary += `      ${pairData.userBName} ได้รับ: ${calcB.winnings.toFixed(0)} บาท (หัก 5%: ${calcB.commission.toFixed(0)} บาท)\n`;
+
+    // Process each slip
+    for (const [slipName, slipBets] of Object.entries(slipGroups)) {
+      // Group by pair within each slip
+      const pairs = {};
+      let roundNumber = 1;
+
+      for (const bet of slipBets) {
+        const pairKey = `${bet.userAName} vs ${bet.userBName}`;
+        if (!pairs[pairKey]) {
+          pairs[pairKey] = {
+            userAName: bet.userAName,
+            userBName: bet.userBName,
+            roundNumber: roundNumber++,
+            bets: []
+          };
         }
+        pairs[pairKey].bets.push(bet);
       }
-      
-      console.log(`   📊 Pair summary: ${pairData.userAName} (${userAWins}W-${userBWins}L-${draws}D) vs ${pairData.userBName} (${userBWins}W-${userAWins}L-${draws}D)`);
-      
-      summary += `\n   ═══════════════════\n`;
-      summary += `   📊 สรุปผลลัพธ์:\n`;
-      summary += `   ${pairData.userAName}: ${userAWins} ชนะ | ${userBWins} แพ้ | ${draws} เสมอ\n`;
-      summary += `   ${pairData.userBName}: ${userBWins} ชนะ | ${userAWins} แพ้ | ${draws} เสมอ\n`;
-      summary += `\n   💰 ยอดรวม:\n`;
-      summary += `   ${pairData.userAName}: ${userATotal >= 0 ? '+' : ''}${userATotal.toFixed(0)} บาท (หัก commission: ${userACommission.toFixed(0)} บาท)\n`;
-      summary += `   ${pairData.userBName}: ${userBTotal >= 0 ? '+' : ''}${userBTotal.toFixed(0)} บาท (หัก commission: ${userBCommission.toFixed(0)} บาท)\n`;
-      summary += `   📝 รายการ: ${pairData.bets.length} ครั้ง\n\n`;
+
+      // Calculate slip totals
+      let slipTotalBet = 0;
+      let slipTotalFee = 0;
+      let yangPlayers = {};  // ยั้ง/ย
+      let laiPlayers = {};   // ไล่/ล
+
+      // Display each pair
+      for (const [pairKey, pairData] of Object.entries(pairs)) {
+        summary += `🎆 ${slipName}(${pairData.roundNumber})\n`;
+        summary += `═══════════════════════════════════\n\n`;
+
+        let userATotal = 0;
+        let userBTotal = 0;
+        let userAWins = 0;
+        let userBWins = 0;
+        let draws = 0;
+        let totalBet = 0;
+        let totalFee = 0;
+
+        // Show each bet
+        for (const bet of pairData.bets) {
+          const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
+          totalBet += betAmount;
+          slipTotalBet += betAmount;
+
+          let resultText = '';
+          let userAAmount = 0;
+          let userBAmount = 0;
+          let fee = 0;
+
+          if (bet.resultA === '✅') {
+            userAWins++;
+            fee = Math.round(betAmount * 0.1);
+            userAAmount = betAmount - fee;
+            userBAmount = -betAmount;
+            resultText = `✅ ${pairData.userAName} ชนะ`;
+          } else if (bet.resultA === '❌') {
+            userBWins++;
+            fee = Math.round(betAmount * 0.1);
+            userAAmount = -betAmount;
+            userBAmount = betAmount - fee;
+            resultText = `✅ ${pairData.userBName} ชนะ`;
+          } else if (bet.resultA === '⛔️') {
+            draws++;
+            fee = Math.round(betAmount * 0.05);
+            userAAmount = -fee;
+            userBAmount = -fee;
+            resultText = `⛔️ เสมอ`;
+          }
+
+          userATotal += userAAmount;
+          userBTotal += userBAmount;
+          totalFee += fee;
+          slipTotalFee += fee;
+
+          summary += `   ${resultText}\n`;
+          summary += `   เดิมพัน: ${betAmount} บาท | หัก: ${fee} บาท\n\n`;
+
+          // Track players by side
+          const sideA = bet.betTypeA || 'unknown';
+          const sideB = bet.betTypeB || 'unknown';
+
+          if (sideA.includes('ย') || sideA.includes('ต')) {
+            if (!yangPlayers[pairData.userAName]) yangPlayers[pairData.userAName] = 0;
+            yangPlayers[pairData.userAName] += userAAmount;
+          } else {
+            if (!laiPlayers[pairData.userAName]) laiPlayers[pairData.userAName] = 0;
+            laiPlayers[pairData.userAName] += userAAmount;
+          }
+
+          if (sideB.includes('ย') || sideB.includes('ต')) {
+            if (!yangPlayers[pairData.userBName]) yangPlayers[pairData.userBName] = 0;
+            yangPlayers[pairData.userBName] += userBAmount;
+          } else {
+            if (!laiPlayers[pairData.userBName]) laiPlayers[pairData.userBName] = 0;
+            laiPlayers[pairData.userBName] += userBAmount;
+          }
+        }
+
+        // Summary table for this pair
+        summary += `┌──────────────────────────────────────┐\n`;
+        summary += `│ ผู้เล่น                 │ ยั้ง │ ไล่  │\n`;
+        summary += `├──────────────────────────────────────┤\n`;
+        const userANameDisplay = `(${pairData.roundNumber})${pairData.userAName}`.substring(0, 20).padEnd(20);
+        const userBNameDisplay = `(${pairData.roundNumber})${pairData.userBName}`.substring(0, 20).padEnd(20);
+        summary += `│ ${userANameDisplay} │ ${String(totalBet).padStart(4)} │ ${String(userATotal).padStart(4)} │\n`;
+        summary += `│ ${userBNameDisplay} │ ${String(totalBet).padStart(4)} │ ${String(userBTotal).padStart(4)} │\n`;
+        summary += `└──────────────────────────────────────┘\n`;
+
+        summary += `\n   📊 สรุป:\n`;
+        summary += `   ${pairData.userAName}: ${userAWins} ชนะ | ${userBWins} แพ้ | ${draws} เสมอ\n`;
+        summary += `   ${pairData.userBName}: ${userBWins} ชนะ | ${userAWins} แพ้ | ${draws} เสมอ\n`;
+        summary += `   💰 ยอดรวม: ${pairData.userAName} ${userATotal >= 0 ? '+' : ''}${userATotal} บาท | ${pairData.userBName} ${userBTotal >= 0 ? '+' : ''}${userBTotal} บาท\n`;
+        summary += `   📝 รายการ: ${pairData.bets.length} ครั้ง | หัก commission: ${totalFee} บาท\n\n`;
+      }
+
+      // Summary for entire slip
+      summary += `🎆 สรุป${slipName}\n`;
+      summary += `═══════════════════════════════════\n\n`;
+      summary += `📊 ยอดรวมบั้งไฟ: ${slipTotalBet} บาท | หัก commission: ${slipTotalFee} บาท\n\n`;
+
+      // Show players by side
+      summary += `👥 รายชื่อผู้เล่น:\n`;
+      summary += `\n   ยั้ง/ย:\n`;
+      for (const [name, amount] of Object.entries(yangPlayers)) {
+        summary += `   • ${name}: ${amount >= 0 ? '+' : ''}${amount} บาท\n`;
+      }
+      summary += `\n   ไล่/ล:\n`;
+      for (const [name, amount] of Object.entries(laiPlayers)) {
+        summary += `   • ${name}: ${amount >= 0 ? '+' : ''}${amount} บาท\n`;
+      }
+      summary += `\n`;
     }
-    
+
     return summary;
   } catch (error) {
     console.error('❌ Error generating summary:', error.message);

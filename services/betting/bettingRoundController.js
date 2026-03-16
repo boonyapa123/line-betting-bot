@@ -667,8 +667,20 @@ class BettingRoundController {
         };
       }
 
-      // จับคู่การเล่น
-      const pairs = bettingPairingService.constructor.findPairs(slipBets);
+      // จับคู่การเล่น - ใช้ slipBets ที่มี userBId (จับคู่สำเร็จแล้ว)
+      const pairs = [];
+      for (const bet of slipBets) {
+        if (bet.userBId && bet.userBId !== '') {
+          // ค้นหา User B ในรายการ
+          const userBBet = slipBets.find(b => b.userId === bet.userBId);
+          if (userBBet) {
+            pairs.push({
+              bet1: bet,
+              bet2: userBBet,
+            });
+          }
+        }
+      }
 
       // คำนวณผลลัพธ์และค่าธรรมเนียม
       const results = [];
@@ -689,12 +701,13 @@ class BettingRoundController {
         await bettingResultService.recordResult(result, slipName, score);
 
         // อัปเดตยอดเงิน
+        // ✅ ใช้ displayName แทน lineName
         await bettingPairingService.updateUserBalance(
-          result.winner.lineName,
+          result.winner.displayName,
           result.winner.netAmount
         );
         await bettingPairingService.updateUserBalance(
-          result.loser.lineName,
+          result.loser.displayName,
           result.loser.netAmount
         );
 
@@ -719,6 +732,89 @@ class BettingRoundController {
       // สร้างรายงานผลลัพธ์
       const reportMessage = await this.buildResultReport(slipName, score, results);
 
+      // ✅ ส่งข้อความเข้ากลุ่ม (ประกาศผลบั้งไฟที่ประกาศเท่านั้น)
+      let groupMessage = `📊 ประกาศผลแทง\n`;
+      groupMessage += `🎆 บั้งไฟ: ${slipName}\n`;
+      groupMessage += `ผลที่ออก: ${score}\n`;
+      groupMessage += `═══════════════════\n\n`;
+
+      // เพิ่มผลลัพธ์ของแต่ละคู่
+      for (const result of results) {
+        const { bet1, bet2 } = result.pair;
+        const { winner, loser, isDraw } = result;
+
+        if (isDraw) {
+          groupMessage += `⛔️ ${bet1.displayName} vs ${bet2.displayName} เสมอ\n`;
+          groupMessage += `   เดิมพัน: ${Math.min(bet1.amount, bet2.amount)} บาท\n`;
+          groupMessage += `   ค่าธรรมเนียม: ${result.drawFee} บาท\n\n`;
+        } else if (winner.userId === bet1.userId) {
+          groupMessage += `✅ ${bet1.displayName} ชนะ\n`;
+          groupMessage += `❌ ${bet2.displayName} แพ้\n`;
+          groupMessage += `   เดิมพัน: ${Math.min(bet1.amount, bet2.amount)} บาท\n`;
+          groupMessage += `   ได้รับ: ${winner.netAmount} บาท\n\n`;
+        } else {
+          groupMessage += `❌ ${bet1.displayName} แพ้\n`;
+          groupMessage += `✅ ${bet2.displayName} ชนะ\n`;
+          groupMessage += `   เดิมพัน: ${Math.min(bet1.amount, bet2.amount)} บาท\n`;
+          groupMessage += `   ได้รับ: ${winner.netAmount} บาท\n\n`;
+        }
+      }
+
+      groupMessage += `═══════════════════\n`;
+      groupMessage += `📝 รวมทั้งสิ้น: ${results.length} รายการ`;
+
+      // ✅ ส่งข้อความเข้ากลุ่ม
+      if (source?.groupId) {
+        try {
+          const LineNotificationService = require('../line/lineNotificationService');
+          const notificationService = new LineNotificationService(accountNumber || 1);
+          await notificationService.sendGroupMessage(source.groupId, groupMessage);
+          console.log(`   📢 Group message sent successfully`);
+        } catch (groupError) {
+          console.error(`   ❌ Error sending group message:`, groupError);
+        }
+      }
+
+      // ✅ ส่งข้อความเข้าผู้เล่นแต่ละคน
+      for (const result of results) {
+        const { bet1, bet2 } = result.pair;
+        const { winner, loser, isDraw } = result;
+
+        try {
+          const LineNotificationService = require('../line/lineNotificationService');
+          const notificationService = new LineNotificationService(accountNumber || 1);
+
+          // ส่งให้ผู้ชนะ
+          if (winner.userId) {
+            let winnerMsg = `🎉 ยินดีด้วย! คุณชนะ\n\n`;
+            winnerMsg += `🎆 บั้งไฟ: ${slipName}\n`;
+            winnerMsg += `📊 คะแนนที่ออก: ${score}\n`;
+            winnerMsg += `✅ ชนะ\n`;
+            winnerMsg += `💰 เดิมพัน: ${Math.min(bet1.amount, bet2.amount)} บาท\n`;
+            winnerMsg += `💸 ค่าธรรมเนียม: ${result.fee || result.drawFee} บาท\n`;
+            winnerMsg += `🏆 ได้รับ: ${winner.netAmount} บาท`;
+
+            await notificationService.sendPrivateMessage(winner.userId, winnerMsg);
+            console.log(`   📤 Winner message sent to ${winner.displayName}`);
+          }
+
+          // ส่งให้ผู้แพ้
+          if (loser.userId) {
+            let loserMsg = `😔 เสียใจด้วย คุณแพ้\n\n`;
+            loserMsg += `🎆 บั้งไฟ: ${slipName}\n`;
+            loserMsg += `📊 คะแนนที่ออก: ${score}\n`;
+            loserMsg += `❌ แพ้\n`;
+            loserMsg += `💰 เดิมพัน: ${Math.min(bet1.amount, bet2.amount)} บาท\n`;
+            loserMsg += `💸 เสีย: ${Math.abs(loser.netAmount)} บาท`;
+
+            await notificationService.sendPrivateMessage(loser.userId, loserMsg);
+            console.log(`   📤 Loser message sent to ${loser.displayName}`);
+          }
+        } catch (playerError) {
+          console.error(`   ❌ Error sending player message:`, playerError);
+        }
+      }
+
       // ล้างข้อมูลการเล่น
       await bettingPairingService.clearRoundTransactions();
 
@@ -727,7 +823,7 @@ class BettingRoundController {
 
       return {
         type: 'text',
-        text: reportMessage,
+        text: groupMessage,
       };
     } catch (error) {
       console.error('Error in calculate command:', error);

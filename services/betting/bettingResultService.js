@@ -8,6 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const { LineNotificationService } = require('../line/lineNotificationService');
 const bettingPairingService = require('./bettingPairingService');
+// ✅ Import class ของ BettingPairingService เพื่อใช้ static methods
+const BettingPairingService = bettingPairingService.constructor;
 
 class BettingResultService {
   constructor() {
@@ -87,8 +89,6 @@ class BettingResultService {
         const drawFee = Math.round(winAmount * this.DRAW_FEE_PERCENTAGE);
         return {
           isDraw: true,
-          winner: bet1,
-          loser: bet2,
           pair,
           winAmount,
           drawFee,
@@ -118,8 +118,6 @@ class BettingResultService {
 
         return {
           isDraw: false,
-          winner,
-          loser,
           pair,
           winAmount,
           fee,
@@ -142,7 +140,8 @@ class BettingResultService {
     }
     
     // ถ้าไม่ใช่การเล่นแบบร้องราคา ให้ใช้ bettingPairingService
-    const baseResult = bettingPairingService.constructor.calculateResult(
+    // ✅ ใช้ static method ที่ถูกต้อง
+    const baseResult = BettingPairingService.calculateResult(
       pair,
       slipName,
       score
@@ -221,7 +220,9 @@ class BettingResultService {
       return null;
     }
 
-    const priceRange = bettingPairingService.constructor.parsePriceRange(bet1.price);
+    // ✅ ใช้ PriceRangeCalculator แทน bettingPairingService.constructor
+    const PriceRangeCalculator = require('./priceRangeCalculator');
+    const priceRange = PriceRangeCalculator.parsePriceRange(bet1.price);
     const inRange = score >= priceRange.min && score <= priceRange.max;
 
     console.log(`   💹 Price Range: ${priceRange.min}-${priceRange.max}, inRange=${inRange}`);
@@ -315,6 +316,12 @@ class BettingResultService {
       const values = response.data.values || [];
       let matchedRowIndex = -1;
 
+      console.log(`🔍 Looking for matched row:`);
+      console.log(`   Slip: ${slipName}`);
+      console.log(`   User A: ${bet1.displayName} (ID: ${bet1.userId})`);
+      console.log(`   User B: ${bet1.userBName || bet2.displayName} (ID: ${bet2.userId})`);
+      console.log(`   Total rows: ${values.length}`);
+
       // ค้นหาแถวที่มี User A + User B ของบั้งไฟนี้
       for (let i = 0; i < values.length; i++) {
         const row = values[i];
@@ -326,21 +333,30 @@ class BettingResultService {
         // ✅ ใช้ bet1.userBName แทน bet2.displayName
         const expectedUserBName = bet1.userBName || bet2.displayName;
 
+        // ✅ ตรวจสอบว่า userBName ตรงกัน (ไม่ว่าง)
+        const userBNameMatch = userBName && (userBName === expectedUserBName);
+
         if (
           rowSlipName === slipName &&
           userBAmount !== undefined &&
           userBAmount !== '' &&
           userAName === bet1.displayName &&
-          userBName === expectedUserBName
+          userBNameMatch
         ) {
           matchedRowIndex = i + 2; // +2 เพราะ header + 0-indexed
+          console.log(`   ✅ Found at row ${matchedRowIndex}`);
           break;
         }
       }
 
       if (matchedRowIndex === -1) {
-        console.warn(`No matched row found for slip: ${slipName}`);
+        console.warn(`❌ No matched row found for slip: ${slipName}`);
         console.warn(`   Looking for: ${bet1.displayName} vs ${bet1.userBName || bet2.displayName}`);
+        console.warn(`   First few rows:`);
+        for (let i = 0; i < Math.min(3, values.length); i++) {
+          const row = values[i];
+          console.warn(`      Row ${i + 2}: ${row[2]} vs ${row[11]} (Slip: ${row[4]}, Amount B: ${row[7]})`);
+        }
         return { success: false, error: 'No matched row found' };
       }
 
@@ -370,11 +386,17 @@ class BettingResultService {
       // Column S: ยอดเงิน A (ได้/เสีย)
       let amountA;
       if (isDraw) {
+        // เสมอ: ทั้งสองฝั่งเสีย ค่าธรรมเนียม 5%
         amountA = -result.drawFee;
-      } else if (result.winner.userId === bet1.userId) {
-        amountA = result.winner.netAmount;
       } else {
-        amountA = result.loser.netAmount;
+        // ตรวจสอบว่า bet1 ชนะหรือแพ้
+        if (result.winner.userId === bet1.userId) {
+          // A ชนะ: ได้ netAmount
+          amountA = result.winner.netAmount;
+        } else {
+          // A แพ้: เสีย netAmount (ลบ)
+          amountA = result.loser.netAmount;
+        }
       }
       updates.push({
         range: `${this.betsSheetName}!S${matchedRowIndex}`,
@@ -384,11 +406,17 @@ class BettingResultService {
       // Column T: ยอดเงิน B (ได้/เสีย)
       let amountB;
       if (isDraw) {
+        // เสมอ: ทั้งสองฝั่งเสีย ค่าธรรมเนียม 5%
         amountB = -result.drawFee;
-      } else if (result.winner.userId === bet2.userId) {
-        amountB = result.winner.netAmount;
       } else {
-        amountB = result.loser.netAmount;
+        // ตรวจสอบว่า bet1 ชนะหรือแพ้
+        if (result.winner.userId === bet1.userId) {
+          // A ชนะ → B แพ้: เสีย netAmount (ลบ)
+          amountB = result.loser.netAmount;
+        } else {
+          // A แพ้ → B ชนะ: ได้ netAmount
+          amountB = result.winner.netAmount;
+        }
       }
       updates.push({
         range: `${this.betsSheetName}!T${matchedRowIndex}`,
