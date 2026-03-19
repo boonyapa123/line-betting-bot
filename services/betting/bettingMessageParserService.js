@@ -35,6 +35,12 @@ class BettingMessageParserService {
   static METHOD2_ALT_PATTERN = /^(.+?)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SIMPLE_PATTERN = /^(\d+[\-\.\/\*]\d+)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SLASH_PATTERN = /^([ก-๙]+)\/(\d+[\-\.\/\*]\d+)\/(\d+)\/?([ก-๙\s]+)$/;
+  
+  /**
+   * รูปแบบ Space-Slash: [ฝั่ง] [ราคา]/[ยอดเงิน][ชื่อบั้งไฟ]
+   * ตัวอย่าง: "ยั้ง 380-400/60แอด"
+   */
+  static METHOD2_SPACE_SLASH_PATTERN = /^([ก-๙]+)\s+(\d+[\-\.\/\*]\d+)\/(\d+)([ก-๙\s]+)$/;
 
   /**
    * Parse ข้อความเล่น
@@ -48,6 +54,12 @@ class BettingMessageParserService {
     const method2SlashMatch = trimmedMessage.match(this.METHOD2_SLASH_PATTERN);
     if (method2SlashMatch) {
       return this.parseMethod2Slash(method2SlashMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบ Space-Slash: "ยั้ง 380-400/60แอด"
+    const method2SpaceSlashMatch = trimmedMessage.match(this.METHOD2_SPACE_SLASH_PATTERN);
+    if (method2SpaceSlashMatch) {
+      return this.parseMethod2Slash(method2SpaceSlashMatch);
     }
 
     // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบเดิม
