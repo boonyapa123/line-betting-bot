@@ -28,6 +28,7 @@ class BetsSheetColumns {
     RESULT_A: 18,           // S: ผลลัพธ์ A
     RESULT_B: 19,           // T: ผลลัพธ์ B
     MATCHED_AUTO: 20,       // U: MATCHED Auto (จับคู่อัตโนมัติ)
+    MESSAGE_ID: 21,          // V: LINE Message ID (สำหรับจับคู่ reply)
   };
 
   // ชื่อคอลัมน์ (สำหรับอ้างอิง)
@@ -53,6 +54,7 @@ class BetsSheetColumns {
     18: 'S - ผลลัพธ์ A',
     19: 'T - ผลลัพธ์ B',
     20: 'U - MATCHED Auto',
+    21: 'V - MESSAGE_ID',
   };
 
   /**
@@ -61,8 +63,8 @@ class BetsSheetColumns {
    * @returns {array} แถวข้อมูล (21 คอลัมน์)
    */
   static createRow(data) {
-    // สร้างแถวที่มี 21 คอลัมน์ (A-U) พร้อมค่าว่างเปล่า
-    const row = new Array(21).fill('');
+    // สร้างแถวที่มี 22 คอลัมน์ (A-V) พร้อมค่าว่างเปล่า
+    const row = new Array(22).fill('');
 
     // ตั้งค่าข้อมูลตามคอลัมน์
     if (data.timestamp) row[this.COLUMNS.TIMESTAMP] = data.timestamp;
@@ -86,6 +88,7 @@ class BetsSheetColumns {
     if (data.resultA) row[this.COLUMNS.RESULT_A] = data.resultA;
     if (data.resultB) row[this.COLUMNS.RESULT_B] = data.resultB;
     if (data.matchedAuto) row[this.COLUMNS.MATCHED_AUTO] = data.matchedAuto;
+    if (data.messageId) row[this.COLUMNS.MESSAGE_ID] = data.messageId;
 
     return row;
   }
@@ -152,6 +155,7 @@ class BetsSheetColumns {
       resultA: row[this.COLUMNS.RESULT_A],
       resultB: row[this.COLUMNS.RESULT_B],
       matchedAuto: row[this.COLUMNS.MATCHED_AUTO],
+      messageId: row[this.COLUMNS.MESSAGE_ID],
       price: price,
       method: price ? 2 : 1,
       status: row[this.COLUMNS.MATCHED_AUTO] ? 'MATCHED' : '', // ✅ ตั้งค่าจาก Column U (MATCHED_AUTO)

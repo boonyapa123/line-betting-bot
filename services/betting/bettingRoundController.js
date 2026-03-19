@@ -68,14 +68,19 @@ class BettingRoundController {
         console.log(`   Found ${groupBets.length} bets in group`);
 
         // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
-        // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
         let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
 
         if (!pendingBet) {
-          console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
-          pendingBet = groupBets.find(bet => 
+          // fallback: ถ้ามี pending bet เพียง 1 ตัว ให้ใช้ตัวนั้น
+          const pendingBets = groupBets.filter(bet => 
             !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
           );
+          if (pendingBets.length === 1) {
+            console.log(`   ⚠️  Message ID not found, but only 1 pending bet - using it`);
+            pendingBet = pendingBets[0];
+          } else {
+            console.log(`   ❌ Message ID not found, ${pendingBets.length} pending bets - cannot determine which one`);
+          }
         }
 
         if (!pendingBet) {
@@ -238,14 +243,19 @@ class BettingRoundController {
         console.log(`   Found ${groupBets.length} bets in group`);
 
         // ค้นหาเบตที่ตรงกับ quotedMessageId (ข้อความที่ reply นั้น)
-        // ถ้าไม่พบ ให้ค้นหาเบตที่ยังไม่มี User B
         let pendingBet = groupBets.find(bet => bet.messageId === message.quotedMessageId);
 
         if (!pendingBet) {
-          console.log(`   ⚠️  Message ID not found in bets, searching for any pending bet...`);
-          pendingBet = groupBets.find(bet => 
+          // fallback: ถ้ามี pending bet เพียง 1 ตัว ให้ใช้ตัวนั้น
+          const pendingBets = groupBets.filter(bet => 
             !bet.userBId || bet.userBId === '' || bet.status === 'PENDING'
           );
+          if (pendingBets.length === 1) {
+            console.log(`   ⚠️  Message ID not found, but only 1 pending bet - using it`);
+            pendingBet = pendingBets[0];
+          } else {
+            console.log(`   ❌ Message ID not found, ${pendingBets.length} pending bets - cannot determine which one`);
+          }
         }
 
         if (!pendingBet) {
@@ -559,7 +569,8 @@ class BettingRoundController {
         '',
         '',
         source.groupId || '',
-        message.text  // ส่งข้อความเดิมจาก User A
+        message.text,  // ส่งข้อความเดิมจาก User A
+        message.id     // ส่ง LINE message ID สำหรับจับคู่ reply
       );
 
       if (!recordResult.success) {

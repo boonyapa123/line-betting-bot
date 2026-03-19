@@ -317,7 +317,7 @@ class BettingResultService {
       // ค้นหาแถวที่จับคู่ไปแล้ว
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.betsSheetName}!A2:U`,
+        range: `${this.betsSheetName}!A2:V`,
       });
 
       const values = response.data.values || [];

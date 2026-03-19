@@ -61,7 +61,7 @@ class BettingPairingService {
    * @param {string} groupId - Group ID (optional)
    * @returns {object}
    */
-  async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '', originalMessage = '') {
+  async recordBet(betData, userId, displayName, lineName = '', groupName = '', userToken = '', groupId = '', originalMessage = '', messageId = '') {
     try {
       // Ensure initialization is complete
       await this.ensureInitialized();
@@ -97,6 +97,7 @@ class BettingPairingService {
         groupName: groupName || '',
         tokenA: userToken || '',
         groupId: groupId || '',
+        messageId: messageId || '',
       });
 
       // เพิ่มแถวใหม่ลงชีท Bets
@@ -111,7 +112,7 @@ class BettingPairingService {
       
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A:U`,
+        range: `${this.transactionsSheetName}!A:V`,
         valueInputOption: 'RAW',
         resource: {
           values: [row],
@@ -139,7 +140,7 @@ class BettingPairingService {
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A2:U`,
+        range: `${this.transactionsSheetName}!A2:V`,
       });
 
       const values = response.data.values || [];

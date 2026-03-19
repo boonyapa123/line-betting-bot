@@ -2537,6 +2537,7 @@ app.post('/webhook', async (req, res) => {
                 controllerResult = await bettingRoundController.handleMessage({
                   message: {
                     text: message.content,
+                    id: message.messageId,
                     quotedMessageId: message.quotedMessageId
                   },
                   source: {
