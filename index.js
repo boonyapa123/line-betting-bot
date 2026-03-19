@@ -1159,6 +1159,7 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     let grandTotalBet = 0;
     let grandTotalFee = 0;
     let slipIndex = 0;
+    const grandPlayerTotals = {}; // { playerName: totalAmount } รวมทุกบั้งไฟ
 
     // Process each slip (firework)
     for (const [slipName, slipBets] of Object.entries(slipGroups)) {
@@ -1216,26 +1217,42 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       grandTotalFee += slipTotalFee;
 
       // Format slip header
-      summary += `🎆 สรุปการแทง ${slipName} (${slipIndex})\n`;
+      summary += `🎆 สรุปการแทง บั้งไฟ ${slipName} (${slipIndex})\n`;
       summary += `───────────────────────────────────\n`;
-      summary += `ผู้เล่น              ยั้ง        ไล่\n`;
+      summary += `ผู้เล่น              ยั้ง      ไล่      รวม\n`;
 
       // Format each player row
       for (const [name, amounts] of Object.entries(players)) {
-        const displayName = name.length > 18 ? name.substring(0, 16) + '...' : name;
-        const yangStr = amounts.yang.toLocaleString();
-        const laiStr = amounts.lai.toLocaleString();
-        summary += `${displayName.padEnd(18)} ${yangStr.padStart(8)}  ${laiStr.padStart(8)}\n`;
+        const displayName = name.length > 16 ? name.substring(0, 14) + '..' : name;
+        const total = amounts.yang + amounts.lai;
+        const yangStr = amounts.yang !== 0 ? (amounts.yang > 0 ? '+' : '') + amounts.yang.toLocaleString() : '';
+        const laiStr = amounts.lai !== 0 ? (amounts.lai > 0 ? '+' : '') + amounts.lai.toLocaleString() : '';
+        const totalStr = (total > 0 ? '+' : '') + total.toLocaleString();
+        summary += `${displayName.padEnd(16)} ${yangStr.padStart(8)}  ${laiStr.padStart(8)}  ${totalStr.padStart(8)}\n`;
+
+        // สะสมยอดรวมรายบุคคล
+        if (!grandPlayerTotals[name]) grandPlayerTotals[name] = 0;
+        grandPlayerTotals[name] += total;
       }
 
-      summary += `\n`;
+      summary += `───────────────────────────────────\n\n`;
     }
 
     // Grand total
     summary += `💰 สรุปรวมทั้งหมด\n`;
     summary += `═══════════════════════════════════\n`;
     summary += `📊 ยอดเดิมพันรวม: ${grandTotalBet.toLocaleString()} บาท\n`;
-    summary += `💵 Commission รวม: ${grandTotalFee.toLocaleString()} บาท\n`;
+    summary += `💵 Commission รวม: ${grandTotalFee.toLocaleString()} บาท\n\n`;
+
+    // สรุปรายบุคคล (รวมทุกบั้งไฟ)
+    summary += `👤 สรุปรายบุคคล\n`;
+    summary += `═══════════════════════════════════\n`;
+    for (const [name, total] of Object.entries(grandPlayerTotals)) {
+      const displayName = name.length > 16 ? name.substring(0, 14) + '..' : name;
+      const sign = total > 0 ? '+' : '';
+      const icon = total > 0 ? '📈' : total < 0 ? '📉' : '➖';
+      summary += `${displayName.padEnd(16)} : ${sign}${total.toLocaleString()} บาท ${icon}\n`;
+    }
 
     return summary;
   } catch (error) {
