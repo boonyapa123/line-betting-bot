@@ -438,6 +438,115 @@ async function findMatchingBets(priceRange, fireworkName, resultScore) {
   }
 }
 
+// Update result in Google Sheets (Sheet only - ไม่ส่ง LINE แจ้งเตือน)
+async function updateBetResultSheetOnly(rowIndex, resultNumber, resultSymbol, accessToken) {
+  if (!googleAuth) {
+    console.log('⚠️  Google Sheets not initialized');
+    return;
+  }
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!A${rowIndex}:U${rowIndex}`,
+    });
+
+    const row = response.data.values?.[0] || [];
+    const userAId = row[1] || '';
+    const userAName = row[2] || '';
+    const userBId = row[17] || '';
+    const userBName = row[11] || '';
+    const betAmountA = parseFloat(row[6]) || 0;
+    const betAmountB = parseFloat(row[7]) || 0;
+    const betAmount = betAmountB > 0 ? Math.min(betAmountA, betAmountB) : betAmountA;
+    const fireworkName = row[4] || '';
+
+    if (!userAId || !userBId) {
+      console.log(`   ⚠️  Skipping row ${rowIndex}: ไม่มีคู่เล่นที่สมบูรณ์`);
+      return;
+    }
+
+    // ใช้ bettingResultService เพื่อคำนวณผลลัพธ์
+    const bettingResultService = require('./services/betting/bettingResultService');
+    const priceA = row[3] || '';
+    const sideA = (() => {
+      const sidePatterns = ['ไล่', 'ยั้ง', 'ชล', 'ชถ', 'ชย', 'ล', 'ย', 'ต', 'บ', 'ถ'];
+      for (const pattern of sidePatterns) {
+        if (priceA.includes(pattern)) return pattern;
+      }
+      return null;
+    })();
+    const hasPriceRangeA = priceA && priceA.includes('-');
+    const extractedPriceA = (() => {
+      let match = priceA.match(/\/(\d+[\-\.\/\*]\d+)\//);
+      if (match) return match[1];
+      match = priceA.match(/^(\d+[\-\.\/\*]\d+)/);
+      if (match) return match[1];
+      return null;
+    })();
+    const getOppositeSide = (side) => {
+      const oppositeMap = { 'ล': 'ย', 'ย': 'ล', 'ไล่': 'ต', 'ต': 'ไล่', 'ชล': 'ชถ', 'ชถ': 'ชล', 'ชย': 'ชล' };
+      return oppositeMap[side] || side;
+    };
+
+    const pair = {
+      bet1: { userId: userAId, displayName: userAName, userBName, userBId, amount: betAmount, price: extractedPriceA, side: sideA, sideCode: sideA, method: hasPriceRangeA ? 2 : 1 },
+      bet2: { userId: userBId, displayName: userBName, userBName: userAName, amount: betAmount, price: null, side: getOppositeSide(sideA), sideCode: getOppositeSide(sideA), method: hasPriceRangeA ? 2 : 'REPLY' },
+    };
+
+    const result = bettingResultService.calculateResultWithFees(pair, fireworkName, resultNumber);
+
+    let userAResultText = result.isDraw ? '⛔️' : (result.winner.userId === userAId ? '✅' : '❌');
+    let userBResultText = result.isDraw ? '⛔️' : (result.winner.userId === userAId ? '❌' : '✅');
+
+    let userAWinnings = 0, userBWinnings = 0;
+    if (result.isDraw) {
+      userAWinnings = -result.winner.fee;
+      userBWinnings = -result.loser.fee;
+    } else if (result.pair.bet1.userId === userAId) {
+      userAWinnings = result.winner.netAmount;
+      userBWinnings = result.loser.netAmount;
+    } else {
+      userAWinnings = result.loser.netAmount;
+      userBWinnings = result.winner.netAmount;
+    }
+
+    // อัปเดต Column I-K
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth, spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!I${rowIndex}:K${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[resultNumber, userAResultText, userBResultText]] },
+    });
+
+    // อัปเดต Column R
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth, spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!R${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[userBId]] },
+    });
+
+    // อัปเดต Column S, T
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth, spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!S${rowIndex}:T${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[userAWinnings, userBWinnings]] },
+    });
+
+    console.log(`   ✅ Sheet updated row ${rowIndex}: I=${resultNumber}, J=${userAResultText}, K=${userBResultText}, S=${userAWinnings}, T=${userBWinnings}`);
+
+    // อัปเดตยอดเงิน
+    if (userAId && userAName) await updatePlayerBalance(userAId, userAName, userAWinnings);
+    if (userBId && userBName) await updatePlayerBalance(userBId, userBName, userBWinnings);
+
+  } catch (error) {
+    console.error(`❌ Error updating bet result (sheet only): ${error.message}`);
+  }
+}
+
 // Update result in Google Sheets
 async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken) {
   if (!googleAuth) {
@@ -641,11 +750,24 @@ async function updateBetResult(rowIndex, resultNumber, resultSymbol, accessToken
       },
     });
 
+    // อัปเดต Column S, T (ยอดเงินได้/เสีย A, B)
+    await sheets.spreadsheets.values.update({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${GOOGLE_WORKSHEET_NAME}!S${rowIndex}:T${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[userAWinnings, userBWinnings]],
+      },
+    });
+
     console.log(`   ✅ Updated row ${rowIndex}:`);
     console.log(`      Column I: ${resultNumber}`);
     console.log(`      Column J: ${userAResultText}`);
     console.log(`      Column K: ${userBResultText}`);
     console.log(`      Column R: ${userBId}`);
+    console.log(`      Column S: ${userAWinnings}`);
+    console.log(`      Column T: ${userBWinnings}`);
 
     // 📤 ส่งข้อความแจ้งผลให้ผู้เล่นทั้งสองฝั่ง
     console.log(`   📤 Sending result messages to players...`);
@@ -1039,149 +1161,90 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       slipGroups[slipName].push(bet);
     }
 
-    // Generate summary
+    // Generate new format summary
     let summary = '📊 สรุปยอดแทง\n';
     summary += '═══════════════════════════════════\n\n';
 
-    // Add group names if available
-    const uniqueGroups = [...new Set(bets.map(b => b.groupName).filter(g => g))];
-    if (uniqueGroups.length > 0) {
-      summary += `🏘️  กลุ่มแชท: ${uniqueGroups.join(', ')}\n`;
-      summary += '═══════════════════════════════════\n\n';
-    }
+    let grandTotalBet = 0;
+    let grandTotalFee = 0;
+    let slipIndex = 0;
 
-    // Process each slip
+    // Process each slip (firework)
     for (const [slipName, slipBets] of Object.entries(slipGroups)) {
-      // Group by pair within each slip
-      const pairs = {};
-      let roundNumber = 1;
-
-      for (const bet of slipBets) {
-        const pairKey = `${bet.userAName} vs ${bet.userBName}`;
-        if (!pairs[pairKey]) {
-          pairs[pairKey] = {
-            userAName: bet.userAName,
-            userBName: bet.userBName,
-            roundNumber: roundNumber++,
-            bets: []
-          };
-        }
-        pairs[pairKey].bets.push(bet);
-      }
-
-      // Calculate slip totals
+      slipIndex++;
+      
+      // Collect players and their yang/lai totals for this slip
+      const players = {}; // { playerName: { yang: 0, lai: 0 } }
       let slipTotalBet = 0;
       let slipTotalFee = 0;
-      let yangPlayers = {};  // ยั้ง/ย
-      let laiPlayers = {};   // ไล่/ล
 
-      // Display each pair
-      for (const [pairKey, pairData] of Object.entries(pairs)) {
-        summary += `🎆 ${slipName}(${pairData.roundNumber})\n`;
-        summary += `═══════════════════════════════════\n\n`;
+      for (const bet of slipBets) {
+        const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
+        slipTotalBet += betAmount;
 
-        let userATotal = 0;
-        let userBTotal = 0;
-        let userAWins = 0;
-        let userBWins = 0;
-        let draws = 0;
-        let totalBet = 0;
-        let totalFee = 0;
+        let userAAmount = 0;
+        let userBAmount = 0;
+        let fee = 0;
 
-        // Show each bet
-        for (const bet of pairData.bets) {
-          const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
-          totalBet += betAmount;
-          slipTotalBet += betAmount;
-
-          let resultText = '';
-          let userAAmount = 0;
-          let userBAmount = 0;
-          let fee = 0;
-
-          if (bet.resultA === '✅') {
-            userAWins++;
-            fee = Math.round(betAmount * 0.1);
-            userAAmount = betAmount - fee;
-            userBAmount = -betAmount;
-            resultText = `✅ ${pairData.userAName} ชนะ`;
-          } else if (bet.resultA === '❌') {
-            userBWins++;
-            fee = Math.round(betAmount * 0.1);
-            userAAmount = -betAmount;
-            userBAmount = betAmount - fee;
-            resultText = `✅ ${pairData.userBName} ชนะ`;
-          } else if (bet.resultA === '⛔️') {
-            draws++;
-            fee = Math.round(betAmount * 0.05);
-            userAAmount = -fee;
-            userBAmount = -fee;
-            resultText = `⛔️ เสมอ`;
-          }
-
-          userATotal += userAAmount;
-          userBTotal += userBAmount;
-          totalFee += fee;
-          slipTotalFee += fee;
-
-          summary += `   ${resultText}\n`;
-          summary += `   เดิมพัน: ${betAmount} บาท | หัก: ${fee} บาท\n\n`;
-
-          // Track players by side
-          const sideA = bet.betTypeA || 'unknown';
-          const sideB = bet.betTypeB || 'unknown';
-
-          if (sideA.includes('ย') || sideA.includes('ต')) {
-            if (!yangPlayers[pairData.userAName]) yangPlayers[pairData.userAName] = 0;
-            yangPlayers[pairData.userAName] += userAAmount;
-          } else {
-            if (!laiPlayers[pairData.userAName]) laiPlayers[pairData.userAName] = 0;
-            laiPlayers[pairData.userAName] += userAAmount;
-          }
-
-          if (sideB.includes('ย') || sideB.includes('ต')) {
-            if (!yangPlayers[pairData.userBName]) yangPlayers[pairData.userBName] = 0;
-            yangPlayers[pairData.userBName] += userBAmount;
-          } else {
-            if (!laiPlayers[pairData.userBName]) laiPlayers[pairData.userBName] = 0;
-            laiPlayers[pairData.userBName] += userBAmount;
-          }
+        if (bet.resultA === '✅') {
+          fee = Math.round(betAmount * 0.1);
+          userAAmount = betAmount - fee;
+          userBAmount = -betAmount;
+        } else if (bet.resultA === '❌') {
+          fee = Math.round(betAmount * 0.1);
+          userAAmount = -betAmount;
+          userBAmount = betAmount - fee;
+        } else if (bet.resultA === '⛔️') {
+          fee = Math.round(betAmount * 0.05);
+          userAAmount = -fee;
+          userBAmount = -fee;
         }
 
-        // Summary table for this pair
-        summary += `┌──────────────────────────────────────┐\n`;
-        summary += `│ ผู้เล่น                 │ ยั้ง │ ไล่  │\n`;
-        summary += `├──────────────────────────────────────┤\n`;
-        const userANameDisplay = `(${pairData.roundNumber})${pairData.userAName}`.substring(0, 20).padEnd(20);
-        const userBNameDisplay = `(${pairData.roundNumber})${pairData.userBName}`.substring(0, 20).padEnd(20);
-        summary += `│ ${userANameDisplay} │ ${String(totalBet).padStart(4)} │ ${String(userATotal).padStart(4)} │\n`;
-        summary += `│ ${userBNameDisplay} │ ${String(totalBet).padStart(4)} │ ${String(userBTotal).padStart(4)} │\n`;
-        summary += `└──────────────────────────────────────┘\n`;
+        slipTotalFee += fee;
 
-        summary += `\n   📊 สรุป:\n`;
-        summary += `   ${pairData.userAName}: ${userAWins} ชนะ | ${userBWins} แพ้ | ${draws} เสมอ\n`;
-        summary += `   ${pairData.userBName}: ${userBWins} ชนะ | ${userAWins} แพ้ | ${draws} เสมอ\n`;
-        summary += `   💰 ยอดรวม: ${pairData.userAName} ${userATotal >= 0 ? '+' : ''}${userATotal} บาท | ${pairData.userBName} ${userBTotal >= 0 ? '+' : ''}${userBTotal} บาท\n`;
-        summary += `   📝 รายการ: ${pairData.bets.length} ครั้ง | หัก commission: ${totalFee} บาท\n\n`;
+        // Track User A
+        const sideA = bet.betTypeA || 'unknown';
+        if (!players[bet.userAName]) players[bet.userAName] = { yang: 0, lai: 0 };
+        if (sideA.includes('ย') || sideA.includes('ต')) {
+          players[bet.userAName].yang += userAAmount;
+        } else {
+          players[bet.userAName].lai += userAAmount;
+        }
+
+        // Track User B
+        const sideB = bet.betTypeB || 'unknown';
+        if (!players[bet.userBName]) players[bet.userBName] = { yang: 0, lai: 0 };
+        if (sideB.includes('ย') || sideB.includes('ต')) {
+          players[bet.userBName].yang += userBAmount;
+        } else {
+          players[bet.userBName].lai += userBAmount;
+        }
       }
 
-      // Summary for entire slip
-      summary += `🎆 สรุป${slipName}\n`;
-      summary += `═══════════════════════════════════\n\n`;
-      summary += `📊 ยอดรวมบั้งไฟ: ${slipTotalBet} บาท | หัก commission: ${slipTotalFee} บาท\n\n`;
+      grandTotalBet += slipTotalBet;
+      grandTotalFee += slipTotalFee;
 
-      // Show players by side
-      summary += `👥 รายชื่อผู้เล่น:\n`;
-      summary += `\n   ยั้ง/ย:\n`;
-      for (const [name, amount] of Object.entries(yangPlayers)) {
-        summary += `   • ${name}: ${amount >= 0 ? '+' : ''}${amount} บาท\n`;
+      // Format slip header
+      summary += `🎆 สรุปการแทง ${slipName} (${slipIndex})\n`;
+      summary += `───────────────────────────────────\n`;
+      summary += `ผู้เล่น              ยั้ง        ไล่\n`;
+
+      // Format each player row
+      for (const [name, amounts] of Object.entries(players)) {
+        const displayName = name.length > 18 ? name.substring(0, 16) + '...' : name;
+        const yangStr = amounts.yang.toLocaleString();
+        const laiStr = amounts.lai.toLocaleString();
+        summary += `${displayName.padEnd(18)} ${yangStr.padStart(8)}  ${laiStr.padStart(8)}\n`;
       }
-      summary += `\n   ไล่/ล:\n`;
-      for (const [name, amount] of Object.entries(laiPlayers)) {
-        summary += `   • ${name}: ${amount >= 0 ? '+' : ''}${amount} บาท\n`;
-      }
+
       summary += `\n`;
     }
+
+    // Grand total
+    summary += `💰 สรุปรวมทั้งหมด\n`;
+    summary += `═══════════════════════════════════\n`;
+    summary += `📊 ยอดเดิมพันรวม: ${grandTotalBet.toLocaleString()} บาท\n`;
+    summary += `💵 Commission รวม: ${grandTotalFee.toLocaleString()} บาท\n`;
 
     return summary;
   } catch (error) {
@@ -2437,13 +2500,13 @@ app.post('/webhook', async (req, res) => {
                 await sendLineMessage(message.groupId, groupSummary, accessToken);
               }
               
-              // Find matching bets (legacy)
+              // Find matching bets (legacy) - อัปเดตเฉพาะ Sheet ไม่ส่งแจ้งเตือนซ้ำ (autoMatchingService ส่งแล้ว)
               const matchingBets = await findMatchingBets(resultData.priceRange, resultData.fireworkName, resultData.resultNumber);
-              console.log(`   Found ${matchingBets.length} matching bet(s)`);
+              console.log(`   Found ${matchingBets.length} matching bet(s) (legacy - sheet update only)`);
               
-              // Update each matching bet
+              // Update each matching bet (เฉพาะ Column I, J, K, R, S, T ไม่ส่ง LINE ซ้ำ)
               for (const bet of matchingBets) {
-                await updateBetResult(bet.rowIndex, resultData.resultNumber, resultData.result, accessToken);
+                await updateBetResultSheetOnly(bet.rowIndex, resultData.resultNumber, resultData.result, accessToken);
               }
               
               if (matchingBets.length > 0) {

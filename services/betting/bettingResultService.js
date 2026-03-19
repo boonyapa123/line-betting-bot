@@ -223,6 +223,13 @@ class BettingResultService {
     // ✅ ใช้ PriceRangeCalculator แทน bettingPairingService.constructor
     const PriceRangeCalculator = require('./priceRangeCalculator');
     const priceRange = PriceRangeCalculator.parsePriceRange(bet1.price);
+    
+    // ✅ ตรวจสอบว่า priceRange ไม่เป็น null ก่อนใช้
+    if (!priceRange || !priceRange.min || !priceRange.max) {
+      console.log(`   ⚠️  Failed to parse price range from: ${bet1.price}, returning null`);
+      return null;
+    }
+    
     const inRange = score >= priceRange.min && score <= priceRange.max;
 
     console.log(`   💹 Price Range: ${priceRange.min}-${priceRange.max}, inRange=${inRange}`);

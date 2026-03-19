@@ -18,12 +18,12 @@ class AutoMatchingService {
    */
   async findWaitingPlayers(fireworkName) {
     try {
-      console.log(`🔍 ค้นหาผู้เล่นที่รอการจับคู่: ${fireworkName}`);
+      console.log(`🔍 ค้นหาผู้เล่นที่รอประกาศผล: ${fireworkName}`);
 
       const response = await this.sheets.spreadsheets.values.get({
         auth: this.googleAuth,
         spreadsheetId: this.googleSheetId,
-        range: `${this.worksheetName}!A:N`,
+        range: `${this.worksheetName}!A:U`,
       });
 
       const rows = response.data.values || [];
@@ -35,12 +35,29 @@ class AutoMatchingService {
         if (!row || row.length < 10) continue;
 
         // Column E (index 4) = ชื่อบั้งไฟ
-        // Column J (index 9) = ผลแพ้ชนะ User A (ว่างเปล่า = รอการจับคู่)
-        const rowFireworkName = row[4] || '';
+        // Column H (index 7) = ยอดเงิน B (มีค่า = จับคู่สำเร็จแล้ว)
+        // Column I (index 8) = ผลที่ออก (ว่าง = ยังไม่มีผลลัพธ์)
+        // Column J (index 9) = ผลแพ้ชนะ User A (ว่าง = ยังไม่ประกาศผล)
+        // Column L (index 11) = ชื่อ User B
+        // Column R (index 17) = User B ID
+        const rowFireworkName = (row[4] || '').trim();
+        const amountB = row[7] || '';
+        const resultNumber = row[8] || '';
         const resultA = row[9] || '';
+        const userBName = row[11] || '';
+        const userBId = row[17] || '';
 
-        // ค้นหาบั้งไฟที่ตรงกันและยังไม่มีผลลัพธ์
-        if (rowFireworkName.toLowerCase().includes(fireworkName.toLowerCase()) && !resultA) {
+        // ✅ เงื่อนไขที่ถูกต้อง:
+        // 1. ชื่อบั้งไฟต้องตรงกัน (exact match)
+        // 2. ต้องจับคู่สำเร็จแล้ว (Column H มีค่า + Column L มีชื่อ User B)
+        // 3. ยังไม่มีผลลัพธ์ (Column I ว่าง + Column J ว่าง)
+        if (
+          rowFireworkName === fireworkName.trim() &&
+          amountB && amountB !== '' &&
+          userBName && userBName !== '' &&
+          !resultNumber &&
+          !resultA
+        ) {
           waitingPlayers.push({
             rowIndex: i + 1,
             userA: row[1],
@@ -48,15 +65,15 @@ class AutoMatchingService {
             messageA: row[3],
             betTypeA: row[5],
             amountA: parseFloat(row[6]) || 0,
-            userB: row[11],
-            userBName: row[11],
-            betTypeB: row[13],
-            amountB: parseFloat(row[7]) || 0,
+            userB: userBId || row[1],  // User B ID จาก Column R
+            userBName: userBName,
+            betTypeB: row[12] || '',   // Column M = รายการแทง B
+            amountB: parseFloat(amountB) || 0,
           });
         }
       }
 
-      console.log(`   ✅ พบ ${waitingPlayers.length} ผู้เล่นที่รอการจับคู่`);
+      console.log(`   ✅ พบ ${waitingPlayers.length} รายการที่รอประกาศผล (บั้งไฟ: ${fireworkName})`);
       return waitingPlayers;
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
@@ -72,53 +89,44 @@ class AutoMatchingService {
    */
   async autoMatchPlayers(fireworkName, playerBalances) {
     try {
-      console.log(`🎯 จับคู่เล่นอัตโนมัติ: ${fireworkName}`);
+      console.log(`🎯 ค้นหาคู่เล่นที่รอประกาศผล: ${fireworkName}`);
 
       const waitingPlayers = await this.findWaitingPlayers(fireworkName);
       const matchedPairs = [];
 
-      // จับคู่ผู้เล่นตามลำดับ
-      for (let i = 0; i < waitingPlayers.length - 1; i++) {
-        const playerA = waitingPlayers[i];
-        const playerB = waitingPlayers[i + 1];
-
-        // ตรวจสอบว่าชื่อตรงกันหรือไม่
-        if (playerA.userAName === playerB.userAName) {
-          console.log(`   ⚠️  ผู้เล่นคนเดียวกัน: ${playerA.userAName}`);
+      // แต่ละแถวคือคู่ที่จับคู่สำเร็จแล้ว (User A + User B อยู่ในแถวเดียวกัน)
+      for (const player of waitingPlayers) {
+        // ตรวจสอบว่ามี User B จริง
+        if (!player.userB || !player.userBName) {
+          console.log(`   ⚠️  Row ${player.rowIndex}: ไม่มี User B ข้าม`);
           continue;
         }
 
         // ดึงยอดเงินของผู้เล่น
-        const balanceA = playerBalances[playerA.userA] || 0;
-        const balanceB = playerBalances[playerB.userA] || 0;
+        const balanceA = playerBalances[player.userA] || 0;
+        const balanceB = playerBalances[player.userB] || 0;
 
-        // ยึดจากคนยอดน้อยกว่า
-        const minBalance = Math.min(balanceA, balanceB);
-        const maxBetAmount = Math.min(playerA.amountA, playerB.amountA, minBalance);
+        // ใช้ยอดเดิมพันที่น้อยกว่า
+        const betAmount = Math.min(player.amountA, player.amountB) || player.amountA || player.amountB;
 
-        // ตรวจสอบว่ายอดเงินเพียงพอหรือไม่
-        if (balanceA < maxBetAmount) {
-          console.log(`   ❌ ${playerA.userAName} ยอดเงินไม่เพียงพอ (${balanceA} < ${maxBetAmount})`);
-          continue;
-        }
-
-        if (balanceB < maxBetAmount) {
-          console.log(`   ❌ ${playerB.userAName} ยอดเงินไม่เพียงพอ (${balanceB} < ${maxBetAmount})`);
-          continue;
-        }
-
-        // จับคู่สำเร็จ
         matchedPairs.push({
-          playerA: playerA,
-          playerB: playerB,
-          betAmount: maxBetAmount,
+          playerA: player,
+          playerB: {
+            rowIndex: player.rowIndex,
+            userA: player.userB,
+            userAName: player.userBName,
+            betTypeA: player.betTypeB,
+            amountA: player.amountB,
+          },
+          betAmount: betAmount,
           balanceA: balanceA,
           balanceB: balanceB,
         });
 
-        console.log(`   ✅ จับคู่สำเร็จ: ${playerA.userAName} vs ${playerB.userAName} (${maxBetAmount} บาท)`);
+        console.log(`   ✅ คู่เล่น Row ${player.rowIndex}: ${player.userAName} vs ${player.userBName} (${betAmount} บาท)`);
       }
 
+      console.log(`   📋 รวม ${matchedPairs.length} คู่ที่รอประกาศผล (บั้งไฟ: ${fireworkName})`);
       return matchedPairs;
     } catch (error) {
       console.error(`❌ ข้อผิดพลาด: ${error.message}`);
@@ -175,20 +183,33 @@ class AutoMatchingService {
    */
   async updateResultAndBalance(pair, winLoss) {
     try {
-      console.log(`📊 อัปเดตผลลัพธ์และยอดเงิน`);
+      console.log(`📊 อัปเดตผลลัพธ์และยอดเงิน Row ${pair.playerA.rowIndex}`);
 
-      // อัปเดตผลลัพธ์ในชีท
+      const rowIndex = pair.playerA.rowIndex;
+
+      // อัปเดต Column J, K (ผลแพ้ชนะ A, B)
       await this.sheets.spreadsheets.values.update({
         auth: this.googleAuth,
         spreadsheetId: this.googleSheetId,
-        range: `${this.worksheetName}!J${pair.playerA.rowIndex}:K${pair.playerA.rowIndex}`,
+        range: `${this.worksheetName}!J${rowIndex}:K${rowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[winLoss.resultA, winLoss.resultB]],
         },
       });
 
-      console.log(`   ✅ อัปเดตผลลัพธ์สำเร็จ`);
+      // อัปเดต Column S, T (ยอดเงินได้/เสีย A, B)
+      await this.sheets.spreadsheets.values.update({
+        auth: this.googleAuth,
+        spreadsheetId: this.googleSheetId,
+        range: `${this.worksheetName}!S${rowIndex}:T${rowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[winLoss.winningsA, winLoss.winningsB]],
+        },
+      });
+
+      console.log(`   ✅ อัปเดตผลลัพธ์สำเร็จ (J: ${winLoss.resultA}, K: ${winLoss.resultB}, S: ${winLoss.winningsA}, T: ${winLoss.winningsB})`);
 
       return {
         success: true,
