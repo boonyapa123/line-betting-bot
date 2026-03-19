@@ -3424,6 +3424,7 @@ async function getPlayerBalance(userId, userName) {
     let retries = 3;
     let balance = 0;
     let found = false;
+    let lastErrorWasQuota = false;
     
     while (retries > 0 && !found) {
       try {
@@ -3478,6 +3479,16 @@ async function getPlayerBalance(userId, userName) {
         }
       } catch (apiError) {
         console.error(`   ⚠️  API error (attempt ${4 - retries}): ${apiError.message}`);
+        // ตรวจสอบว่าเป็น quota error หรือไม่
+        if (apiError.code === 429 || apiError.response?.status === 429 || 
+            apiError.message?.includes('Quota exceeded')) {
+          if (retries <= 1) {
+            // retry หมดแล้ว - ให้ return found: true เพื่อไม่ให้ระบบบอกว่า "ไม่พบในระบบ"
+            console.warn(`   ⚠️  All retries exhausted due to quota error - assuming player exists`);
+            console.log(`   📊 === End Getting Player Balance (QUOTA ERROR) ===\n`);
+            return { balance: 0, found: true, apiError: true };
+          }
+        }
         if (retries > 1) {
           console.log(`   ⏳ Retrying in 2 seconds...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
