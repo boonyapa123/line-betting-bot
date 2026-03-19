@@ -240,8 +240,11 @@ class BetsSheetColumns {
     const opposites = {
       'ชล': 'ชถ',
       'ชถ': 'ชล',
-      'ล': 'ต',
+      'ล': 'ย',
+      'ย': 'ล',
       'ต': 'ล',
+      'ไล่': 'ยั้ง',
+      'ยั้ง': 'ไล่',
     };
     return opposites[sideCode] || sideCode;
   }

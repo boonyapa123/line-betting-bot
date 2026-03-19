@@ -2446,10 +2446,18 @@ app.post('/webhook', async (req, res) => {
               for (const pair of matchedPairs) {
                 try {
                   // คำนวนแพ้ชนะ
-                  const winLoss = matchingService.calculateWinLoss(pair, resultData.result);
+                  const winLoss = matchingService.calculateWinLoss(pair, resultData.result, resultData.resultNumber);
                   
                   // อัปเดตผลลัพธ์
-                  await matchingService.updateResultAndBalance(pair, winLoss);
+                  await matchingService.updateResultAndBalance(pair, winLoss, resultData.resultNumber);
+                  
+                  // อัปเดตยอดเงินผู้เล่น
+                  if (pair.playerA.userA && pair.playerA.userAName) {
+                    await updatePlayerBalance(pair.playerA.userA, pair.playerA.userAName, winLoss.winningsA);
+                  }
+                  if (pair.playerB.userA && pair.playerB.userAName) {
+                    await updatePlayerBalance(pair.playerB.userA, pair.playerB.userAName, winLoss.winningsB);
+                  }
                   
                   // คำนวนยอดเงินหลังการเล่น
                   const updatedBalances = {

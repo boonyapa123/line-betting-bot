@@ -140,39 +140,70 @@ class AutoMatchingService {
    * @param {string} resultSymbol - ผลลัพธ์ (✅ = ชนะ, ❌ = แพ้, ⛔️ = เสมอ)
    * @returns {Object} ผลการคำนวน
    */
-  calculateWinLoss(pair, resultSymbol) {
+  calculateWinLoss(pair, resultSymbol, resultNumber = null) {
     const betAmount = pair.betAmount;
     let resultA, resultB, winningsA, winningsB;
 
+    // ถ้ามี resultNumber และ messageA มีช่วงราคา → ใช้ checkPriceRangeResult
+    const messageA = pair.playerA.messageA || '';
+    const priceMatch = messageA.match(/(\d+)-(\d+)/);
+    
+    if (resultNumber && priceMatch) {
+      const BettingResultService = require('./bettingResultService');
+      const bettingResultService = new BettingResultService();
+      
+      // สร้าง bet objects สำหรับ checkPriceRangeResult
+      const bet1 = {
+        userId: pair.playerA.userA,
+        price: `${priceMatch[1]}-${priceMatch[2]}`,
+        sideCode: pair.playerA.betTypeA || '',
+        side: pair.playerA.betTypeA || '',
+      };
+      const bet2 = {
+        userId: pair.playerB.userA,
+        sideCode: pair.playerB.betTypeA || '',
+        side: pair.playerB.betTypeA || '',
+      };
+      
+      const priceResult = bettingResultService.checkPriceRangeResult(bet1, bet2, resultNumber);
+      
+      if (priceResult) {
+        if (priceResult.isDraw) {
+          const commission = betAmount * 0.05;
+          return { resultA: '⛔️', resultB: '⛔️', winningsA: -commission, winningsB: -commission };
+        }
+        
+        const commission = betAmount * 0.1;
+        if (priceResult.winnerUserId === pair.playerA.userA) {
+          return { resultA: '✅', resultB: '❌', winningsA: betAmount - commission, winningsB: -betAmount };
+        } else {
+          return { resultA: '❌', resultB: '✅', winningsA: -betAmount, winningsB: betAmount - commission };
+        }
+      }
+    }
+
+    // Fallback: ใช้ resultSymbol ตรงๆ (กรณีไม่มีช่วงราคา)
     if (resultSymbol === '✅') {
-      // User A ชนะ
       resultA = '✅';
       resultB = '❌';
-      const commission = betAmount * 0.1; // 10% commission
+      const commission = betAmount * 0.1;
       winningsA = betAmount - commission;
       winningsB = -betAmount;
     } else if (resultSymbol === '❌') {
-      // User A แพ้
       resultA = '❌';
       resultB = '✅';
       winningsA = -betAmount;
-      const commission = betAmount * 0.1; // 10% commission
+      const commission = betAmount * 0.1;
       winningsB = betAmount - commission;
     } else {
-      // เสมอ
       resultA = '⛔️';
       resultB = '⛔️';
-      const commission = betAmount * 0.05; // 5% commission
+      const commission = betAmount * 0.05;
       winningsA = -commission;
       winningsB = -commission;
     }
 
-    return {
-      resultA,
-      resultB,
-      winningsA,
-      winningsB,
-    };
+    return { resultA, resultB, winningsA, winningsB };
   }
 
   /**
@@ -181,11 +212,24 @@ class AutoMatchingService {
    * @param {Object} winLoss - ผลการคำนวนแพ้ชนะ
    * @returns {Promise<Object>} ผลการอัปเดต
    */
-  async updateResultAndBalance(pair, winLoss) {
+  async updateResultAndBalance(pair, winLoss, resultNumber = null) {
     try {
       console.log(`📊 อัปเดตผลลัพธ์และยอดเงิน Row ${pair.playerA.rowIndex}`);
 
       const rowIndex = pair.playerA.rowIndex;
+
+      // อัปเดต Column I (ผลที่ออก) ถ้ามี resultNumber
+      if (resultNumber) {
+        await this.sheets.spreadsheets.values.update({
+          auth: this.googleAuth,
+          spreadsheetId: this.googleSheetId,
+          range: `${this.worksheetName}!I${rowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[resultNumber]],
+          },
+        });
+      }
 
       // อัปเดต Column J, K (ผลแพ้ชนะ A, B)
       await this.sheets.spreadsheets.values.update({
