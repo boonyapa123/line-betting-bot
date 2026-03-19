@@ -63,6 +63,7 @@ class AutoMatchingService {
             userA: row[1],
             userAName: row[2],
             messageA: row[3],
+            fireworkName: rowFireworkName,  // ชื่อบั้งไฟจาก Column E
             betTypeA: row[5],
             amountA: parseFloat(row[6]) || 0,
             userB: userBId || row[1],  // User B ID จาก Column R
@@ -282,7 +283,7 @@ class AutoMatchingService {
      */
     createResultMessage(pair, winLoss, balances = {}) {
       const betAmount = pair.betAmount;
-      const fireworkName = pair.playerA.messageA.split(' ')[0] || 'บั้งไฟ';
+      const fireworkName = pair.playerA.fireworkName || pair.playerA.messageA.split(' ')[0] || 'บั้งไฟ';
 
       // ใช้ยอดเงินที่ส่งมา หรือคำนวนจากยอดเดิม
       const balanceA = balances.userA !== undefined ? balances.userA : (pair.balanceA + winLoss.winningsA);
