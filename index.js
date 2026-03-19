@@ -3426,58 +3426,64 @@ async function getPlayerBalance(userId, userName) {
     let found = false;
     
     while (retries > 0 && !found) {
-      // ดึงข้อมูลจาก Players sheet
-      const response = await sheets.spreadsheets.values.get({
-        auth: googleAuth,
-        spreadsheetId: GOOGLE_SHEET_ID,
-        range: `Players!A:E`,
-      });
-      
-      const rows = response.data.values || [];
-      console.log(`   📊 Total rows in Players sheet: ${rows.length} (attempt ${4 - retries})`);
-      
-      // แสดงข้อมูลทั้งหมด (สำหรับ debug)
-      if (rows.length > 1) {
-        console.log(`   📋 Players data:`);
-        for (let i = 1; i < Math.min(rows.length, 10); i++) {
-          if (rows[i]) {
-            console.log(`      Row ${i + 1}: Name=${rows[i][1]}, UserID=${rows[i][0]}, Balance=${rows[i][4]}`);
+      try {
+        // ดึงข้อมูลจาก Players sheet
+        const response = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `Players!A:E`,
+        });
+        
+        const rows = response.data.values || [];
+        console.log(`   📊 Total rows in Players sheet: ${rows.length} (attempt ${4 - retries})`);
+        
+        // แสดงข้อมูลทั้งหมด (สำหรับ debug)
+        if (rows.length > 1) {
+          console.log(`   📋 Players data:`);
+          for (let i = 1; i < Math.min(rows.length, 10); i++) {
+            if (rows[i]) {
+              console.log(`      Row ${i + 1}: Name=${rows[i][1]}, UserID=${rows[i][0]}, Balance=${rows[i][4]}`);
+            }
           }
         }
-      }
-      
-      // ค้นหาผู้เล่นจาก ชื่อ LINE เป็นหลัก
-      console.log(`   🔍 Searching by LINE name: "${userName}"`);
-      for (let i = 1; i < rows.length; i++) {
-        if (rows[i] && rows[i][1] === userName) {  // ✅ Column B (index 1) = ชื่อ
-          balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
-          console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
-          found = true;
-          break;
-        }
-      }
-      
-      // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID
-      if (!found) {
-        console.log(`   ℹ️  Not found by LINE name, searching by User ID...`);
+        
+        // ค้นหาผู้เล่นจาก ชื่อ LINE เป็นหลัก
+        console.log(`   🔍 Searching by LINE name: "${userName}"`);
         for (let i = 1; i < rows.length; i++) {
-          if (rows[i] && rows[i][0] === userId) {  // ✅ Column A (index 0) = User ID
+          if (rows[i] && rows[i][1] === userName) {  // ✅ Column B (index 1) = ชื่อ
             balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
-            console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+            console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
             found = true;
             break;
           }
         }
+        
+        // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID
+        if (!found) {
+          console.log(`   ℹ️  Not found by LINE name, searching by User ID...`);
+          for (let i = 1; i < rows.length; i++) {
+            if (rows[i] && rows[i][0] === userId) {  // ✅ Column A (index 0) = User ID
+              balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
+              console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+              found = true;
+              break;
+            }
+          }
+        }
+        
+        // ถ้าไม่พบ ให้รอและลองใหม่
+        if (!found && retries > 1) {
+          console.log(`   ⏳ Player not found, retrying in 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (apiError) {
+        console.error(`   ⚠️  API error (attempt ${4 - retries}): ${apiError.message}`);
+        if (retries > 1) {
+          console.log(`   ⏳ Retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
-      
-      // ถ้าไม่พบ ให้รอและลองใหม่
-      if (!found && retries > 1) {
-        console.log(`   ⏳ Player not found, retrying in 1 second...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        retries--;
-      } else {
-        retries = 0;
-      }
+      retries--;
     }
     
     if (!found) {
