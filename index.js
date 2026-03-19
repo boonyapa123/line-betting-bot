@@ -2500,17 +2500,21 @@ app.post('/webhook', async (req, res) => {
                 await sendLineMessage(message.groupId, groupSummary, accessToken);
               }
               
-              // Find matching bets (legacy) - อัปเดตเฉพาะ Sheet ไม่ส่งแจ้งเตือนซ้ำ (autoMatchingService ส่งแล้ว)
-              const matchingBets = await findMatchingBets(resultData.priceRange, resultData.fireworkName, resultData.resultNumber);
-              console.log(`   Found ${matchingBets.length} matching bet(s) (legacy - sheet update only)`);
-              
-              // Update each matching bet (เฉพาะ Column I, J, K, R, S, T ไม่ส่ง LINE ซ้ำ)
-              for (const bet of matchingBets) {
-                await updateBetResultSheetOnly(bet.rowIndex, resultData.resultNumber, resultData.result, accessToken);
-              }
-              
-              if (matchingBets.length > 0) {
-                console.log(`✅ Results updated successfully`);
+              // Find matching bets (legacy) - เฉพาะกรณีที่ autoMatchingService ไม่ได้จัดการ
+              if (matchedPairs.length === 0) {
+                const matchingBets = await findMatchingBets(resultData.priceRange, resultData.fireworkName, resultData.resultNumber);
+                console.log(`   Found ${matchingBets.length} matching bet(s) (legacy - sheet update only)`);
+                
+                // Update each matching bet (เฉพาะ Column I, J, K, R, S, T ไม่ส่ง LINE ซ้ำ)
+                for (const bet of matchingBets) {
+                  await updateBetResultSheetOnly(bet.rowIndex, resultData.resultNumber, resultData.result, accessToken);
+                }
+                
+                if (matchingBets.length > 0) {
+                  console.log(`✅ Results updated successfully`);
+                }
+              } else {
+                console.log(`   ⏭️  Skip legacy flow - autoMatchingService already handled ${matchedPairs.length} pair(s)`);
               }
             } else {
               // ✅ ใช้ bettingRoundController ที่ทำงานถูกต้องแล้ว

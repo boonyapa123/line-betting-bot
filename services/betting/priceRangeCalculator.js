@@ -17,13 +17,24 @@ class PriceRangeCalculator {
   static parsePriceRange(priceStr) {
     if (!priceStr) return null;
 
-    const match = priceStr.match(/(\d+)-(\d+)\s+([ยล])/);
-    if (!match) return null;
+    // รองรับทั้งแบบมี side code (370-400 ล) และไม่มี (370-400)
+    const matchWithSide = priceStr.match(/(\d+)-(\d+)\s+([ยล])/);
+    if (matchWithSide) {
+      return {
+        min: parseInt(matchWithSide[1]),
+        max: parseInt(matchWithSide[2]),
+        side: matchWithSide[3], // ย = ต่ำ, ล = สูง
+      };
+    }
+
+    // แบบไม่มี side code - parse เฉพาะช่วงราคา
+    const matchRange = priceStr.match(/(\d+)-(\d+)/);
+    if (!matchRange) return null;
 
     return {
-      min: parseInt(match[1]),
-      max: parseInt(match[2]),
-      side: match[3], // ย = ต่ำ, ล = สูง
+      min: parseInt(matchRange[1]),
+      max: parseInt(matchRange[2]),
+      side: null,
     };
   }
 
