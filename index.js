@@ -1174,42 +1174,45 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
         const betAmount = Math.min(parseFloat(bet.amountA) || 0, parseFloat(bet.amountB) || 0);
         slipTotalBet += betAmount;
 
-        let userAAmount = 0;
-        let userBAmount = 0;
+        let userAWin = 0;
+        let userBWin = 0;
         let fee = 0;
 
         if (bet.resultA === '✅') {
           fee = Math.round(betAmount * 0.1);
-          userAAmount = betAmount - fee;
-          userBAmount = -betAmount;
+          userAWin = betAmount - fee;  // User A ชนะ (หักคอมแล้ว)
+          // User B แพ้ → ไม่ได้เงิน
         } else if (bet.resultA === '❌') {
           fee = Math.round(betAmount * 0.1);
-          userAAmount = -betAmount;
-          userBAmount = betAmount - fee;
+          // User A แพ้ → ไม่ได้เงิน
+          userBWin = betAmount - fee;  // User B ชนะ (หักคอมแล้ว)
         } else if (bet.resultA === '⛔️') {
           fee = Math.round(betAmount * 0.05);
-          userAAmount = -fee;
-          userBAmount = -fee;
+          // เสมอ → ไม่มีใครชนะ
         }
 
         slipTotalFee += fee;
 
-        // Track User A
+        // Track User A (เฉพาะที่ชนะ)
         const sideA = bet.betTypeA || 'unknown';
         if (!players[bet.userAName]) players[bet.userAName] = { yang: 0, lai: 0 };
-        if (sideA.includes('ย') || sideA.includes('ต')) {
-          players[bet.userAName].yang += userAAmount;
-        } else {
-          players[bet.userAName].lai += userAAmount;
+        if (userAWin > 0) {
+          if (sideA.includes('ย') || sideA.includes('ต')) {
+            players[bet.userAName].yang += userAWin;
+          } else {
+            players[bet.userAName].lai += userAWin;
+          }
         }
 
-        // Track User B
+        // Track User B (เฉพาะที่ชนะ)
         const sideB = bet.betTypeB || 'unknown';
         if (!players[bet.userBName]) players[bet.userBName] = { yang: 0, lai: 0 };
-        if (sideB.includes('ย') || sideB.includes('ต')) {
-          players[bet.userBName].yang += userBAmount;
-        } else {
-          players[bet.userBName].lai += userBAmount;
+        if (userBWin > 0) {
+          if (sideB.includes('ย') || sideB.includes('ต')) {
+            players[bet.userBName].yang += userBWin;
+          } else {
+            players[bet.userBName].lai += userBWin;
+          }
         }
       }
 
@@ -1225,9 +1228,9 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
       for (const [name, amounts] of Object.entries(players)) {
         const displayName = name.length > 16 ? name.substring(0, 14) + '..' : name;
         const total = amounts.yang + amounts.lai;
-        const yangStr = amounts.yang !== 0 ? (amounts.yang > 0 ? '+' : '') + amounts.yang.toLocaleString() : '';
-        const laiStr = amounts.lai !== 0 ? (amounts.lai > 0 ? '+' : '') + amounts.lai.toLocaleString() : '';
-        const totalStr = (total > 0 ? '+' : '') + total.toLocaleString();
+        const yangStr = amounts.yang > 0 ? amounts.yang.toLocaleString() : '';
+        const laiStr = amounts.lai > 0 ? amounts.lai.toLocaleString() : '';
+        const totalStr = total > 0 ? total.toLocaleString() : '0';
         summary += `${displayName.padEnd(16)} ${yangStr.padStart(8)}  ${laiStr.padStart(8)}  ${totalStr.padStart(8)}\n`;
 
         // สะสมยอดรวมรายบุคคล
@@ -1244,14 +1247,13 @@ async function generateBettingSummary(groupId, sourceType, accountNumber) {
     summary += `📊 ยอดเดิมพันรวม: ${grandTotalBet.toLocaleString()} บาท\n`;
     summary += `💵 Commission รวม: ${grandTotalFee.toLocaleString()} บาท\n\n`;
 
-    // สรุปรายบุคคล (รวมทุกบั้งไฟ)
+    // สรุปรายบุคคล (รวมทุกบั้งไฟ — เฉพาะยอดชนะหักคอมแล้ว)
     summary += `👤 สรุปรายบุคคล\n`;
     summary += `═══════════════════════════════════\n`;
     for (const [name, total] of Object.entries(grandPlayerTotals)) {
       const displayName = name.length > 16 ? name.substring(0, 14) + '..' : name;
-      const sign = total > 0 ? '+' : '';
-      const icon = total > 0 ? '📈' : total < 0 ? '📉' : '➖';
-      summary += `${displayName.padEnd(16)} : ${sign}${total.toLocaleString()} บาท ${icon}\n`;
+      const totalStr = total > 0 ? total.toLocaleString() : '0';
+      summary += `${displayName.padEnd(16)} : ${totalStr} บาท\n`;
     }
 
     return summary;
