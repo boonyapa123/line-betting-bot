@@ -90,6 +90,15 @@ class BettingRoundController {
           };
         }
 
+        // ✅ ตรวจสอบว่าเบตนี้ถูกจับคู่ไปแล้วหรือยัง
+        if (pendingBet.status === 'MATCHED' || (pendingBet.userBId && pendingBet.userBId !== '')) {
+          console.log(`   ❌ Bet already matched - User B: ${pendingBet.userBName}`);
+          return {
+            type: 'text',
+            text: '❌ การเดิมพันนี้ถูกจับคู่ไปแล้ว',
+          };
+        }
+
         console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
         console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
 
@@ -262,6 +271,15 @@ class BettingRoundController {
           return {
             type: 'text',
             text: '❌ ไม่พบการเดิมพันที่รอการจับคู่\n\n💡 โปรดรอให้ผู้เล่นคนแรกส่งข้อมูลการเดิมพันก่อน',
+          };
+        }
+
+        // ✅ ตรวจสอบว่าเบตนี้ถูกจับคู่ไปแล้วหรือยัง
+        if (pendingBet.status === 'MATCHED' || (pendingBet.userBId && pendingBet.userBId !== '')) {
+          console.log(`   ❌ Bet already matched - User B: ${pendingBet.userBName}`);
+          return {
+            type: 'text',
+            text: '❌ การเดิมพันนี้ถูกจับคู่ไปแล้ว',
           };
         }
 
