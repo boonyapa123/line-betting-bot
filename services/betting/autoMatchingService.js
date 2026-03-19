@@ -149,8 +149,7 @@ class AutoMatchingService {
     const priceMatch = messageA.match(/(\d+)-(\d+)/);
     
     if (resultNumber && priceMatch) {
-      const BettingResultService = require('./bettingResultService');
-      const bettingResultService = new BettingResultService();
+      const bettingResultService = require('./bettingResultService');
       
       // สร้าง bet objects สำหรับ checkPriceRangeResult
       const bet1 = {
