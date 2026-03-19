@@ -105,8 +105,8 @@ async function clearAndRecordResults() {
             userBWinnings = -commission;
           } else {
             // คะแนนนอกช่วง → ตรวจสอบประเภทการเดิมพัน
-            const lowBetTypes = ['ชถ', 'ย', 'ล่าง', 'ถอย', 'ต่ำ/ยั่ง', 'ยั้ง', 'ถ'];
-            const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
+            const lowBetTypes = ['ชถ', 'ย'];
+            const highBetTypes = ['ชล', 'ล'];
 
             if (lowBetTypes.includes(betTypeA)) {
               if (resultNumber < minPrice) {

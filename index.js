@@ -296,26 +296,17 @@ async function getLineGroupName(groupId, accessToken) {
 
 // Get opposite bet type
 function getOppositeBetType(betType) {
-  // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
-  // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
+  // ยั้ง (ต่ำ): ชถ, ย
+  // ไล่ (สูง): ชล, ล
   
   const opposites = {
-    // ต่ำ → สูง
+    // ยั้ง → ไล่
     'ชถ': 'ชล',
     'ย': 'ล',
-    'ล่าง': 'บน',
-    'ถอย': 'ชล',
-    'ต่ำ/ยั่ง': 'สูง/ไล่',
-    'ยั้ง': 'บน',
-    'ถ': 'ชล',
     
-    // สูง → ต่ำ
+    // ไล่ → ยั้ง
     'ชล': 'ชถ',
-    'บน': 'ล่าง',
-    'สูง/ไล่': 'ต่ำ/ยั่ง',
     'ล': 'ย',
-    'บ': 'ถ',
-    'ส': 'ถ',
   };
   return opposites[betType] || '';
 }
@@ -1332,17 +1323,19 @@ function extractBetAmount(message) {
 }
 
 function extractBetType(message) {
-  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
-  const slashFormatMatch = message.match(/^([ตยสล])\//);
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่ หรือ ยั้ง/350-390/10000แอด
+  const slashFormatMatch = message.match(/^([ตยสลไล่ยั้ง]+)\//);
   if (slashFormatMatch) {
     const typeChar = slashFormatMatch[1];
     const typeMap = {
-      'ต': 'ต่ำ/ยั่ง',
-      'ย': 'ต่ำ/ยั่ง',
-      'ส': 'สูง/ไล่',
-      'ล': 'สูง/ไล่'
+      'ต': 'ย',
+      'ย': 'ย',
+      'ยั้ง': 'ย',
+      'ส': 'ล',
+      'ล': 'ล',
+      'ไล่': 'ล'
     };
-    const betType = typeMap[typeChar];
+    const betType = typeMap[typeChar] || typeChar;
     console.log(`      ✅ Bet type (slash format): ${betType}`);
     return betType;
   }
@@ -1352,32 +1345,34 @@ function extractBetType(message) {
   if (newFormatMatch) {
     const typeChar = newFormatMatch[1];
     const typeMap = {
-      'ต': 'ต่ำ/ยั่ง',
-      'ย': 'ต่ำ/ยั่ง',
-      'ส': 'สูง/ไล่',
-      'ล': 'สูง/ไล่'
+      'ต': 'ย',
+      'ย': 'ย',
+      'ส': 'ล',
+      'ล': 'ล'
     };
-    const betType = typeMap[typeChar];
+    const betType = typeMap[typeChar] || typeChar;
     console.log(`      ✅ Bet type (new format): ${betType}`);
     return betType;
   }
   
-  // รูปแบบเดิม
+  // รูปแบบเดิม - แปลงเป็น sideCode สั้นๆ
   const betTypes = {
-    'ถอย': 'ถอย',
-    'ยั้ง': 'ยั้ง',
-    'ล่าง': 'ล่าง',
-    'บน': 'บน',
+    'ถอย': 'ชถ',
+    'ยั้ง': 'ย',
+    'ล่าง': 'ย',
+    'บน': 'ล',
     'ชล': 'ชล',
-    'ชถ': 'ชล',
-    'สกัด': 'สกัด',
-    'ติด': 'ยั้ง', // "ติด" = ยั้ง
-    'สูง': 'สูง',
-    'ต่ำ': 'ต่ำ',
-    'ถ': 'ถอย',
-    'ย': 'ยั้ง',
-    'ล': 'สูง/ไล่',
-    'บ': 'บน',
+    'ชถ': 'ชถ',
+    'สกัด': 'ย',
+    'ติด': 'ย',
+    'สูง': 'ล',
+    'ต่ำ': 'ย',
+    'ไล่': 'ล',
+    'ถ': 'ชถ',
+    'ย': 'ย',
+    'ล': 'ล',
+    'บ': 'ล',
+    'ส': 'ล',
   };
   
   for (const [key, value] of Object.entries(betTypes)) {
@@ -1413,8 +1408,8 @@ function extractPriceRange(message) {
 }
 
 function extractFireworkName(message) {
-  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่
-  const slashFormatMatch = message.match(/\/\d+([ก-๙]+)$/);
+  // รูปแบบใหม่: ไล่/350-390/10000แอดไล่ หรือ ไล่/265-275/12/ขาว
+  const slashFormatMatch = message.match(/\/\d+\/?([ก-๙]+)$/);
   if (slashFormatMatch) {
     const fireworkName = slashFormatMatch[1];
     console.log(`      ✅ Firework name (slash format): ${fireworkName}`);
@@ -1676,7 +1671,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
       pair.userA,          // [1] = B: User A ID
       userAName,           // [2] = C: ชื่อ User A
       pair.messageA,       // [3] = D: ข้อความ A
-      `${betDetailsA.priceRange || ''} ${betDetailsA.fireworkName || ''}`.trim(),  // [4] = E: ชื่อบั้งไฟ + ช่วงราคา
+      betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
       betDetailsA.betType || '',       // [5] = F: รายการเล่น
       betAmount,           // [6] = G: ยอดเงิน
       betAmount,           // [7] = H: ยอดเงิน B
@@ -1738,7 +1733,7 @@ async function appendToGoogleSheets(pair, userAName, userBName, groupName, match
           pair.userA,          // [1] = B: User A ID
           userAName,           // [2] = C: ชื่อ User A
           pair.messageA,       // [3] = D: ข้อความ A
-          `${betDetailsA.priceRange || ''} ${betDetailsA.fireworkName || ''}`.trim(),  // [4] = E: ชื่อบั้งไฟ + ช่วงราคา
+          betDetailsA.fireworkName || '',  // [4] = E: ชื่อบั้งไฟ
           betDetailsA.betType || '',       // [5] = F: รายการเล่น
           betAmount,           // [6] = G: ยอดเงิน
           betAmount,           // [7] = H: ยอดเงิน B
@@ -2641,10 +2636,10 @@ app.post('/webhook', async (req, res) => {
                 
                 // ตรวจสอบว่าประเภทตรงข้ามกัน (✅ vs ❌ หรือ ต่ำ vs สูง)
                 const isOpposite = (typeA, typeB) => {
-                  // ต่ำ: ชถ, ย, ล่าง, ถอย, ต่ำ/ยั่ง, ยั้ง, ถ
-                  // สูง: ชล, บน, สูง/ไล่, ล, บ, ส
-                  const lowBetTypes = ['ชถ', 'ย', 'ล่าง', 'ถอย', 'ต่ำ/ยั่ง', 'ยั้ง', 'ถ'];
-                  const highBetTypes = ['ชล', 'บน', 'สูง/ไล่', 'ล', 'บ', 'ส'];
+                  // ยั้ง: ชถ, ย
+                  // ไล่: ชล, ล
+                  const lowBetTypes = ['ชถ', 'ย'];
+                  const highBetTypes = ['ชล', 'ล'];
                   
                   const typeAIsLow = lowBetTypes.includes(typeA);
                   const typeAIsHigh = highBetTypes.includes(typeA);
@@ -2660,22 +2655,13 @@ app.post('/webhook', async (req, res) => {
                 if (!userBBetType) {
                   // ถ้า User B ไม่ระบุประเภท ให้ใช้ประเภทตรงข้ามกับ User A
                   const opposites = {
-                    // ต่ำ → สูง
+                    // ยั้ง → ไล่
                     'ชถ': 'ชล',
                     'ย': 'ล',
-                    'ล่าง': 'บน',
-                    'ถอย': 'ชล',
-                    'ต่ำ/ยั่ง': 'สูง/ไล่',
-                    'ยั้ง': 'บน',
-                    'ถ': 'ชล',
                     
-                    // สูง → ต่ำ
+                    // ไล่ → ยั้ง
                     'ชล': 'ชถ',
-                    'บน': 'ล่าง',
-                    'สูง/ไล่': 'ต่ำ/ยั่ง',
                     'ล': 'ย',
-                    'บ': 'ถ',
-                    'ส': 'ถ',
                   };
                   userBBetType = opposites[betDetailsA.betType];
                   console.log(`   ℹ️  User B didn't specify bet type, assuming opposite: ${userBBetType}`);

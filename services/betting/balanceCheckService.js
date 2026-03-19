@@ -427,6 +427,17 @@ class BalanceCheckService {
           checkResult.pendingAmount,
           checkResult.availableBalance
         );
+      } else if (checkResult.availableBalance <= 50) {
+        // ถ้าเงินใกล้หมด (≤ 50 บาท) แต่ยังเล่นได้ ให้แจ้งเตือน
+        await this.notifyLowBalance(
+          lineName,
+          checkResult.currentBalance,
+          checkResult.pendingAmount,
+          checkResult.availableBalance,
+          userId,
+          accountNumber,
+          groupId
+        );
       }
 
       return checkResult;
@@ -437,6 +448,76 @@ class BalanceCheckService {
         registered: false,
         error: error.message,
       };
+    }
+  }
+
+  /**
+   * แจ้งเตือนเงินใกล้หมด (เมื่อ availableBalance <= 50 แต่ยังเล่นได้)
+   * @param {string} lineName - ชื่อ LINE
+   * @param {number} currentBalance - ยอดเงินคงเหลือ
+   * @param {number} pendingAmount - เงินค้างรอผล
+   * @param {number} availableBalance - เงินที่ใช้ได้จริง
+   * @param {string} userId - LINE User ID
+   * @param {number} accountNumber - LINE OA Account Number
+   * @param {string} groupId - LINE Group ID
+   */
+  async notifyLowBalance(lineName, currentBalance, pendingAmount, availableBalance, userId, accountNumber = 1, groupId = null) {
+    try {
+      // ดึงรายละเอียดรายการรอผล
+      const pendingBets = await pendingBalanceService.getPendingBetsDetails(lineName);
+      
+      // สร้างข้อความ
+      let message = `⚠️ แจ้งเตือน: เงินใกล้หมด\n`;
+      message += `👤 ${lineName}\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `💰 ยอดเงินคงเหลือ: ${currentBalance} บาท\n`;
+      message += `⏳ เงินค้างรอผล: ${pendingAmount} บาท (${pendingBets.length} รายการ)\n`;
+      message += `✅ เงินที่ใช้ได้จริง: ${availableBalance} บาท\n`;
+      message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      
+      if (pendingBets.length > 0) {
+        message += `📋 รายการรอผล:\n`;
+        pendingBets.forEach((bet, index) => {
+          message += `  ${index + 1}. ${bet.slipName} - ${bet.side} ${bet.amount} บาท\n`;
+        });
+        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      }
+      
+      message += `💡 เงินเหลือน้อย กรุณาเติมเงินเพิ่ม\n`;
+      message += `📱 ติดต่อแอดมิน หากมีปัญหา\n`;
+      message += `https://lin.ee/JO6X7FE`;
+
+      console.log(`\n📤 === Low Balance Warning ===`);
+      console.log(`   Player: ${lineName}`);
+      console.log(`   Available balance: ${availableBalance} บาท`);
+      console.log(`   Pending bets: ${pendingBets.length} รายการ`);
+
+      // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
+      let finalAccountNumber = accountNumber;
+      if (groupId) {
+        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+        if (groupAccountNumber) {
+          finalAccountNumber = groupAccountNumber;
+        }
+      }
+
+      // สร้าง notification service ตามหมายเลข Account
+      const notificationService = new LineNotificationService(finalAccountNumber);
+
+      // ส่งข้อความส่วนตัว
+      const result = await notificationService.sendPrivateMessage(userId, message);
+
+      if (result.success) {
+        console.log(`   ✅ Low balance warning sent`);
+      } else {
+        console.error(`   ❌ Failed to send warning: ${result.error}`);
+      }
+
+      console.log(`   === End Warning ===\n`);
+      return { success: result.success };
+    } catch (error) {
+      console.error('Error notifying low balance:', error);
+      return { success: false, error: error.message };
     }
   }
 

@@ -232,8 +232,8 @@ class BettingMessageParserService {
       'ไล่': 'ไล่',
       'ย': 'ยั้ง',
       'ยั้ง': 'ยั้ง',
-      'ต': 'ต่ำ/ยั่ง',
-      'ส': 'สูง/ไล่',
+      'ต': 'ยั้ง',
+      'ส': 'ไล่',
     };
 
     const sideCodeMap = {
@@ -241,8 +241,8 @@ class BettingMessageParserService {
       'ไล่': 'ล',
       'ย': 'ย',
       'ยั้ง': 'ย',
-      'ต': 'ต',
-      'ส': 'ส',
+      'ต': 'ย',
+      'ส': 'ล',
     };
 
     return {
