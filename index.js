@@ -2371,12 +2371,12 @@ app.post('/webhook', async (req, res) => {
           console.log(`✅ Bank account info sent`);
         } else if (message.content.trim() === 'กติกา') {
           console.log(`📋 Rules command detected`);
-          const rulesMessage = `👇วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\nไล่/325-340/100ฟ้า\n\n📌 วิธีที่ 2 ร้องราคา\n300-330 ล 500 ฟ้าหลังฝน\n300-330 ย 500 ฟ้าหลังฝน\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
+          const rulesMessage = `วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\nชล/100/ฟ้า\nชถ/100/ฟ้า\n\n📌 วิธีที่ 2 ร้องราคา\n300-330/ล/500/ฟ้า\n300-330/ย/500/ฟ้า\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
           await sendLineMessage(message.groupId, rulesMessage, accessToken);
           console.log(`✅ Rules sent`);
         } else if (message.content.trim() === 'กต') {
           console.log(`📋 Rules command detected (กต)`);
-          const rulesMessage = `👇วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\nไล่/325-340/100ฟ้า\n\n📌 วิธีที่ 2 ร้องราคา\n300-330 ล 500 ฟ้าหลังฝน\n300-330 ย 500 ฟ้าหลังฝน\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
+          const rulesMessage = `วิธีการแทง 👇\n\n📌 วิธีที่ 1 กรณีมีราคาช่าง\nชล/100/ฟ้า\nชถ/100/ฟ้า\n\n📌 วิธีที่ 2 ร้องราคา\n300-330/ล/500/ฟ้า\n300-330/ย/500/ฟ้า\n\n💥ขั้นต่ำ 100 บาท 💥\n💥 ยอดเล่นได้เสียหัก10% ทุกกรณี\n💥 ออกกลางหัก5% ทุกรณี`;
           await sendLineMessage(message.groupId, rulesMessage, accessToken);
           console.log(`✅ Rules sent`);
         } else if (message.content.trim() === 'ถอน') {
