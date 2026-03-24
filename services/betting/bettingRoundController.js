@@ -574,6 +574,20 @@ class BettingRoundController {
       // ❌ ไม่พบคู่ - บันทึกเป็นการเดิมพันใหม่
       console.log(`❌ No matching pair found - recording as new bet`);
 
+      // ✅ เช็คซ้ำ: ถ้า User A คนเดียวกัน ส่งข้อความเดียวกัน ในกลุ่มเดียวกัน → ไม่บันทึกซ้ำ
+      const duplicateBet = groupBets.find(bet => 
+        bet.userId === userId && 
+        bet.message === message.text &&
+        (!bet.userBId || bet.userBId === '')
+      );
+      if (duplicateBet) {
+        console.log(`⚠️  Duplicate bet detected - same user, same message, same group. Skipping.`);
+        return {
+          type: 'text',
+          text: `⚠️ ข้อความนี้ถูกบันทึกไปแล้ว\n\n⏳ รอการจับคู่...`,
+        };
+      }
+
       const recordResult = await bettingPairingService.recordBet(
         {
           price: parsedBet.price,

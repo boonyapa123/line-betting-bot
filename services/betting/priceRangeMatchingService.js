@@ -92,7 +92,8 @@ class PriceRangeMatchingService {
 
     for (let i = 0; i < existingBets.length; i++) {
       const existingBet = existingBets[i];
-      if (existingBet.status === 'MATCHED' || !existingBet.price) continue;
+      // ข้ามเบตที่จับคู่แล้ว (เช็คทั้ง status และ userBId)
+      if (existingBet.status === 'MATCHED' || existingBet.userBId || !existingBet.price) continue;
 
       if (this.isValidPriceRangePair(newBet, existingBet)) {
         // คำนวณจำนวนเงินที่ใช้ (ใช้ยอดน้อยกว่า)
