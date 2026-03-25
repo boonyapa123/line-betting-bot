@@ -232,7 +232,7 @@ async function getLineUserProfile(userId, accessToken) {
           // ถ้า status 403 หรือ 404 แสดงว่าไม่เป็นเพื่อน
           if (res.statusCode === 403 || res.statusCode === 404) {
             console.log(`      ⚠️  User is not a friend of this OA (Status: ${res.statusCode})`);
-            resolve('Unknown');
+            resolve(null); // return null เพื่อให้ caller ลอง group profile
             return;
           }
           
@@ -258,6 +258,46 @@ async function getLineUserProfile(userId, accessToken) {
       resolve('Unknown');
     });
 
+    req.end();
+  });
+}
+
+// LINE API: Get group member profile (ดึงชื่อจากกลุ่ม แม้ไม่ได้เป็นเพื่อน OA)
+async function getLineGroupMemberProfile(groupId, userId, accessToken) {
+  if (!groupId || !userId) return null;
+  const token = accessToken || LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) return null;
+
+  return new Promise((resolve) => {
+    console.log(`      🔍 Fetching group member profile for userId: ${userId} in group: ${groupId}`);
+    const options = {
+      hostname: 'api.line.me',
+      path: `/v2/bot/group/${groupId}/member/${userId}`,
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          if (res.statusCode === 200) {
+            const profile = JSON.parse(data);
+            if (profile.displayName) {
+              console.log(`      ✅ Got group member displayName: ${profile.displayName}`);
+              resolve(profile.displayName);
+              return;
+            }
+          }
+          console.log(`      ⚠️  Could not get group member profile (Status: ${res.statusCode})`);
+          resolve(null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
     req.end();
   });
 }
@@ -2165,7 +2205,7 @@ app.post('/webhook', async (req, res) => {
           console.log(`👤 Getting LINE user profile...`);
           let lineUserName = 'Unknown';
           try {
-            lineUserName = await getLineUserProfile(event.source.userId, accessToken);
+            lineUserName = await getLineUserProfile(event.source.userId, accessToken) || 'Unknown';
             console.log(`   ✅ User name: ${lineUserName}`);
           } catch (profileError) {
             console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
@@ -2547,6 +2587,22 @@ app.post('/webhook', async (req, res) => {
               try {
                 const bettingRoundController = require('./services/betting/bettingRoundController');
                 
+                // ดึงชื่อผู้เล่น
+                let playerDisplayName = await getLineUserProfile(message.userId, accessToken) || 
+                                        await getLineGroupMemberProfile(message.groupId, message.userId, accessToken) || 
+                                        'Unknown';
+
+                // ถ้าดึงชื่อไม่ได้ (Unknown) ให้แจ้งในกลุ่มให้เพิ่มเพื่อน OA
+                if (playerDisplayName === 'Unknown') {
+                  console.log(`⚠️  Player is Unknown - sending add friend message to group`);
+                  const addFriendMessage = `⚠️ ไม่สามารถระบุตัวตนผู้เล่นได้\n\n` +
+                    `กรุณาเพิ่มเพื่อน LINE OA ก่อนเล่น\n` +
+                    `👉 https://lin.ee/VxA9oz5\n\n` +
+                    `เพิ่มเพื่อนแล้วลองส่งข้อความใหม่อีกครั้งนะคะ`;
+                  await sendLineMessage(message.groupId, addFriendMessage, accessToken);
+                  break;
+                }
+
                 // เตรียมข้อมูลสำหรับ bettingRoundController
                 controllerResult = await bettingRoundController.handleMessage({
                   message: {
@@ -2556,7 +2612,7 @@ app.post('/webhook', async (req, res) => {
                   },
                   source: {
                     userId: message.userId,
-                    displayName: await getLineUserProfile(message.userId, accessToken),
+                    displayName: playerDisplayName,
                     groupId: message.groupId
                   }
                 });
@@ -2744,8 +2800,8 @@ app.post('/webhook', async (req, res) => {
                 
                 // Fetch user names first
                 console.log('👤 Fetching user profiles and group name...');
-                const userAName = await getLineUserProfile(pair.userA, accessToken);
-                const userBName = await getLineUserProfile(pair.userB, accessToken);
+                const userAName = await getLineUserProfile(pair.userA, accessToken) || 'Unknown';
+                const userBName = await getLineUserProfile(pair.userB, accessToken) || 'Unknown';
                 const groupName = await getLineGroupName(pair.groupId, accessToken);
                 
                 console.log(`   User A: ${userAName}`);
@@ -3000,7 +3056,7 @@ app.post('/webhook', async (req, res) => {
         console.log(`   User ID: ${userId}`);
         
         // Get user name
-        const userName = await getLineUserProfile(userId, accessToken);
+        const userName = await getLineUserProfile(userId, accessToken) || 'Unknown';
         
         // Get group name
         const groupId = event.source.groupId || event.source.userId;
@@ -3123,7 +3179,7 @@ async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, l
     if (!actualUserName || actualUserName === 'Unknown') {
       try {
         console.log(`   🔄 ชื่อเป็น Unknown ดึงจาก LINE Profile API...`);
-        actualUserName = await getLineUserProfile(userId, accessToken);
+        actualUserName = await getLineUserProfile(userId, accessToken) || 'Unknown';
         console.log(`   📝 ดึงชื่อจาก LINE Profile: ${actualUserName}`);
       } catch (error) {
         console.warn(`   ⚠️  ไม่สามารถดึงชื่อจาก LINE Profile: ${error.message}`);

@@ -467,112 +467,12 @@ class BettingRoundController {
         };
       }
 
-      // ✅ ตรวจสอบการจับคู่อัตโนมัติแบบราคาต่างกัน (เฉพาะในกลุ่มเดียวกัน) ก่อนบันทึก
-      // หมายเหตุ: REPLY Method ได้จัดการการจับคู่แล้ว ส่วนนี้สำหรับ Direct Method เท่านั้น
-      const PriceRangeMatchingService = require('./priceRangeMatchingService');
+      // บันทึกเป็นการเดิมพันใหม่ (รอ reply จับคู่)
+      console.log(`📝 Recording as new bet - waiting for reply matching`);
 
       console.log(`🔍 Fetching bets for group: ${source.groupId || 'NO_GROUP'}`);
       const groupBets = await bettingPairingService.getBetsByGroupId(source.groupId || '');
       console.log(`   Found ${groupBets.length} bets in group`);
-
-      if (groupBets.length > 0) {
-        console.log(`   Bets in group:`, groupBets.map(b => ({
-          displayName: b.displayName,
-          slipName: b.slipName,
-          sideCode: b.sideCode,
-          price: b.price,
-          amount: b.amount,
-          status: b.status
-        })));
-      }
-
-      // ค้นหาคู่ที่มีฝั่งตรงข้าม (ราคาต่างกันได้) เฉพาะในกลุ่มเดียวกัน
-      const matchedPair = PriceRangeMatchingService.findMatchForNewBet(parsedBet, groupBets);
-
-      console.log(`   Matching result:`, matchedPair ? 'FOUND' : 'NOT FOUND');
-
-      if (matchedPair) {
-        // 🎯 พบคู่ - อัปเดตแถว User A โดยตรง (ไม่บันทึก User B ลงแถวใหม่)
-        console.log(`🎯 Auto-matched price range pair found!`);
-        console.log(`   ${displayName} (${parsedBet.sideCode}) vs ${matchedPair.existingBet.displayName} (${matchedPair.existingBet.sideCode})`);
-        console.log(`   Slip: ${parsedBet.slipName}, Price: ${parsedBet.price}, Amount: ${matchedPair.betAmount} บาท`);
-
-        // สร้าง Price B จาก Price A
-        const priceB = BetsSheetColumns.createPriceB(matchedPair.existingBet.message, matchedPair.existingBet.sideCode);
-
-        // 📝 อัปเดตแถวของ User A ด้วยข้อมูล User B
-        const userBData = {
-          userId: userId,
-          displayName: displayName,
-          sideCode: parsedBet.sideCode,
-          amount: matchedPair.betAmount,
-          price: parsedBet.price,
-          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
-          slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
-          groupName: '', // ยังไม่มีข้อมูล
-          tokenB: '', // ยังไม่มีข้อมูล
-        };
-
-        const updateResult = await bettingPairingService.updateRowWithUserB(
-          matchedPair.existingBet.rowIndex,
-          userBData
-        );
-
-        if (!updateResult.success) {
-          console.error(`❌ Failed to update row: ${updateResult.message}`);
-          // ถ้าอัปเดตไม่สำเร็จ ให้บันทึก User B ลงแถวใหม่แทน
-          const recordResult = await bettingPairingService.recordBet(
-            {
-              price: parsedBet.price,
-              sideCode: parsedBet.sideCode,
-              amount: parsedBet.amount,
-              slipName: parsedBet.slipName
-            },
-            userId,
-            displayName,
-            displayName,
-            '',
-            '',
-            source.groupId || ''
-          );
-
-          if (!recordResult.success) {
-            return {
-              type: 'text',
-              text: `❌ เกิดข้อผิดพลาดในการบันทึก: ${recordResult.message}`,
-            };
-          }
-
-          return {
-            type: 'text',
-            text: `⚠️  ไม่สามารถจับคู่กับการเดิมพันเดิมได้ บันทึกเป็นการเดิมพันใหม่แทน\n\n` +
-              `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-              `💹 ราคา: ${parsedBet.price}\n` +
-              `💰 ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
-              `⏳ รอการจับคู่...`,
-          };
-        }
-
-        console.log(`✅ Row updated successfully`);
-
-        // ส่งข้อความยืนยัน
-        return {
-          type: 'text',
-          text: `✅ จับคู่เล่นสำเร็จ\n\n` +
-            `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-            `💹 ราคา: ${parsedBet.price}\n\n` +
-            `👤 ${matchedPair.existingBet.displayName}\n` +
-            `   ฝั่ง: ${matchedPair.existingBet.sideCode}\n` +
-            `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
-            `👤 ${displayName}\n` +
-            `   ฝั่ง: ${parsedBet.sideCode}\n` +
-            `   ยอดเงิน: ${matchedPair.betAmount} บาท\n\n` +
-            `⏳ รอการประกาศผล...`,
-        };
-      }
-
-      // ❌ ไม่พบคู่ - บันทึกเป็นการเดิมพันใหม่
-      console.log(`❌ No matching pair found - recording as new bet`);
 
       // ✅ เช็คซ้ำ: ถ้า User A คนเดียวกัน ส่งข้อความเดียวกัน ในกลุ่มเดียวกัน → ไม่บันทึกซ้ำ
       const duplicateBet = groupBets.find(bet => 
