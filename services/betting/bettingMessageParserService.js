@@ -39,6 +39,8 @@ class BettingMessageParserService {
   static METHOD2_ALT_PATTERN = /^(.+?)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SIMPLE_PATTERN = /^(\d+[\-\.\/\*]\d+)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SLASH_PATTERN = /^([ก-๙]+)\/(\d+[\-\.\/\*]\d+)\/(\d+)\/?([ก-๙\s]+)$/;
+  // รูปแบบติดกัน: 350-400ย44ฟ้า (ราคา+ฝั่ง+ยอด+ชื่อบั้งไฟ)
+  static METHOD2_COMPACT_PATTERN = /^(\d+[\-\.\/\*]\d+)([ลยตส])(\d+)([ก-๙]+.*)$/;
   
   /**
    * รูปแบบ Space-Slash: [ฝั่ง] [ราคา]/[ยอดเงิน][ชื่อบั้งไฟ]
@@ -106,6 +108,12 @@ class BettingMessageParserService {
     const method2SimpleMatch = trimmedMessage.match(this.METHOD2_SIMPLE_PATTERN);
     if (method2SimpleMatch) {
       return this.parseMethod2Simple(method2SimpleMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบติดกัน: 350-400ย44ฟ้า
+    const method2CompactMatch = trimmedMessage.match(this.METHOD2_COMPACT_PATTERN);
+    if (method2CompactMatch) {
+      return this.parseMethod2Compact(method2CompactMatch);
     }
 
     // ไม่ตรงรูปแบบ
@@ -246,6 +254,33 @@ class BettingMessageParserService {
     const sideMap = {
       'ล': 'ไล่',
       'ย': 'ยั้ง',
+    };
+
+    return {
+      success: true,
+      method: 2,
+      price: price.trim(),
+      side: sideMap[side] || side,
+      sideCode: side,
+      amount: parseInt(amount),
+      slipName: slipName.trim(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Parse วิธีที่ 2 (ราคาคะแนน) - รูปแบบติดกัน
+   * รูปแบบ: 350-400ย44ฟ้า
+   * @private
+   */
+  static parseMethod2Compact(match) {
+    const [, price, side, amount, slipName] = match;
+
+    const sideMap = {
+      'ล': 'ไล่',
+      'ย': 'ยั้ง',
+      'ต': 'ต่อ',
+      'ส': 'สู้',
     };
 
     return {
