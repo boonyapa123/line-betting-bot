@@ -67,6 +67,8 @@ const SLIP_RECEIVER_ACCOUNT_1 = process.env.SLIP_RECEIVER_ACCOUNT_1 || '';  // A
 const SLIP_RECEIVER_ACCOUNT_2 = process.env.SLIP_RECEIVER_ACCOUNT_2 || '';  // Account 2
 const SLIP_RECEIVER_ACCOUNT_3 = process.env.SLIP_RECEIVER_ACCOUNT_3 || '';  // Account 3
 const SLIP_RECEIVER_PROMPTPAY = process.env.SLIP_RECEIVER_PROMPTPAY || '';  // PromptPay เบอร์โทร
+// ชื่อผู้รับที่อนุญาต (สำหรับเทียบเมื่อบัญชีไม่ตรงจาก checkReceiver)
+const SLIP_RECEIVER_NAMES = (process.env.SLIP_RECEIVER_NAMES || 'บุญญาภา,ชญาภา').split(',').map(n => n.trim());
 
 // Google Sheets
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -2232,15 +2234,6 @@ app.post('/webhook', async (req, res) => {
               });
             }
           });
-
-          // เพิ่ม PromptPay เบอร์โทร (ใช้ accountType เดียวกัน)
-          if (SLIP_RECEIVER_PROMPTPAY && !uniqueAccounts.has(SLIP_RECEIVER_PROMPTPAY)) {
-            uniqueAccounts.add(SLIP_RECEIVER_PROMPTPAY);
-            allReceiverAccounts.push({
-              accountType: '01004',
-              accountNumber: SLIP_RECEIVER_PROMPTPAY
-            });
-          }
           
           if (allReceiverAccounts.length === 0) {
             console.log(`   ⚠️  No receiver account configured`);
@@ -2307,17 +2300,27 @@ app.post('/webhook', async (req, res) => {
 
           // ตรวจสอบบัญชีตรงกันหรือไม่ THIRD
           if (!verificationService.isReceiverMatched(verificationResult)) {
-            console.log(`\n❌ Receiver account not matched (Code: 200401)`);
-            const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n` +
-              `📋 รหัส: 200401\n\n` +
-              `📸 กรุณาส่งสลิปใหม่`;
-            try {
-              await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
-            } catch (sendError) {
-              console.error(`❌ Failed to send error message: ${sendError.message}`);
+            // Fallback: เทียบชื่อผู้รับจาก response data (สำหรับ PromptPay ที่ checkReceiver เช็คไม่ได้)
+            const receiverName = verificationResult?.data?.receiver?.account?.name || '';
+            const isNameMatched = SLIP_RECEIVER_NAMES.some(name => receiverName.includes(name));
+            
+            if (isNameMatched) {
+              console.log(`   ✅ Receiver name matched: "${receiverName}" (fallback check)`);
+              // ผ่าน — ชื่อผู้รับตรงกัน ถือว่าบัญชีถูกต้อง
+            } else {
+              console.log(`\n❌ Receiver account not matched (Code: 200401)`);
+              console.log(`   Receiver name: "${receiverName}" - not in allowed list: ${SLIP_RECEIVER_NAMES.join(', ')}`);
+              const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
+                `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n` +
+                `📋 รหัส: 200401\n\n` +
+                `📸 กรุณาส่งสลิปใหม่`;
+              try {
+                await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
+              } catch (sendError) {
+                console.error(`❌ Failed to send error message: ${sendError.message}`);
+              }
+              continue;
             }
-            continue;
           }
 
           // ✅ ทั้งหมดตรวจสอบสำเร็จ บันทึกข้อมูล

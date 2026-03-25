@@ -82,11 +82,16 @@ class Slip2GoImageVerificationService {
   isVerified(response) {
     // Code 200000 = สลิปถูกต้อง (ไม่ได้ตรวจสอบเงื่อนไข)
     // Code 200200 = สลิปถูกต้อง + บัญชีตรงกัน
-    // Code 200100 = สลิปซ้ำ
-    // Code 200300 = บัญชีไม่ตรงกัน
-    // Code 200400 = จำนวนเงินไม่ตรงกัน
+    // Code 200401 = สลิปจริง แต่บัญชีไม่ตรง (ไม่ใช่สลิปปลอม)
+    // Code 200501 = สลิปซ้ำ (ไม่ใช่สลิปปลอม)
+    // Code 200500 = สลิปปลอม
     
-    return response?.code === '200000' || response?.code === '200200' || response?.success === true;
+    const code = response?.code;
+    // สลิปปลอมจริงๆ คือ 200500 เท่านั้น
+    if (code === '200500') return false;
+    // code อื่นๆ ที่มี data = สลิปจริง
+    if (code === '200000' || code === '200200' || code === '200401' || code === '200501' || code === '200300') return true;
+    return response?.success === true || !!response?.data;
   }
 
   /**
