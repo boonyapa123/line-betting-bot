@@ -2903,64 +2903,28 @@ app.post('/webhook', async (req, res) => {
                   
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
+                  // ส่งรูป QR payment
+                  const qrImageUrl1 = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+                  await sendLineImageMessage(pair.groupId, qrImageUrl1, qrImageUrl1, accessToken);
                 } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
                   
                   // สร้างข้อความแจ้งเตือนในกลุ่ม
-                  let groupWarningMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n\n`;
+                  let names = [];
+                  if (userABalance < betAmount) names.push(`${userAName} (ขาด ${(betAmount - userABalance).toFixed(0)} บาท)`);
+                  if (userBBalance < betAmount) names.push(`${userBName} (ขาด ${(betAmount - userBBalance).toFixed(0)} บาท)`);
                   
-                  // Send detailed message to User A if balance is insufficient
-                  if (userABalance < betAmount) {
-                    const userADetailMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n` +
-                      `👤 ${userAName}\n` +
-                      `💰 ยอดเงินปัจจุบัน: ${userABalance} บาท\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                      `💡 วิธีแก้ไข (เติมเงิน):\n` +
-                      `1️⃣  โอนเงินเพิ่มอย่างน้อย ${(betAmount - userABalance).toFixed(0)} บาท\n` +
-                      `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n` +
-                      `3️⃣  รอการยืนยันจากระบบ\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-                      `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
-                    console.log(`   📤 Sending insufficient balance message to ${userAName}`);
-                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
-                    groupWarningMessage += `👤 ${userAName} ยอดเงินไม่พอ (ขาด ${(betAmount - userABalance).toFixed(0)} บาท)\n`;
-                    // Add delay between messages to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  }
+                  const groupWarningMessage2 = `⚠️ ${names.join(', ')} ยอดเงินไม่พอ\n\n` +
+                    `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
+                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
+                    `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+                    `👉 https://lin.ee/9EDgGIV`;
                   
-                  // Send detailed message to User B if balance is insufficient
-                  if (userBBalance < betAmount) {
-                    const userBDetailMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่พอสำหรับการเดิมพัน ⚠️ ⚠️ ⚠️\n` +
-                      `👤 ${userBName}\n` +
-                      `💰 ยอดเงินปัจจุบัน: ${userBBalance} บาท\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                      `💡 วิธีแก้ไข (เติมเงิน):\n` +
-                      `1️⃣  โอนเงินเพิ่มอย่างน้อย ${(betAmount - userBBalance).toFixed(0)} บาท\n` +
-                      `2️⃣  ส่งสลิปการโอนเงินให้ระบบตรวจสอบ\n` +
-                      `3️⃣  รอการยืนยันจากระบบ\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-                      `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
-                    console.log(`   📤 Sending insufficient balance message to ${userBName}`);
-                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
-                    groupWarningMessage += `👤 ${userBName} ยอดเงินไม่พอ (ขาด ${(betAmount - userBBalance).toFixed(0)} บาท)\n`;
-                    // Add delay between messages to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  }
-                  
-                  // แจ้งในกลุ่มด้วย
-                  groupWarningMessage += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                  groupWarningMessage += `💡 วิธีแก้ไข:\n`;
-                  groupWarningMessage += `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n`;
-                  groupWarningMessage += `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n`;
-                  groupWarningMessage += `3️⃣  รอการยืนยันจากระบบ\n`;
-                  groupWarningMessage += `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
-                  groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
-                  // Add delay to avoid rate limiting (1 second total)
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                  await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
+                  await sendLineMessage(pair.groupId, groupWarningMessage2, accessToken);
+                  // ส่งรูป QR payment
+                  const qrImageUrl2 = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+                  await sendLineImageMessage(pair.groupId, qrImageUrl2, qrImageUrl2, accessToken);
                 } else {
                   // ยอดเงินเพียงพอ บันทึกการเดิมพัน
                   console.log(`✅ Balance sufficient for both players`);
