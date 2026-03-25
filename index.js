@@ -2362,7 +2362,23 @@ app.post('/webhook', async (req, res) => {
             console.log(`   ✅ Recorded to Google Sheets`);
 
             // Create and send success reply message
-            const replyMessage = verificationService.createLineMessage(verificationResult);
+            // ถ้า code เป็น 200401 แต่ผ่าน fallback ชื่อผู้รับ → สร้างข้อความสำเร็จเอง
+            let replyMessage;
+            if (verificationResult.code === '200401') {
+              const data = verificationResult.data;
+              replyMessage = `✅ ได้รับยอดเงินแล้ว\n\n` +
+                `📊 รายละเอียดสลิป:\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `💰 จำนวนเงิน: ${data.amount} บาท\n` +
+                `👤 ผู้ส่ง: ${data.sender?.account?.name}\n` +
+                `👥 ผู้รับ: ${data.receiver?.account?.name}\n` +
+                `📅 วันที่: ${new Date(data.dateTime).toLocaleString('th-TH')}\n` +
+                `🔖 เลขอ้างอิง: ${data.transRef}\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `ขอบคุณที่ใช้บริการ 🙏`;
+            } else {
+              replyMessage = verificationService.createLineMessage(verificationResult);
+            }
             const successGroupMessage = `✅ เติมเงินสำเร็จ\n\n` +
               `👤 ${lineUserName}\n` +
               `💰 จำนวน: ${verificationResult.data.amount} บาท\n\n` +
