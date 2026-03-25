@@ -2353,7 +2353,7 @@ app.post('/webhook', async (req, res) => {
             const successGroupMessage = `✅ เติมเงินสำเร็จ\n\n` +
               `👤 ${lineUserName}\n` +
               `💰 จำนวน: ${verificationResult.data.amount} บาท\n\n` +
-              `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
+              `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
               `👉 https://lin.ee/9EDgGIV`;
             console.log(`   📝 Reply message created`);
 
@@ -2664,9 +2664,9 @@ app.post('/webhook', async (req, res) => {
                 if (playerDisplayName === 'Unknown') {
                   console.log(`⚠️  Player is Unknown - sending add friend message to group`);
                   const addFriendMessage = `⚠️ ไม่สามารถระบุตัวตนผู้เล่นได้\n\n` +
-                    `กรุณาเพิ่มเพื่อน LINE OA ก่อนเล่น\n` +
-                    `👉 https://lin.ee/9EDgGIV\n\n` +
-                    `เพิ่มเพื่อนแล้วลองส่งข้อความใหม่อีกครั้งนะคะ`;
+                    `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
+                    `📱 เลข บช. 865-0-35901-9 กรุงไทย\n` +
+                    `ชญาภา พรรณวงค์`;
                   await sendLineMessage(message.groupId, addFriendMessage, accessToken);
                   break;
                 }
@@ -2919,9 +2919,8 @@ app.post('/webhook', async (req, res) => {
                   
                   const groupWarningMessage = `⚠️ ${names.join(', ')} ยังไม่ได้เติมเงิน\n\n` +
                     `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n` +
-                    `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
-                    `👉 https://lin.ee/9EDgGIV`;
+                    `📱 เลข บช. 865-0-35901-9 กรุงไทย\n` +
+                    `ชญาภา พรรณวงค์`;
                   
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
@@ -2938,9 +2937,8 @@ app.post('/webhook', async (req, res) => {
                   
                   const groupWarningMessage2 = `⚠️ ${names.join(', ')} ยอดเงินไม่พอ\n\n` +
                     `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n` +
-                    `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
-                    `👉 https://lin.ee/9EDgGIV`;
+                    `📱 เลข บช. 865-0-35901-9 กรุงไทย\n` +
+                    `ชญาภา พรรณวงค์`;
                   
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessage(pair.groupId, groupWarningMessage2, accessToken);

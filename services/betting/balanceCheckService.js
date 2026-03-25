@@ -255,9 +255,8 @@ class BalanceCheckService {
         if (groupId) {
           const groupMessage = `⚠️ ${lineName} ยังไม่ได้เติมเงิน\n\n` +
             `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-            `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
-            `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
-            `👉 https://lin.ee/9EDgGIV`;
+            `📱 เลข บช. 865-0-35901-9 กรุงไทย\n` +
+            `ชญาภา พรรณวงค์`;
 
           console.log(`\n   📢 Sending group message...`);
           const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
@@ -325,9 +324,8 @@ class BalanceCheckService {
         if (groupId) {
           const groupMessage = `⚠️ ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n\n` +
             `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-            `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
-            `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
-            `👉 https://lin.ee/9EDgGIV`;
+            `📱 เลข บช. 865-0-35901-9 กรุงไทย\n` +
+            `ชญาภา พรรณวงค์`;
 
           console.log(`\n   📢 Sending group message...`);
           const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
