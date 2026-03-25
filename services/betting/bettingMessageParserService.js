@@ -16,6 +16,10 @@ class BettingMessageParserService {
    */
   static METHOD1_PATTERN = /^(.+?)\s+(ชล\.|ชถ\.)\s+(\d+)$/;
   static METHOD1_ALT_PATTERN = /^(ชล|ชถ|ชย)\s+(\d+)\s+(.+)$/;
+  // รูปแบบ Slash: ชล/100/ฟ้า หรือ ชถ/100/ฟ้า
+  static METHOD1_SLASH_PATTERN = /^(ชล|ชถ|ชย)\/(\d+)\/([ก-๙\s]+)$/;
+  // รูปแบบติดกัน: ชถ10ฟ้า หรือ ชล100ฟ้า
+  static METHOD1_COMPACT_PATTERN = /^(ชล|ชถ|ชย)(\d+)([ก-๙]+.*)$/;
 
   /**
    * Regex Pattern สำหรับวิธีที่ 2 (ราคาคะแนน)
@@ -62,6 +66,12 @@ class BettingMessageParserService {
       return this.parseMethod2Slash(method2SpaceSlashMatch);
     }
 
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบ Slash: ชล/100/ฟ้า
+    const method1SlashMatch = trimmedMessage.match(this.METHOD1_SLASH_PATTERN);
+    if (method1SlashMatch) {
+      return this.parseMethod1Slash(method1SlashMatch);
+    }
+
     // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบเดิม
     const method1Match = trimmedMessage.match(this.METHOD1_PATTERN);
     if (method1Match) {
@@ -72,6 +82,12 @@ class BettingMessageParserService {
     const method1AltMatch = trimmedMessage.match(this.METHOD1_ALT_PATTERN);
     if (method1AltMatch) {
       return this.parseMethod1Alt(method1AltMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบติดกัน: ชถ10ฟ้า
+    const method1CompactMatch = trimmedMessage.match(this.METHOD1_COMPACT_PATTERN);
+    if (method1CompactMatch) {
+      return this.parseMethod1Alt(method1CompactMatch);
     }
 
     // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบเดิม
@@ -116,6 +132,32 @@ class BettingMessageParserService {
       sideCode: side === 'ชล.' ? 'ชล' : 'ชถ',
       amount: parseInt(amount),
       price: null, // วิธีที่ 1 ไม่มีราคา
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Parse วิธีที่ 1 (ราคาช่าง) - รูปแบบ Slash
+   * รูปแบบ: ชล/100/ฟ้า
+   * @private
+   */
+  static parseMethod1Slash(match) {
+    const [, side, amount, slipName] = match;
+
+    const sideMap = {
+      'ชล': 'ไล่',
+      'ชถ': 'ถอย',
+      'ชย': 'ยั้ง',
+    };
+
+    return {
+      success: true,
+      method: 1,
+      slipName: slipName.trim(),
+      side: sideMap[side] || side,
+      sideCode: side,
+      amount: parseInt(amount),
+      price: null,
       timestamp: new Date().toISOString(),
     };
   }
