@@ -177,6 +177,43 @@ class LineNotificationService {
       return { success: false, error: error.message };
     }
   }
+  /**
+   * ส่งรูปภาพไปยังกลุ่ม
+   * @param {string} groupId - LINE Group ID
+   * @param {string} originalContentUrl - URL รูปภาพต้นฉบับ
+   * @param {string} previewImageUrl - URL รูปภาพ preview
+   */
+  async sendGroupImageMessage(groupId, originalContentUrl, previewImageUrl) {
+    try {
+      console.log(`📢 Sending image to group ${groupId} via Account ${this.accountNumber}`);
+
+      const response = await axios.post(
+        `${this.apiUrl}/push`,
+        {
+          to: groupId,
+          messages: [
+            {
+              type: 'image',
+              originalContentUrl: originalContentUrl,
+              previewImageUrl: previewImageUrl,
+            },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log(`✅ ส่งรูปภาพไปยังกลุ่ม ${groupId} สำเร็จ (Status: ${response.status})`);
+      return { success: true };
+    } catch (error) {
+      console.error(`❌ เกิดข้อผิดพลาดในการส่งรูปภาพกลุ่ม:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = { LineNotificationService };

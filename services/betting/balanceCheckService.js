@@ -231,76 +231,60 @@ class BalanceCheckService {
    * @param {string} groupId - LINE Group ID (สำหรับส่งข้อความในกลุ่ม)
    */
   async notifyPlayerNotRegistered(lineName, userId, accountNumber = 1, groupId = null) {
-    try {
-      const message = `❌ ❌ ❌ ยังไม่ได้ลงทะเบียนในระบบ ❌ ❌ ❌\n\n` +
-        `👤 ${lineName}\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `⚠️  คุณยังไม่ได้ลงทะเบียนในระบบ\n\n` +
-        `💡 วิธีแก้ไข (เติมเงินเพื่อลงทะเบียน):\n` +
-        `1️⃣  โอนเงินเข้าระบบ\n` +
-        `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
-        `3️⃣  รอการยืนยันจากระบบ\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-        `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
+      try {
+        console.log(`\n📤 === Player Not Registered Notification ===`);
+        console.log(`   Player: ${lineName}`);
+        console.log(`   User ID: ${userId}`);
+        console.log(`   Account: ${accountNumber}`);
+        console.log(`   Group ID: ${groupId || 'N/A'}`);
 
-      console.log(`\n📤 === Player Not Registered Notification ===`);
-      console.log(`   Player: ${lineName}`);
-      console.log(`   User ID: ${userId}`);
-      console.log(`   Account: ${accountNumber}`);
-      console.log(`   Group ID: ${groupId || 'N/A'}`);
-
-      // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
-      let finalAccountNumber = accountNumber;
-      if (groupId) {
-        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
-        if (groupAccountNumber) {
-          finalAccountNumber = groupAccountNumber;
-          console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+        // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
+        let finalAccountNumber = accountNumber;
+        if (groupId) {
+          const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+          if (groupAccountNumber) {
+            finalAccountNumber = groupAccountNumber;
+            console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+          }
         }
-      }
 
-      // สร้าง notification service ตามหมายเลข Account
-      const notificationService = new LineNotificationService(finalAccountNumber);
+        // สร้าง notification service ตามหมายเลข Account
+        const notificationService = new LineNotificationService(finalAccountNumber);
 
-      // ส่งข้อความส่วนตัว
-      console.log(`\n   📤 Sending private message...`);
-      const result = await notificationService.sendPrivateMessage(userId, message);
+        // ส่งข้อความแจ้งเตือนในกลุ่ม (ข้อความเดียว + รูป QR)
+        if (groupId) {
+          const groupMessage = `⚠️ ${lineName} ยังไม่ได้เติมเงิน\n\n` +
+            `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
+            `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
+            `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+            `👉 https://lin.ee/9EDgGIV`;
 
-      if (result.success) {
-        console.log(`   ✅ Private message sent successfully`);
-      } else {
-        console.error(`   ❌ Failed to send private message: ${result.error}`);
-      }
+          console.log(`\n   📢 Sending group message...`);
+          const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
+          if (groupResult.success) {
+            console.log(`   ✅ Group message sent successfully`);
+          } else {
+            console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+          }
 
-      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
-      if (groupId) {
-        const groupMessage = `❌ ❌ ❌ ยังไม่ได้ลงทะเบียนในระบบ ❌ ❌ ❌\n\n` +
-          `👤 ${lineName} ยังไม่ได้ลงทะเบียน\n\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `💡 วิธีแก้ไข (เติมเงินเพื่อลงทะเบียน):\n` +
-          `1️⃣  โอนเงินเข้าระบบ\n` +
-          `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
-          `3️⃣  รอการยืนยันจากระบบ\n\n` +
-          `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-          `🔗 เข้าร่วมกลุ่ม: https://lin.ee/JO6X7FE`;
-
-        console.log(`\n   📢 Sending group message...`);
-        const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
-        if (groupResult.success) {
-          console.log(`   ✅ Group message sent successfully`);
-        } else {
-          console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+          // ส่งรูป QR payment ในกลุ่ม
+          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+          console.log(`   📢 Sending QR payment image...`);
+          const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
+          if (imageResult.success) {
+            console.log(`   ✅ QR image sent successfully`);
+          } else {
+            console.error(`   ❌ Failed to send QR image: ${imageResult.error}`);
+          }
         }
-      }
 
-      console.log(`\n   === End Notification ===\n`);
-      return { success: result.success };
-    } catch (error) {
-      console.error('Error notifying player not registered:', error);
-      return { success: false, error: error.message };
+        console.log(`\n   === End Notification ===\n`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error notifying player not registered:', error);
+        return { success: false, error: error.message };
+      }
     }
-  }
 
   /**
    * แจ้งเตือนเมื่อยอดเงินไม่พอ (รวมเงินค้าง)
@@ -315,79 +299,62 @@ class BalanceCheckService {
    * @param {number} availableBalance - เงินที่สามารถใช้ได้
    */
   async notifyInsufficientBalance(lineName, currentBalance, requiredAmount, shortfall, userId, accountNumber = 1, groupId = null, pendingAmount = 0, availableBalance = 0) {
-    try {
-      const message = this.buildInsufficientBalanceMessage(
-        lineName,
-        currentBalance,
-        requiredAmount,
-        shortfall,
-        pendingAmount,
-        availableBalance
-      );
+      try {
+        console.log(`\n📤 === Insufficient Balance Notification ===`);
+        console.log(`   Player: ${lineName}`);
+        console.log(`   User ID: ${userId}`);
+        console.log(`   Current balance: ${currentBalance} บาท`);
+        console.log(`   Required amount: ${requiredAmount} บาท`);
+        console.log(`   Shortfall: ${shortfall} บาท`);
+        console.log(`   Account: ${accountNumber}`);
+        console.log(`   Group ID: ${groupId || 'N/A'}`);
 
-      console.log(`\n📤 === Insufficient Balance Notification ===`);
-      console.log(`   Player: ${lineName}`);
-      console.log(`   User ID: ${userId}`);
-      console.log(`   Current balance: ${currentBalance} บาท`);
-      console.log(`   Pending amount: ${pendingAmount} บาท`);
-      console.log(`   Available balance: ${availableBalance} บาท`);
-      console.log(`   Required amount: ${requiredAmount} บาท`);
-      console.log(`   Shortfall: ${shortfall} บาท`);
-      console.log(`   Account: ${accountNumber}`);
-      console.log(`   Group ID: ${groupId || 'N/A'}`);
-
-      // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
-      let finalAccountNumber = accountNumber;
-      if (groupId) {
-        const groupAccountNumber = await this.getGroupAccountNumber(groupId);
-        if (groupAccountNumber) {
-          finalAccountNumber = groupAccountNumber;
-          console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+        // ดึง Account Number จากกลุ่ม (ถ้ามี groupId)
+        let finalAccountNumber = accountNumber;
+        if (groupId) {
+          const groupAccountNumber = await this.getGroupAccountNumber(groupId);
+          if (groupAccountNumber) {
+            finalAccountNumber = groupAccountNumber;
+            console.log(`   📍 Using group's account: ${finalAccountNumber}`);
+          }
         }
-      }
 
-      // สร้าง notification service ตามหมายเลข Account
-      const notificationService = new LineNotificationService(finalAccountNumber);
+        const notificationService = new LineNotificationService(finalAccountNumber);
 
-      // ส่งข้อความส่วนตัว
-      console.log(`\n   📤 Sending private message...`);
-      const result = await notificationService.sendPrivateMessage(userId, message);
+        // ส่งข้อความแจ้งเตือนในกลุ่ม (ข้อความเดียว + รูป QR)
+        if (groupId) {
+          const groupMessage = `⚠️ ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n\n` +
+            `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
+            `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
+            `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+            `👉 https://lin.ee/9EDgGIV`;
 
-      if (result.success) {
-        console.log(`   ✅ Private message sent successfully`);
-      } else {
-        console.error(`   ❌ Failed to send private message: ${result.error}`);
-      }
+          console.log(`\n   📢 Sending group message...`);
+          const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
+          if (groupResult.success) {
+            console.log(`   ✅ Group message sent successfully`);
+          } else {
+            console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+          }
 
-      // ส่งข้อความแจ้งเตือนในกลุ่มด้วย (ถ้ามี groupId)
-      if (groupId) {
-        const groupMessage = `⚠️ ⚠️ ⚠️ ยอดเงินไม่เพียงพอ ⚠️ ⚠️ ⚠️\n` +
-          `👤 ${lineName} ยอดเงินไม่พอ (ขาด ${shortfall} บาท)\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `💡 วิธีแก้ไข:\n` +
-          `1️⃣  โอนเงินเพิ่มเติมให้เพียงพอ\n` +
-          `2️⃣  ส่งสลิปการโอนให้ระบบตรวจสอบ\n` +
-          `3️⃣  รอการยืนยันจากระบบ\n` +
-          `4️⃣  ลองเดิมพันใหม่อีกครั้ง\n` +
-          `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-          `https://lin.ee/JO6X7FE`;
-
-        console.log(`\n   📢 Sending group message...`);
-        const groupResult = await notificationService.sendGroupMessage(groupId, groupMessage);
-        if (groupResult.success) {
-          console.log(`   ✅ Group message sent successfully`);
-        } else {
-          console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
+          // ส่งรูป QR payment ในกลุ่ม
+          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+          console.log(`   📢 Sending QR payment image...`);
+          const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
+          if (imageResult.success) {
+            console.log(`   ✅ QR image sent successfully`);
+          } else {
+            console.error(`   ❌ Failed to send QR image: ${imageResult.error}`);
+          }
         }
-      }
 
-      console.log(`\n   === End Notification ===\n`);
-      return { success: result.success };
-    } catch (error) {
-      console.error('Error notifying insufficient balance:', error);
-      return { success: false, error: error.message };
+        console.log(`\n   === End Notification ===\n`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error notifying insufficient balance:', error);
+        return { success: false, error: error.message };
+      }
     }
-  }
 
   /**
    * สร้างข้อความแจ้งเตือนยอดเงินไม่พอ (รวมเงินค้าง)

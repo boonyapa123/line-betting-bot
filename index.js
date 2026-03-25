@@ -1342,6 +1342,45 @@ async function sendLineMessage(groupId, message, accessToken) {
   });
 }
 
+// Send LINE image message
+async function sendLineImageMessage(groupId, originalContentUrl, previewImageUrl, accessToken) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({
+      to: groupId,
+      messages: [
+        {
+          type: 'image',
+          originalContentUrl: originalContentUrl,
+          previewImageUrl: previewImageUrl
+        }
+      ]
+    });
+    
+    const options = {
+      hostname: 'api.line.me',
+      path: '/v2/bot/message/push',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+    
+    https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        console.log(`   ✅ Image sent`);
+        resolve(true);
+      });
+    }).on('error', (err) => {
+      console.log(`   ❌ Error sending image:`, err.message);
+      resolve(false);
+    }).write(body);
+  });
+}
+
 function extractBetAmount(message) {
   if (!message) return null;
   
@@ -2428,8 +2467,11 @@ app.post('/webhook', async (req, res) => {
           console.log(`✅ Summary sent`);
         } else if (message.content.trim() === 'บช') {
           console.log(`💳 Bank account command detected`);
-          const bankMessage = `💳✨ ช่องทางการเติมเงิน ✨💳\n\n🏦 ธนาคารกรุงไทย\n🔢 เลขที่บัญชี: 865-0-35901-9\n👤 ชื่อบัญชี: ชญาภา พรรณวงค์\n\n📎 กรุณาแนบสลิปการโอนเงินผ่านลิงก์ด้านล่างนี้\n🔗 https://lin.ee/JO6X7FE`;
+          const bankMessage = `💳✨ ช่องทางการเติมเงิน ✨💳\n\n🏦 ธนาคารกรุงไทย\n🔢 เลขที่บัญชี: 865-0-35901-9\n👤 ชื่อบัญชี: ชญาภา พรรณวงค์\n\n📎 กรุณาส่งสลิปการโอนเงินในห้องแชทนี้`;
           await sendLineMessage(message.groupId, bankMessage, accessToken);
+          // ส่งรูป QR payment
+          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
+          await sendLineImageMessage(message.groupId, qrImageUrl, qrImageUrl, accessToken);
           console.log(`✅ Bank account info sent`);
         } else if (message.content.trim() === 'กติกา') {
           console.log(`📋 Rules command detected`);
@@ -2849,54 +2891,17 @@ app.post('/webhook', async (req, res) => {
                   console.log(`❌ Player not registered`);
                   
                   // สร้างข้อความแจ้งเตือนในกลุ่ม
-                  let groupWarningMessage = `⚠️ ⚠️ ⚠️ ผู้เล่นยังไม่ลงทะเบียน ⚠️ ⚠️ ⚠️\n\n`;
+                  let names = [];
+                  if (!userAFound) names.push(userAName);
+                  if (!userBFound) names.push(userBName);
                   
-                  // Send message to User A if not registered
-                  if (!userAFound) {
-                    const userADetailMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
-                      `ชื่อ: ${userAName}\n` +
-                      `ข้อความ: ${pair.messageA}\n\n` +
-                      `💡 วิธีแก้ไข:\n` +
-                      `1️⃣  ติดต่อแอดมิน\n` +
-                      `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
-                      `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-                      `https://lin.ee/JO6X7FE`;
-                    console.log(`   📤 Sending not registered message to ${userAName}`);
-                    await sendLineMessageToUser(pair.userA, userADetailMessage, accessToken);
-                    groupWarningMessage += `👤 ${userAName} ยังไม่ลงทะเบียน\n`;
-                    // Add delay between messages to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  }
+                  const groupWarningMessage = `⚠️ ${names.join(', ')} ยังไม่ได้เติมเงิน\n\n` +
+                    `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
+                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
+                    `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+                    `👉 https://lin.ee/9EDgGIV`;
                   
-                  // Send message to User B if not registered
-                  if (!userBFound) {
-                    const userBDetailMessage = `❌ ยังไม่ลงทะเบียนในระบบ\n\n` +
-                      `ชื่อ: ${userBName}\n` +
-                      `ข้อความ: ${pair.messageB}\n\n` +
-                      `💡 วิธีแก้ไข:\n` +
-                      `1️⃣  ติดต่อแอดมิน\n` +
-                      `2️⃣  ให้แอดมินเพิ่มชื่อของคุณในระบบ\n` +
-                      `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n` +
-                      `📱 ติดต่อแอดมิน หากมีปัญหา\n` +
-                      `https://lin.ee/JO6X7FE`;
-                    console.log(`   📤 Sending not registered message to ${userBName}`);
-                    await sendLineMessageToUser(pair.userB, userBDetailMessage, accessToken);
-                    groupWarningMessage += `👤 ${userBName} ยังไม่ลงทะเบียน\n`;
-                    // Add delay between messages to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  }
-                  
-                  // แจ้งในกลุ่มด้วย
-                  groupWarningMessage += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                  groupWarningMessage += `💡 วิธีแก้ไข:\n`;
-                  groupWarningMessage += `1️⃣  ติดต่อแอดมิน\n`;
-                  groupWarningMessage += `2️⃣  ให้แอดมินเพิ่มชื่อในระบบ\n`;
-                  groupWarningMessage += `3️⃣  ลองเดิมพันใหม่อีกครั้ง\n\n`;
-                  groupWarningMessage += `📱 ติดต่อแอดมิน หากมีปัญหา`;
                   console.log(`   📢 Sending group warning message`);
-                  // Add delay to avoid rate limiting (1 second total)
-                  await new Promise(resolve => setTimeout(resolve, 1000));
                   await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
                 } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
@@ -3670,6 +3675,9 @@ async function start() {
       reprocessStoredMessages  // Pass the re-processing function
     );
     app.use('/slip2go', slip2GoRouter);
+
+    // Serve QR payment images
+    app.use('/qrpayments', express.static('qrpayments'));
 
     // Register Line Slip Verification router
     const createLineSlipVerificationRouter = require('./routes/lineSlipVerificationWebhook');
