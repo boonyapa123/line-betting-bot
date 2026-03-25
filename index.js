@@ -66,6 +66,7 @@ const LINE_CHANNEL_ID_3 = process.env.LINE_CHANNEL_ID_3;
 const SLIP_RECEIVER_ACCOUNT_1 = process.env.SLIP_RECEIVER_ACCOUNT_1 || '';  // Account 1
 const SLIP_RECEIVER_ACCOUNT_2 = process.env.SLIP_RECEIVER_ACCOUNT_2 || '';  // Account 2
 const SLIP_RECEIVER_ACCOUNT_3 = process.env.SLIP_RECEIVER_ACCOUNT_3 || '';  // Account 3
+const SLIP_RECEIVER_PROMPTPAY = process.env.SLIP_RECEIVER_PROMPTPAY || '';  // PromptPay เบอร์โทร
 
 // Google Sheets
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -2231,6 +2232,15 @@ app.post('/webhook', async (req, res) => {
               });
             }
           });
+
+          // เพิ่ม PromptPay เบอร์โทร
+          if (SLIP_RECEIVER_PROMPTPAY && !uniqueAccounts.has(SLIP_RECEIVER_PROMPTPAY)) {
+            uniqueAccounts.add(SLIP_RECEIVER_PROMPTPAY);
+            allReceiverAccounts.push({
+              accountType: '03',
+              accountNumber: SLIP_RECEIVER_PROMPTPAY
+            });
+          }
           
           if (allReceiverAccounts.length === 0) {
             console.log(`   ⚠️  No receiver account configured`);
@@ -2280,13 +2290,13 @@ app.post('/webhook', async (req, res) => {
             continue;
           }
 
-          // ตรวจสอบบัญชีตรงกันหรือไม่ SECOND
-          if (!verificationService.isReceiverMatched(verificationResult)) {
-            console.log(`\n❌ Receiver account not matched (Code: 200401)`);
+          // ตรวจสอบสลิปจริงหรือไม่ SECOND (สลิปปลอม)
+          if (!verificationService.isVerified(verificationResult)) {
+            console.log(`\n❌ Slip is not valid - Fake slip (Code: 200500)`);
             const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n` +
-              `📋 รหัส: 200401\n\n` +
-              `📸 กรุณาส่งสลิปใหม่`;
+              `🚫 เหตุผล: สลิปปลอม\n` +
+              `📋 รหัส: 200500\n\n` +
+              `📸 กรุณาส่งสลิปจริง`;
             try {
               await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
             } catch (sendError) {
@@ -2295,13 +2305,13 @@ app.post('/webhook', async (req, res) => {
             continue;
           }
 
-          // ตรวจสอบสลิปจริงหรือไม่ THIRD (สลิปปลอม)
-          if (!verificationService.isVerified(verificationResult)) {
-            console.log(`\n❌ Slip is not valid - Fake slip (Code: 200500)`);
+          // ตรวจสอบบัญชีตรงกันหรือไม่ THIRD
+          if (!verificationService.isReceiverMatched(verificationResult)) {
+            console.log(`\n❌ Receiver account not matched (Code: 200401)`);
             const errorMessage = `❌ ตรวจสอบสลิปไม่สำเร็จ\n\n` +
-              `🚫 เหตุผล: สลิปปลอม\n` +
-              `📋 รหัส: 200500\n\n` +
-              `📸 กรุณาส่งสลิปจริง`;
+              `🚫 เหตุผล: บัญชีผู้รับไม่ตรงกัน\n` +
+              `📋 รหัส: 200401\n\n` +
+              `📸 กรุณาส่งสลิปใหม่`;
             try {
               await sendLineMessageToUser(event.source.userId, errorMessage, accessToken);
             } catch (sendError) {

@@ -122,19 +122,20 @@ class Slip2GoImageVerificationService {
       return true;
     }
 
-    // Code 200300 = บัญชีไม่ตรงกัน
-    if (response?.code === '200300') {
-      console.log(`❌ Receiver account not matched (Code: 200300)`);
+    // Code 200401 = บัญชีไม่ตรงกัน
+    if (response?.code === '200401' || response?.code === '200300') {
+      console.log(`❌ Receiver account not matched (Code: ${response?.code})`);
       return false;
     }
 
-    // Code 200000 = สลิปถูกต้อง แต่ไม่ได้ตรวจสอบบัญชี
+    // Code 200000 = สลิปถูกต้อง แต่ไม่ได้ตรวจสอบบัญชี (ถือว่าผ่าน)
     if (response?.code === '200000') {
       console.log(`⚠️  Receiver account not checked (Code: 200000)`);
-      return false;
+      return true;
     }
 
-    return false;
+    // Code อื่นๆ (เช่น 200500 fraud, 200501 duplicate) ไม่เกี่ยวกับบัญชี → ข้ามไป
+    return true;
   }
 
   /**
