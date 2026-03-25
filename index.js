@@ -2737,7 +2737,11 @@ app.post('/webhook', async (req, res) => {
               }
               
               // ข้ามการบันทึกซ้ำถ้า bettingRoundController ได้จัดการแล้ว
-              if (isHandledByController) {
+              // ถ้า controller ได้ประมวลผลข้อความแล้ว (ไม่ว่าจะสำเร็จหรือ error) ให้ข้าม detectPair
+              if (isHandledByController || controllerResult) {
+                if (!isHandledByController && controllerResult) {
+                  console.log(`   ⏭️  Skipping detectPair - bettingRoundController already processed this message`);
+                }
                 return;
               }
 
