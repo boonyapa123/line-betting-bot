@@ -2904,7 +2904,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessage(pair.groupId, groupWarningMessage, accessToken);
                   // ส่งรูป QR payment
-                  const qrImageUrl1 = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+                  const qrImageUrl1 = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
                   await sendLineImageMessage(pair.groupId, qrImageUrl1, qrImageUrl1, accessToken);
                 } else if (userABalance < betAmount || userBBalance < betAmount) {
                   console.log(`❌ Insufficient balance detected`);
@@ -2923,7 +2923,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`   📢 Sending group warning message`);
                   await sendLineMessage(pair.groupId, groupWarningMessage2, accessToken);
                   // ส่งรูป QR payment
-                  const qrImageUrl2 = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+                  const qrImageUrl2 = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
                   await sendLineImageMessage(pair.groupId, qrImageUrl2, qrImageUrl2, accessToken);
                 } else {
                   // ยอดเงินเพียงพอ บันทึกการเดิมพัน

@@ -268,7 +268,7 @@ class BalanceCheckService {
           }
 
           // ส่งรูป QR payment ในกลุ่ม
-          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
           console.log(`   📢 Sending QR payment image...`);
           const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
           if (imageResult.success) {
@@ -338,7 +338,7 @@ class BalanceCheckService {
           }
 
           // ส่งรูป QR payment ในกลุ่ม
-          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/qrpayments2.jpg';
+          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
           console.log(`   📢 Sending QR payment image...`);
           const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
           if (imageResult.success) {
