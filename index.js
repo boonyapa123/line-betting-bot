@@ -2705,17 +2705,6 @@ app.post('/webhook', async (req, res) => {
                     // ข้อความแจ้งเตือนข้อผิดพลาด - ไม่ส่ง
                     console.log(`   ⏭️  Skipping error message (not sending to user)`);
                   }
-
-                  // ถ้าเป็นข้อความแจ้งเตือนยอดเงิน ส่งข้อความเข้ากลุ่มพร้อมรูป QR payment
-                  const isBalanceWarning = controllerResult.text.includes('ผู้เล่นไม่พบในระบบ') || 
-                                           controllerResult.text.includes('ยอดเงินไม่พอ');
-                  if (isBalanceWarning && message.sourceType === 'group') {
-                    console.log(`   📢 Sending balance warning to group with QR payment`);
-                    await sendLineMessage(message.groupId, controllerResult.text, accessToken);
-                    const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
-                    await sendLineImageMessage(message.groupId, qrImageUrl, qrImageUrl, accessToken);
-                    console.log(`   ✅ Balance warning + QR sent to group`);
-                  }
                 }
                 
                 // ถ้า bettingRoundController จัดการการจับคู่แล้ว ให้ส่งข้อความเข้ากลุ่มและแจ้งผู้เล่น A ด้วย
