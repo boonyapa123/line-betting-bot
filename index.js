@@ -2180,7 +2180,7 @@ app.post('/webhook', async (req, res) => {
           
           // ดึงข้อมูลบัญชีจาก Slip2Go API
           // ดึงข้อมูลบัญชีจาก environment variable
-          let receiverAccount = getReceiverAccount(event.source.userId);
+          let receiverAccount = getReceiverAccount(channelId);
           
           if (!receiverAccount) {
             console.log(`   ⚠️  No receiver account configured`);
@@ -2301,15 +2301,31 @@ app.post('/webhook', async (req, res) => {
 
             // Create and send success reply message
             const replyMessage = verificationService.createLineMessage(verificationResult);
+            const successGroupMessage = `✅ เติมเงินสำเร็จ\n\n` +
+              `👤 ${lineUserName}\n` +
+              `💰 จำนวน: ${verificationResult.data.amount} บาท\n\n` +
+              `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+              `👉 https://lin.ee/9EDgGIV`;
             console.log(`   📝 Reply message created`);
 
             // Send reply to user AFTER recording
             console.log(`   📤 Sending reply to user...`);
             try {
               await sendLineMessageToUser(event.source.userId, replyMessage, accessToken);
-              console.log(`   ✅ Reply sent`);
+              console.log(`   ✅ Reply sent to user`);
             } catch (replyError) {
-              console.error(`   ⚠️  Failed to send reply: ${replyError.message}`);
+              console.error(`   ⚠️  Failed to send reply to user: ${replyError.message}`);
+            }
+
+            // Send success message to group
+            if (event.source.groupId) {
+              console.log(`   📤 Sending success message to group...`);
+              try {
+                await sendLineMessage(event.source.groupId, successGroupMessage, accessToken);
+                console.log(`   ✅ Group message sent`);
+              } catch (groupError) {
+                console.error(`   ⚠️  Failed to send group message: ${groupError.message}`);
+              }
             }
           } catch (recordError) {
             console.error(`   ⚠️  Failed to record to Google Sheets: ${recordError.message}`);

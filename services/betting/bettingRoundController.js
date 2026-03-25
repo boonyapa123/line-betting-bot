@@ -182,7 +182,7 @@ class BettingRoundController {
         if (!balanceCheck.registered) {
           return {
             type: 'text',
-            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
           };
         }
 
@@ -353,7 +353,7 @@ class BettingRoundController {
         if (!balanceCheck.registered) {
           return {
             type: 'text',
-            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
           };
         }
 
@@ -454,7 +454,7 @@ class BettingRoundController {
       if (!balanceCheck.registered) {
         return {
           type: 'text',
-          text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 โปรดติดต่อแอดมินเพื่อลงทะเบียน`,
+          text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
         };
       }
 
