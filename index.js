@@ -2233,11 +2233,11 @@ app.post('/webhook', async (req, res) => {
             }
           });
 
-          // เพิ่ม PromptPay เบอร์โทร
+          // เพิ่ม PromptPay เบอร์โทร (ใช้ accountType เดียวกัน)
           if (SLIP_RECEIVER_PROMPTPAY && !uniqueAccounts.has(SLIP_RECEIVER_PROMPTPAY)) {
             uniqueAccounts.add(SLIP_RECEIVER_PROMPTPAY);
             allReceiverAccounts.push({
-              accountType: '03',
+              accountType: '01004',
               accountNumber: SLIP_RECEIVER_PROMPTPAY
             });
           }
