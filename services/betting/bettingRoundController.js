@@ -99,6 +99,15 @@ class BettingRoundController {
           };
         }
 
+        // ✅ ตรวจสอบว่า User B ไม่ใช่คนเดียวกับ User A (ห้ามจับคู่ตัวเอง)
+        if (pendingBet.userId === userId) {
+          console.log(`   ❌ Self-matching detected - User A and User B are the same person: ${userId}`);
+          return {
+            type: 'text',
+            text: '❌ ไม่สามารถจับคู่กับตัวเองได้',
+          };
+        }
+
         console.log(`   ✅ Found pending bet from ${pendingBet.displayName}`);
         console.log(`      Slip: ${pendingBet.slipName}, Side: ${pendingBet.sideCode}, Amount: ${pendingBet.amount}, Price: ${pendingBet.price}`);
 
@@ -116,6 +125,7 @@ class BettingRoundController {
 
         // ตรวจสอบว่าข้อความ reply มีรูปแบบ Direct Method หรือไม่
         const directMethodParsed = BettingMessageParserService.parseMessage(message.text);
+        const replyMethodParsed = BettingMessageParserService.parseReplyMessage(message.text);
 
         let parsedBet;
 
@@ -123,9 +133,9 @@ class BettingRoundController {
           // ถ้า reply มีรูปแบบ Direct Method ให้ใช้ข้อมูลจากข้อความ
           console.log(`   📊 Reply message has Direct Method format - using parsed data`);
           parsedBet = directMethodParsed;
-        } else {
-          // ถ้า reply เป็นแค่ "ต" หรือไม่มีรูปแบบ ให้ใช้ข้อมูลของ User A
-          console.log(`   📊 Reply message is simple - using User A data`);
+        } else if (replyMethodParsed.success) {
+          // ถ้า reply เป็น "ต" หรือ "ต." ให้ใช้ข้อมูลของ User A
+          console.log(`   📊 Reply message is "ต" - using User A data`);
 
           // คำนวณฝั่งตรงข้าม
           const getOppositeSide = (sideCode) => {
@@ -153,6 +163,10 @@ class BettingRoundController {
             price: pendingBet.price,
             timestamp: new Date().toISOString(),
           };
+        } else {
+          // ข้อความ reply ไม่ใช่รูปแบบเดิมพัน และไม่ใช่ "ต" — เป็นแค่แชทปกติ ข้ามไป
+          console.log(`   ⏭️  Reply message is not a betting format - ignoring (normal chat)`);
+          return null;
         }
 
         console.log(`   📊 Final bet data:`, parsedBet);
@@ -245,6 +259,15 @@ class BettingRoundController {
       // ตรวจสอบ REPLY Method (เฉพาะ "ต" หรือ "ต." เท่านั้น)
       const replyParsed = BettingMessageParserService.parseReplyMessage(message.text);
       if (replyParsed.success) {
+        // ✅ ต้อง reply ข้อความเท่านั้น ห้ามพิมพ์ "ต" ลอยๆ โดยไม่ได้ reply
+        if (!message.quotedMessageId) {
+          console.log(`   ❌ "ต" sent without replying to a message - ignoring`);
+          return {
+            type: 'text',
+            text: '❌ กรุณา reply ข้อความของผู้เล่นที่ต้องการจับคู่\n\n💡 กดค้างที่ข้อความแล้วเลือก "ตอบกลับ" แล้วพิมพ์ "ต"',
+          };
+        }
+
         // ค้นหาข้อมูลของ User A ที่ยังรอการจับคู่ในกลุ่มเดียวกัน
         console.log(`🔍 REPLY Method detected (simple "ต") - searching for pending bet in group: ${source.groupId || 'NO_GROUP'}`);
 
@@ -280,6 +303,15 @@ class BettingRoundController {
           return {
             type: 'text',
             text: '❌ การเดิมพันนี้ถูกจับคู่ไปแล้ว',
+          };
+        }
+
+        // ✅ ตรวจสอบว่า User B ไม่ใช่คนเดียวกับ User A (ห้ามจับคู่ตัวเอง)
+        if (pendingBet.userId === userId) {
+          console.log(`   ❌ Self-matching detected - User A and User B are the same person: ${userId}`);
+          return {
+            type: 'text',
+            text: '❌ ไม่สามารถจับคู่กับตัวเองได้',
           };
         }
 
