@@ -2613,7 +2613,7 @@ app.post('/webhook', async (req, res) => {
                   console.log(`⚠️  Player is Unknown - sending add friend message to group`);
                   const addFriendMessage = `⚠️ ไม่สามารถระบุตัวตนผู้เล่นได้\n\n` +
                     `กรุณาเพิ่มเพื่อน LINE OA ก่อนเล่น\n` +
-                    `👉 https://lin.ee/VxA9oz5\n\n` +
+                    `👉 https://lin.ee/9EDgGIV\n\n` +
                     `เพิ่มเพื่อนแล้วลองส่งข้อความใหม่อีกครั้งนะคะ`;
                   await sendLineMessage(message.groupId, addFriendMessage, accessToken);
                   break;
@@ -3539,24 +3539,24 @@ async function getPlayerBalance(userId, userName) {
           }
         }
         
-        // ค้นหาผู้เล่นจาก ชื่อ LINE เป็นหลัก
-        console.log(`   🔍 Searching by LINE name: "${userName}"`);
+        // ค้นหาผู้เล่นจาก User ID เป็นหลัก
+        console.log(`   🔍 Searching by User ID: "${userId}"`);
         for (let i = 1; i < rows.length; i++) {
-          if (rows[i] && rows[i][1] === userName) {  // ✅ Column B (index 1) = ชื่อ
+          if (rows[i] && rows[i][0] === userId) {  // ✅ Column A (index 0) = User ID
             balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
-            console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+            console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
             found = true;
             break;
           }
         }
         
-        // ถ้าไม่พบจากชื่อ ให้ลองค้นหาจาก User ID
+        // ถ้าไม่พบจาก User ID ให้ลองค้นหาจากชื่อ LINE (fallback)
         if (!found) {
-          console.log(`   ℹ️  Not found by LINE name, searching by User ID...`);
+          console.log(`   ℹ️  Not found by User ID, searching by LINE name...`);
           for (let i = 1; i < rows.length; i++) {
-            if (rows[i] && rows[i][0] === userId) {  // ✅ Column A (index 0) = User ID
+            if (rows[i] && rows[i][1] === userName) {  // ✅ Column B (index 1) = ชื่อ
               balance = parseFloat(rows[i][4]) || 0;  // ✅ Column E (index 4) = Balance
-              console.log(`   ✅ Found player by User ID at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
+              console.log(`   ✅ Found player by LINE name at row ${i + 1}: ${rows[i][1]} (balance: ${balance} บาท)`);
               found = true;
               break;
             }

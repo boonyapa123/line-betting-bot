@@ -56,53 +56,51 @@ class BalanceCheckService {
    * @param {string} lineName - ชื่อ LINE
    * @returns {boolean} true ถ้าพบผู้เล่น, false ถ้าไม่พบ
    */
-  async isPlayerRegistered(lineName) {
-    try {
-      // ลองดึงจากชีท UsersBalance ก่อน
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.usersBalanceSheetName}!A:C`,
-      });
+  async isPlayerRegistered(userId) {
+      try {
+        // ลองดึงจากชีท UsersBalance ก่อน (Column A = User ID)
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.usersBalanceSheetName}!A:C`,
+        });
 
-      const values = response.data.values || [];
+        const values = response.data.values || [];
 
-      for (let i = 1; i < values.length; i++) {
-        if (values[i] && values[i][1] === lineName) {
-          return true;
+        for (let i = 1; i < values.length; i++) {
+          if (values[i] && values[i][0] === userId) {
+            return true;
+          }
         }
-      }
 
-      // ถ้าไม่พบในชีท UsersBalance ให้ดึงจากชีท Players
-      const playersResponse = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.playersSheetName}!B:E`,
-      });
+        // ถ้าไม่พบในชีท UsersBalance ให้ดึงจากชีท Players (Column A = User ID)
+        const playersResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.playersSheetName}!A:E`,
+        });
 
-      const playerValues = playersResponse.data.values || [];
+        const playerValues = playersResponse.data.values || [];
 
-      for (let i = 1; i < playerValues.length; i++) {
-        if (playerValues[i] && playerValues[i][0] === lineName) {
-          return true;
+        for (let i = 1; i < playerValues.length; i++) {
+          if (playerValues[i] && playerValues[i][0] === userId) {
+            return true;
+          }
         }
-      }
 
-      return false;
-    } catch (error) {
-      console.error('Error checking if player is registered:', error);
-      // ถ้าเป็น API error (เช่น quota exceeded, network error) ให้ throw ต่อ
-      // เพื่อไม่ให้ระบบเข้าใจผิดว่าผู้เล่นไม่ได้ลงทะเบียน
-      if (error.code === 429 || error.response?.status === 429 || 
-          error.message?.includes('Quota exceeded') || 
-          error.message?.includes('ECONNREFUSED') ||
-          error.message?.includes('ETIMEDOUT')) {
-        const apiError = new Error(`API_ERROR: ${error.message}`);
-        apiError.isApiError = true;
-        apiError.originalError = error;
-        throw apiError;
+        return false;
+      } catch (error) {
+        console.error('Error checking if player is registered:', error);
+        if (error.code === 429 || error.response?.status === 429 || 
+            error.message?.includes('Quota exceeded') || 
+            error.message?.includes('ECONNREFUSED') ||
+            error.message?.includes('ETIMEDOUT')) {
+          const apiError = new Error(`API_ERROR: ${error.message}`);
+          apiError.isApiError = true;
+          apiError.originalError = error;
+          throw apiError;
+        }
+        return false;
       }
-      return false;
     }
-  }
 
   /**
    * ตรวจสอบยอดเงินคงเหลือ (รวมการตรวจสอบเงินค้าง)
@@ -110,12 +108,67 @@ class BalanceCheckService {
    * @param {number} requiredAmount - จำนวนเงินที่ต้องการเดิมพัน
    * @returns {object} ผลลัพธ์ {sufficient: boolean, currentBalance: number, shortfall: number, registered: boolean, pendingAmount: number, availableBalance: number}
    */
-  async checkBalance(lineName, requiredAmount) {
-    try {
-      // ตรวจสอบว่าผู้เล่นมีชื่อในระบบหรือไม่ (อันดับแรก)
-      const isRegistered = await this.isPlayerRegistered(lineName);
-      
-      if (!isRegistered) {
+  async checkBalance(userId, requiredAmount) {
+      try {
+        // ตรวจสอบว่าผู้เล่นมี User ID ในระบบหรือไม่
+        const isRegistered = await this.isPlayerRegistered(userId);
+
+        if (!isRegistered) {
+          return {
+            sufficient: false,
+            currentBalance: 0,
+            shortfall: requiredAmount,
+            registered: false,
+            pendingAmount: 0,
+            availableBalance: 0,
+            message: `ผู้เล่นไม่พบในระบบ`,
+          };
+        }
+
+        const currentBalance = await this.getUserBalance(userId);
+
+        // ตรวจสอบเงินค้าง (เงินเดิมพันที่จับคู่แล้วแต่ยังไม่มีผล)
+        const pendingAmount = await pendingBalanceService.getPendingAmount(userId);
+        const availableBalance = currentBalance - pendingAmount;
+
+        if (availableBalance >= requiredAmount) {
+          return {
+            sufficient: true,
+            currentBalance,
+            shortfall: 0,
+            registered: true,
+            pendingAmount,
+            availableBalance,
+            message: `ยอดเงินเพียงพอ (${availableBalance} บาท หลังหักเงินค้าง)`,
+          };
+        }
+
+        const shortfall = requiredAmount - availableBalance;
+        return {
+          sufficient: false,
+          currentBalance,
+          shortfall,
+          registered: true,
+          pendingAmount,
+          availableBalance,
+          message: `ยอดเงินไม่พอ ขาด ${shortfall} บาท (หลังหักเงินค้าง)`,
+        };
+      } catch (error) {
+        console.error('Error checking balance:', error);
+        if (error.isApiError || error.code === 429 || error.response?.status === 429 ||
+            error.message?.includes('Quota exceeded') || error.message?.includes('API_ERROR')) {
+          console.warn('⚠️  API error during balance check - skipping balance verification (allowing bet)');
+          return {
+            sufficient: true,
+            currentBalance: 0,
+            shortfall: 0,
+            registered: true,
+            pendingAmount: 0,
+            availableBalance: 0,
+            apiError: true,
+            message: `⚠️ ไม่สามารถตรวจสอบยอดเงินได้ (API error) - อนุญาตให้เดิมพันต่อ`,
+          };
+        }
         return {
           sufficient: false,
           currentBalance: 0,
@@ -123,109 +176,52 @@ class BalanceCheckService {
           registered: false,
           pendingAmount: 0,
           availableBalance: 0,
-          message: `ผู้เล่นไม่พบในระบบ`,
+          error: error.message,
         };
       }
-
-      const currentBalance = await this.getUserBalance(lineName);
-      
-      // ตรวจสอบเงินค้าง (เงินเดิมพันที่จับคู่แล้วแต่ยังไม่มีผล)
-      const pendingAmount = await pendingBalanceService.getPendingAmount(lineName);
-      const availableBalance = currentBalance - pendingAmount;
-
-      if (availableBalance >= requiredAmount) {
-        return {
-          sufficient: true,
-          currentBalance,
-          shortfall: 0,
-          registered: true,
-          pendingAmount,
-          availableBalance,
-          message: `ยอดเงินเพียงพอ (${availableBalance} บาท หลังหักเงินค้าง)`,
-        };
-      }
-
-      const shortfall = requiredAmount - availableBalance;
-      return {
-        sufficient: false,
-        currentBalance,
-        shortfall,
-        registered: true,
-        pendingAmount,
-        availableBalance,
-        message: `ยอดเงินไม่พอ ขาด ${shortfall} บาท (หลังหักเงินค้าง)`,
-      };
-    } catch (error) {
-      console.error('Error checking balance:', error);
-      // ถ้าเป็น API error (quota, network) ให้ถือว่าผู้เล่นลงทะเบียนแล้ว (ข้ามการตรวจสอบ)
-      // เพื่อไม่ให้ระบบบอกว่า "ไม่พบในระบบ" ทั้งที่จริงๆ แค่ API มีปัญหา
-      if (error.isApiError || error.code === 429 || error.response?.status === 429 ||
-          error.message?.includes('Quota exceeded') || error.message?.includes('API_ERROR')) {
-        console.warn('⚠️  API error during balance check - skipping balance verification (allowing bet)');
-        return {
-          sufficient: true,
-          currentBalance: 0,
-          shortfall: 0,
-          registered: true,
-          pendingAmount: 0,
-          availableBalance: 0,
-          apiError: true,
-          message: `⚠️ ไม่สามารถตรวจสอบยอดเงินได้ (API error) - อนุญาตให้เดิมพันต่อ`,
-        };
-      }
-      return {
-        sufficient: false,
-        currentBalance: 0,
-        shortfall: requiredAmount,
-        registered: false,
-        pendingAmount: 0,
-        availableBalance: 0,
-        error: error.message,
-      };
     }
-  }
 
   /**
    * ดึงยอดเงินคงเหลือของ User
    * @param {string} lineName - ชื่อ LINE
    * @returns {number} ยอดเงินคงเหลือ
    */
-  async getUserBalance(lineName) {
-    try {
-      // ลองดึงจากชีท UsersBalance ก่อน
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.usersBalanceSheetName}!A:C`,
-      });
+  async getUserBalance(userId) {
+      try {
+        // ลองดึงจากชีท UsersBalance ก่อน (Column A = User ID, Column C = Balance)
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.usersBalanceSheetName}!A:C`,
+        });
 
-      const values = response.data.values || [];
+        const values = response.data.values || [];
 
-      for (let i = 1; i < values.length; i++) {
-        if (values[i] && values[i][1] === lineName) {
-          return parseInt(values[i][2]) || 0;
+        for (let i = 1; i < values.length; i++) {
+          if (values[i] && values[i][0] === userId) {
+            return parseInt(values[i][2]) || 0;
+          }
         }
-      }
 
-      // ถ้าไม่พบในชีท UsersBalance ให้ดึงจากชีท Players
-      const playersResponse = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.playersSheetName}!B:E`,
-      });
+        // ถ้าไม่พบในชีท UsersBalance ให้ดึงจากชีท Players (Column A = User ID, Column E = Balance)
+        const playersResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.playersSheetName}!A:E`,
+        });
 
-      const playerValues = playersResponse.data.values || [];
+        const playerValues = playersResponse.data.values || [];
 
-      for (let i = 1; i < playerValues.length; i++) {
-        if (playerValues[i] && playerValues[i][0] === lineName) {
-          return parseInt(playerValues[i][3]) || 0; // Column E = Balance
+        for (let i = 1; i < playerValues.length; i++) {
+          if (playerValues[i] && playerValues[i][0] === userId) {
+            return parseInt(playerValues[i][4]) || 0;
+          }
         }
-      }
 
-      return 0;
-    } catch (error) {
-      console.error('Error getting user balance:', error);
-      return 0;
+        return 0;
+      } catch (error) {
+        console.error('Error getting user balance:', error);
+        return 0;
+      }
     }
-  }
 
   /**
    * แจ้งเตือนเมื่อผู้เล่นไม่พบในระบบ
@@ -427,76 +423,76 @@ class BalanceCheckService {
    * @returns {object} ผลลัพธ์
    */
   async checkAndNotify(lineName, requiredAmount, userId, accountNumber = 1, groupId = null) {
-    try {
-      const checkResult = await this.checkBalance(lineName, requiredAmount);
+      try {
+        // ใช้ userId ในการเช็คยอดเงิน (แทน lineName)
+        const checkResult = await this.checkBalance(userId, requiredAmount);
 
-      // ถ้า API error ให้ข้ามการตรวจสอบ (อนุญาตให้เดิมพันต่อ)
-      if (checkResult.apiError) {
-        console.warn(`⚠️  API error - skipping balance/registration check for ${lineName}`);
+        // ถ้า API error ให้ข้ามการตรวจสอบ (อนุญาตให้เดิมพันต่อ)
+        if (checkResult.apiError) {
+          console.warn(`⚠️  API error - skipping balance/registration check for ${lineName} (${userId})`);
+          return checkResult;
+        }
+
+        // ถ้าผู้เล่นไม่พบในระบบ ให้แจ้งเตือนทันที
+        if (!checkResult.registered) {
+          await this.notifyPlayerNotRegistered(
+            lineName,
+            userId,
+            accountNumber,
+            groupId
+          );
+          return checkResult;
+        }
+
+        // ถ้ายอดเงินไม่พอ ให้แจ้งเตือน (รวมเงินค้าง)
+        if (!checkResult.sufficient) {
+          await this.notifyInsufficientBalance(
+            lineName,
+            checkResult.currentBalance,
+            requiredAmount,
+            checkResult.shortfall,
+            userId,
+            accountNumber,
+            groupId,
+            checkResult.pendingAmount,
+            checkResult.availableBalance
+          );
+        } else if (checkResult.availableBalance <= 50) {
+          // ถ้าเงินใกล้หมด (≤ 50 บาท) แต่ยังเล่นได้ ให้แจ้งเตือน
+          await this.notifyLowBalance(
+            lineName,
+            checkResult.currentBalance,
+            checkResult.pendingAmount,
+            checkResult.availableBalance,
+            userId,
+            accountNumber,
+            groupId
+          );
+        }
+
         return checkResult;
-      }
-
-      // ถ้าผู้เล่นไม่พบในระบบ ให้แจ้งเตือนทันที
-      if (!checkResult.registered) {
-        await this.notifyPlayerNotRegistered(
-          lineName,
-          userId,
-          accountNumber,
-          groupId
-        );
-        return checkResult;
-      }
-
-      // ถ้ายอดเงินไม่พอ ให้แจ้งเตือน (รวมเงินค้าง)
-      if (!checkResult.sufficient) {
-        await this.notifyInsufficientBalance(
-          lineName,
-          checkResult.currentBalance,
-          requiredAmount,
-          checkResult.shortfall,
-          userId,
-          accountNumber,
-          groupId,
-          checkResult.pendingAmount,
-          checkResult.availableBalance
-        );
-      } else if (checkResult.availableBalance <= 50) {
-        // ถ้าเงินใกล้หมด (≤ 50 บาท) แต่ยังเล่นได้ ให้แจ้งเตือน
-        await this.notifyLowBalance(
-          lineName,
-          checkResult.currentBalance,
-          checkResult.pendingAmount,
-          checkResult.availableBalance,
-          userId,
-          accountNumber,
-          groupId
-        );
-      }
-
-      return checkResult;
-    } catch (error) {
-      console.error('Error in checkAndNotify:', error);
-      // ถ้าเป็น API error ให้ข้ามการตรวจสอบ (อนุญาตให้เดิมพันต่อ)
-      if (error.isApiError || error.code === 429 || error.response?.status === 429 ||
-          error.message?.includes('Quota exceeded') || error.message?.includes('API_ERROR')) {
-        console.warn(`⚠️  API error in checkAndNotify - allowing bet for ${lineName}`);
+      } catch (error) {
+        console.error('Error in checkAndNotify:', error);
+        if (error.isApiError || error.code === 429 || error.response?.status === 429 ||
+            error.message?.includes('Quota exceeded') || error.message?.includes('API_ERROR')) {
+          console.warn(`⚠️  API error in checkAndNotify - allowing bet for ${lineName} (${userId})`);
+          return {
+            sufficient: true,
+            registered: true,
+            currentBalance: 0,
+            pendingAmount: 0,
+            availableBalance: 0,
+            apiError: true,
+            message: `⚠️ ไม่สามารถตรวจสอบยอดเงินได้ - อนุญาตให้เดิมพันต่อ`,
+          };
+        }
         return {
-          sufficient: true,
-          registered: true,
-          currentBalance: 0,
-          pendingAmount: 0,
-          availableBalance: 0,
-          apiError: true,
-          message: `⚠️ ไม่สามารถตรวจสอบยอดเงินได้ - อนุญาตให้เดิมพันต่อ`,
+          sufficient: false,
+          registered: false,
+          error: error.message,
         };
       }
-      return {
-        sufficient: false,
-        registered: false,
-        error: error.message,
-      };
     }
-  }
 
   /**
    * แจ้งเตือนเงินใกล้หมด (เมื่อ availableBalance <= 50 แต่ยังเล่นได้)

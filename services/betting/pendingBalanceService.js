@@ -54,49 +54,47 @@ class PendingBalanceService {
    * @param {string} displayName - ชื่อ LINE
    * @returns {number} จำนวนเงินค้าง
    */
-  async getPendingAmount(displayName) {
-    try {
-      // Ensure initialization is complete
-      await this.ensureInitialized();
+  async getPendingAmount(userId) {
+      try {
+        // Ensure initialization is complete
+        await this.ensureInitialized();
 
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.betsSheetName}!A2:N`,
-      });
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.betsSheetName}!A2:R`,
+        });
 
-      const values = response.data.values || [];
-      let totalPending = 0;
+        const values = response.data.values || [];
+        let totalPending = 0;
 
-      for (const row of values) {
-        // ตรวจสอบว่าเป็นการเล่นของผู้เล่นนี้หรือไม่
-        const userAName = row[2]; // Column C: ชื่อ User A
-        const userBName = row[11]; // Column L: ชื่อ User B
+        for (const row of values) {
+          // ค้นหาจาก User ID แทนชื่อ LINE
+          const userAId = row[1]; // Column B: User A ID
+          const userBId = row[17]; // Column R: User B ID
 
-        // ตรวจสอบสถานะ: MATCHED แต่ยังไม่มีผล (Column I ว่างเปล่า)
-        const status = row[8] || ''; // Column I: แสดงผล
-        const isMATCHED = row[7] !== undefined && row[7] !== ''; // Column H: ยอดเงิน B (ถ้ามีค่า = MATCHED)
-        const hasNoResult = status === '' || status === undefined;
+          // ตรวจสอบสถานะ: MATCHED แต่ยังไม่มีผล (Column I ว่างเปล่า)
+          const status = row[8] || ''; // Column I: แสดงผล
+          const isMATCHED = row[7] !== undefined && row[7] !== ''; // Column H: ยอดเงิน B (ถ้ามีค่า = MATCHED)
+          const hasNoResult = status === '' || status === undefined;
 
-        if (isMATCHED && hasNoResult) {
-          // ถ้า User A ตรงกับ displayName
-          if (userAName === displayName) {
-            const amountA = parseInt(row[6]) || 0; // Column G: ยอดเงิน A
-            totalPending += amountA;
-          }
-          // ถ้า User B ตรงกับ displayName
-          else if (userBName === displayName) {
-            const amountB = parseInt(row[7]) || 0; // Column H: ยอดเงิน B
-            totalPending += amountB;
+          if (isMATCHED && hasNoResult) {
+            if (userAId === userId) {
+              const amountA = parseInt(row[6]) || 0; // Column G: ยอดเงิน A
+              totalPending += amountA;
+            }
+            else if (userBId === userId) {
+              const amountB = parseInt(row[7]) || 0; // Column H: ยอดเงิน B
+              totalPending += amountB;
+            }
           }
         }
-      }
 
-      return totalPending;
-    } catch (error) {
-      console.error('Error getting pending amount:', error);
-      return 0;
+        return totalPending;
+      } catch (error) {
+        console.error('Error getting pending amount:', error);
+        return 0;
+      }
     }
-  }
 
   /**
    * ตรวจสอบว่ายอดเงินเพียงพอสำหรับการเดิมพันใหม่หรือไม่
