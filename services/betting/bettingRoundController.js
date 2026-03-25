@@ -196,14 +196,14 @@ class BettingRoundController {
         if (!balanceCheck.registered) {
           return {
             type: 'text',
-            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
           };
         }
 
         if (!balanceCheck.sufficient) {
           return {
             type: 'text',
-            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
+            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
           };
         }
 
@@ -385,14 +385,14 @@ class BettingRoundController {
         if (!balanceCheck.registered) {
           return {
             type: 'text',
-            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
+            text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
           };
         }
 
         if (!balanceCheck.sufficient) {
           return {
             type: 'text',
-            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
+            text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
           };
         }
 
@@ -486,7 +486,7 @@ class BettingRoundController {
       if (!balanceCheck.registered) {
         return {
           type: 'text',
-          text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 ส่งสลิปโอนเงินมาที่ห้องแชทนี้`,
+          text: `❌ ผู้เล่นไม่พบในระบบ\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
         };
       }
 
@@ -495,7 +495,7 @@ class BettingRoundController {
         // ไม่ต้องส่งข้อความแจ้งเตือนเพิ่มเติม เพราะ checkAndNotify ได้ส่งไปแล้ว
         return {
           type: 'text',
-          text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 โปรดโอนเงินเพิ่มเติมและส่งสลิปให้ระบบตรวจสอบ`,
+          text: `❌ ยอดเงินไม่พอ\n\nยอดเงินปัจจุบัน: ${balanceCheck.currentBalance} บาท\nจำนวนเงินที่ต้องการเดิมพัน: ${parsedBet.amount} บาท\nขาด: ${balanceCheck.shortfall} บาท\n\n💡 กรุณาเติมเงินก่อนเริ่มเล่น\n📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n👉 https://lin.ee/9EDgGIV`,
         };
       }
 

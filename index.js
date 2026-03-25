@@ -2252,6 +2252,10 @@ app.post('/webhook', async (req, res) => {
           try {
             lineUserName = await getLineUserProfile(event.source.userId, accessToken) || 'Unknown';
             console.log(`   ✅ User name: ${lineUserName}`);
+            // ✅ ถ้าดึงชื่อได้แล้ว อัปเดตชื่อ Unknown ในชีทถ้ามี
+            if (lineUserName !== 'Unknown') {
+              await updateUnknownPlayerName(event.source.userId, lineUserName, accessToken);
+            }
           } catch (profileError) {
             console.error(`   ⚠️  Failed to get user profile: ${profileError.message}`);
           }
@@ -2349,7 +2353,7 @@ app.post('/webhook', async (req, res) => {
             const successGroupMessage = `✅ เติมเงินสำเร็จ\n\n` +
               `👤 ${lineUserName}\n` +
               `💰 จำนวน: ${verificationResult.data.amount} บาท\n\n` +
-              `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+              `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
               `👉 https://lin.ee/9EDgGIV`;
             console.log(`   📝 Reply message created`);
 
@@ -2667,6 +2671,9 @@ app.post('/webhook', async (req, res) => {
                   break;
                 }
 
+                // ✅ ดึงชื่อได้แล้ว → อัปเดตชื่อ Unknown ในชีทถ้ามี
+                await updateUnknownPlayerName(message.userId, playerDisplayName, accessToken);
+
                 // เตรียมข้อมูลสำหรับ bettingRoundController
                 controllerResult = await bettingRoundController.handleMessage({
                   message: {
@@ -2697,6 +2704,17 @@ app.post('/webhook', async (req, res) => {
                   } else {
                     // ข้อความแจ้งเตือนข้อผิดพลาด - ไม่ส่ง
                     console.log(`   ⏭️  Skipping error message (not sending to user)`);
+                  }
+
+                  // ถ้าเป็นข้อความแจ้งเตือนยอดเงิน ส่งข้อความเข้ากลุ่มพร้อมรูป QR payment
+                  const isBalanceWarning = controllerResult.text.includes('ผู้เล่นไม่พบในระบบ') || 
+                                           controllerResult.text.includes('ยอดเงินไม่พอ');
+                  if (isBalanceWarning && message.sourceType === 'group') {
+                    console.log(`   📢 Sending balance warning to group with QR payment`);
+                    await sendLineMessage(message.groupId, controllerResult.text, accessToken);
+                    const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
+                    await sendLineImageMessage(message.groupId, qrImageUrl, qrImageUrl, accessToken);
+                    console.log(`   ✅ Balance warning + QR sent to group`);
                   }
                 }
                 
@@ -2901,8 +2919,8 @@ app.post('/webhook', async (req, res) => {
                   
                   const groupWarningMessage = `⚠️ ${names.join(', ')} ยังไม่ได้เติมเงิน\n\n` +
                     `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
-                    `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n` +
+                    `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
                     `👉 https://lin.ee/9EDgGIV`;
                   
                   console.log(`   📢 Sending group warning message`);
@@ -2920,8 +2938,8 @@ app.post('/webhook', async (req, res) => {
                   
                   const groupWarningMessage2 = `⚠️ ${names.join(', ')} ยอดเงินไม่พอ\n\n` +
                     `💡 กรุณาเติมเงินก่อนเริ่มเล่น\n` +
-                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n\n` +
-                    `📱 เพิ่มเพื่อน LINE OA ก่อนเริ่มเล่น\n` +
+                    `📱 โอนเงินแล้วส่งสลิปมาที่ห้องแชทนี้\n` +
+                    `📱 เพิ่มเพื่อน LINE OA ส่งสลิปก่อนเริ่มเล่น\n` +
                     `👉 https://lin.ee/9EDgGIV`;
                   
                   console.log(`   📢 Sending group warning message`);
@@ -3159,6 +3177,117 @@ async function initializeSheets() {
 }
 
 // ===== HELPER FUNCTIONS FOR SLIP RECORDING =====
+
+// ===== UPDATE UNKNOWN NAMES =====
+/**
+ * อัปเดตชื่อ "Unknown" ในชีท Players, Transactions, UsersBalance
+ * เมื่อระบบสามารถดึงชื่อ LINE ได้แล้ว
+ */
+async function updateUnknownPlayerName(userId, newDisplayName, accessToken) {
+  if (!googleAuth || !userId || !newDisplayName || newDisplayName === 'Unknown') return;
+
+  try {
+    console.log(`\n🔄 === Checking for Unknown name to update ===`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   New Name: ${newDisplayName}`);
+
+    let updated = false;
+
+    // 1) อัปเดตชีท Players
+    const playersRes = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `Players!A:B`,
+    });
+    const playersRows = playersRes.data.values || [];
+    for (let i = 1; i < playersRows.length; i++) {
+      if (playersRows[i] && playersRows[i][0] === userId && playersRows[i][1] === 'Unknown') {
+        await sheets.spreadsheets.values.update({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `Players!B${i + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [[newDisplayName]] },
+        });
+        console.log(`   ✅ Players row ${i + 1}: Unknown → ${newDisplayName}`);
+        updated = true;
+      }
+    }
+
+    // 2) อัปเดตชีท UsersBalance
+    const ubRes = await sheets.spreadsheets.values.get({
+      auth: googleAuth,
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `UsersBalance!A:B`,
+    });
+    const ubRows = ubRes.data.values || [];
+    for (let i = 1; i < ubRows.length; i++) {
+      if (ubRows[i] && ubRows[i][0] === userId && ubRows[i][1] === 'Unknown') {
+        await sheets.spreadsheets.values.update({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `UsersBalance!B${i + 1}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [[newDisplayName]] },
+        });
+        console.log(`   ✅ UsersBalance row ${i + 1}: Unknown → ${newDisplayName}`);
+        updated = true;
+      }
+    }
+
+    // 3) อัปเดตชีท Transactions (Column B = ชื่อผู้เล่น, Column L = accessToken)
+    //    เทียบจาก accessToken ของ userId นี้ใน Players sheet
+    try {
+      // ดึง accessToken ของ user นี้จาก Players
+      const playersFullRes = await sheets.spreadsheets.values.get({
+        auth: googleAuth,
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `Players!A:K`,
+      });
+      const playersFullRows = playersFullRes.data.values || [];
+      let playerToken = null;
+      for (let i = 1; i < playersFullRows.length; i++) {
+        if (playersFullRows[i] && playersFullRows[i][0] === userId) {
+          playerToken = playersFullRows[i][10] || null; // Column K (index 10) = Token
+          break;
+        }
+      }
+
+      if (playerToken) {
+        const transRes = await sheets.spreadsheets.values.get({
+          auth: googleAuth,
+          spreadsheetId: GOOGLE_SHEET_ID,
+          range: `Transactions!B:L`,
+        });
+        const transRows = transRes.data.values || [];
+        for (let i = 1; i < transRows.length; i++) {
+          // Column B (index 0 ใน range B:L) = ชื่อ, Column L (index 10 ใน range B:L) = accessToken
+          if (transRows[i] && transRows[i][0] === 'Unknown' && transRows[i][10] === playerToken) {
+            await sheets.spreadsheets.values.update({
+              auth: googleAuth,
+              spreadsheetId: GOOGLE_SHEET_ID,
+              range: `Transactions!B${i + 1}`,
+              valueInputOption: 'USER_ENTERED',
+              requestBody: { values: [[newDisplayName]] },
+            });
+            console.log(`   ✅ Transactions row ${i + 1}: Unknown → ${newDisplayName}`);
+            updated = true;
+          }
+        }
+      }
+    } catch (transError) {
+      console.error(`   ⚠️  Failed to update Transactions: ${transError.message}`);
+    }
+
+    if (!updated) {
+      console.log(`   ℹ️  No Unknown names found for this user`);
+    }
+
+    console.log(`   🔄 === End Update Unknown Name ===\n`);
+  } catch (error) {
+    console.error(`   ⚠️  Failed to update Unknown name: ${error.message}`);
+  }
+}
 
 async function _recordPlayerToSheetFromSlip(googleAuth, googleSheetId, userId, lineUserName, accessToken, amount) {
   try {
