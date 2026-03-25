@@ -266,15 +266,6 @@ class BalanceCheckService {
             console.error(`   ❌ Failed to send group message: ${groupResult.error}`);
           }
 
-          // ส่งรูป QR payment ในกลุ่ม
-          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
-          console.log(`   📢 Sending QR payment image...`);
-          const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
-          if (imageResult.success) {
-            console.log(`   ✅ QR image sent successfully`);
-          } else {
-            console.error(`   ❌ Failed to send QR image: ${imageResult.error}`);
-          }
         }
 
         console.log(`\n   === End Notification ===\n`);
@@ -336,14 +327,6 @@ class BalanceCheckService {
           }
 
           // ส่งรูป QR payment ในกลุ่ม
-          const qrImageUrl = 'https://line-betting-bot.onrender.com/qrpayments/Qrpayment.jpg';
-          console.log(`   📢 Sending QR payment image...`);
-          const imageResult = await notificationService.sendGroupImageMessage(groupId, qrImageUrl, qrImageUrl);
-          if (imageResult.success) {
-            console.log(`   ✅ QR image sent successfully`);
-          } else {
-            console.error(`   ❌ Failed to send QR image: ${imageResult.error}`);
-          }
         }
 
         console.log(`\n   === End Notification ===\n`);
