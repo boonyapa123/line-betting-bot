@@ -383,12 +383,13 @@ async function _recordTransactionToSheet(
       balanceAfter,
       `${dateStr} ${timeStr}`,
       accessToken,
+      userId,
     ];
 
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Transactions!A${nextRowIndex}:L${nextRowIndex}`,
+      range: `Transactions!A${nextRowIndex}:M${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [transactionRow],

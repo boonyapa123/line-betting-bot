@@ -3235,44 +3235,26 @@ async function updateUnknownPlayerName(userId, newDisplayName, accessToken) {
       }
     }
 
-    // 3) อัปเดตชีท Transactions (Column B = ชื่อผู้เล่น, Column L = accessToken)
-    //    เทียบจาก accessToken ของ userId นี้ใน Players sheet
+    // 3) อัปเดตชีท Transactions (Column B = ชื่อผู้เล่น, Column M = userId)
     try {
-      // ดึง accessToken ของ user นี้จาก Players
-      const playersFullRes = await sheets.spreadsheets.values.get({
+      const transRes = await sheets.spreadsheets.values.get({
         auth: googleAuth,
         spreadsheetId: GOOGLE_SHEET_ID,
-        range: `Players!A:K`,
+        range: `Transactions!B:M`,
       });
-      const playersFullRows = playersFullRes.data.values || [];
-      let playerToken = null;
-      for (let i = 1; i < playersFullRows.length; i++) {
-        if (playersFullRows[i] && playersFullRows[i][0] === userId) {
-          playerToken = playersFullRows[i][10] || null; // Column K (index 10) = Token
-          break;
-        }
-      }
-
-      if (playerToken) {
-        const transRes = await sheets.spreadsheets.values.get({
-          auth: googleAuth,
-          spreadsheetId: GOOGLE_SHEET_ID,
-          range: `Transactions!B:L`,
-        });
-        const transRows = transRes.data.values || [];
-        for (let i = 1; i < transRows.length; i++) {
-          // Column B (index 0 ใน range B:L) = ชื่อ, Column L (index 10 ใน range B:L) = accessToken
-          if (transRows[i] && transRows[i][0] === 'Unknown' && transRows[i][10] === playerToken) {
-            await sheets.spreadsheets.values.update({
-              auth: googleAuth,
-              spreadsheetId: GOOGLE_SHEET_ID,
-              range: `Transactions!B${i + 1}`,
-              valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [[newDisplayName]] },
-            });
-            console.log(`   ✅ Transactions row ${i + 1}: Unknown → ${newDisplayName}`);
-            updated = true;
-          }
+      const transRows = transRes.data.values || [];
+      for (let i = 1; i < transRows.length; i++) {
+        // Column B (index 0 ใน range B:M) = ชื่อ, Column M (index 11 ใน range B:M) = userId
+        if (transRows[i] && transRows[i][0] === 'Unknown' && transRows[i][11] === userId) {
+          await sheets.spreadsheets.values.update({
+            auth: googleAuth,
+            spreadsheetId: GOOGLE_SHEET_ID,
+            range: `Transactions!B${i + 1}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[newDisplayName]] },
+          });
+          console.log(`   ✅ Transactions row ${i + 1}: Unknown → ${newDisplayName}`);
+          updated = true;
         }
       }
     } catch (transError) {
@@ -3588,12 +3570,13 @@ async function _recordTransactionToSheetFromSlip(googleAuth, googleSheetId, user
       balanceAfter,
       `${dateStr} ${timeStr}`,
       accessToken,
+      userId,
     ];
 
     await sheets.spreadsheets.values.update({
       auth: googleAuth,
       spreadsheetId: googleSheetId,
-      range: `Transactions!A${nextRowIndex}:L${nextRowIndex}`,
+      range: `Transactions!A${nextRowIndex}:M${nextRowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [transactionRow],
