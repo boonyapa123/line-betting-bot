@@ -2180,22 +2180,28 @@ app.post('/webhook', async (req, res) => {
           
           // ดึงข้อมูลบัญชีจาก Slip2Go API
           // ดึงข้อมูลบัญชีจาก environment variable
-          let receiverAccount = getReceiverAccount(channelId);
+          // รวมบัญชีผู้รับทั้งหมด (ทุก Account) เพื่อเช็คพร้อมกัน
+          const allReceiverAccounts = [];
+          const uniqueAccounts = new Set();
+          [SLIP_RECEIVER_ACCOUNT_1, SLIP_RECEIVER_ACCOUNT_2, SLIP_RECEIVER_ACCOUNT_3].forEach(acc => {
+            if (acc && !uniqueAccounts.has(acc)) {
+              uniqueAccounts.add(acc);
+              allReceiverAccounts.push({
+                accountType: '01004',
+                accountNumber: acc
+              });
+            }
+          });
           
-          if (!receiverAccount) {
+          if (allReceiverAccounts.length === 0) {
             console.log(`   ⚠️  No receiver account configured`);
           } else {
-            console.log(`   ✅ Using receiver account: ${receiverAccount}`);
+            console.log(`   ✅ Using receiver accounts: ${[...uniqueAccounts].join(', ')}`);
           }
           
           const checkCondition = {
-            checkDuplicate: true,  // ตรวจสอบสลิปซ้ำ
-            checkReceiver: receiverAccount ? [
-              {
-                accountType: '01004',
-                accountNumber: receiverAccount
-              }
-            ] : []
+            checkDuplicate: true,
+            checkReceiver: allReceiverAccounts
           };
 
           const verificationResult = await verificationService.verifySlipFromImage(imageBuffer, checkCondition);
