@@ -115,7 +115,9 @@ class BettingRoundController {
 
         // ✅ ตรวจสอบว่า User A ส่งข้อความรูปแบบถูกต้องหรือไม่
         console.log(`   🔍 Validating User A message format...`);
-        const userAMessageParsed = BettingMessageParserService.parseMessage(pendingBet.message);
+        // ลบ tag [ราคาช่าง:xxx] ออกก่อน parse (tag นี้ถูกเพิ่มตอนบันทึก)
+        const userAMessageClean = pendingBet.message.replace(/\s*\[ราคาช่าง:\d+-\d+\]/, '').trim();
+        const userAMessageParsed = BettingMessageParserService.parseMessage(userAMessageClean);
         if (!userAMessageParsed.success) {
           console.log(`   ❌ User A message format is invalid: ${pendingBet.message}`);
           return {
@@ -322,7 +324,9 @@ class BettingRoundController {
 
         // ✅ ตรวจสอบว่า User A ส่งข้อความรูปแบบถูกต้องหรือไม่
         console.log(`   🔍 Validating User A message format...`);
-        const userAMessageParsed = BettingMessageParserService.parseMessage(pendingBet.message);
+        // ลบ tag [ราคาช่าง:xxx] ออกก่อน parse (tag นี้ถูกเพิ่มตอนบันทึก)
+        const userAMessageClean = pendingBet.message.replace(/\s*\[ราคาช่าง:\d+-\d+\]/, '').trim();
+        const userAMessageParsed = BettingMessageParserService.parseMessage(userAMessageClean);
         if (!userAMessageParsed.success) {
           console.log(`   ❌ User A message format is invalid: ${pendingBet.message}`);
           return {
