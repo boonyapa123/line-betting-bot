@@ -467,10 +467,85 @@ class BettingRoundController {
       // ✅ ถ้าเป็นวิธีที่ 1 (ราคาช่าง) ให้ดึงช่วงราคาที่ประกาศไว้
       if (parsedBet.method === 1 && !parsedBet.price) {
         const groupId = source.groupId || '';
+        await announcedPriceService.ensureInitialized();
         const announcedPrice = announcedPriceService.getAnnouncedPrice(groupId, parsedBet.slipName);
         if (announcedPrice) {
           parsedBet.price = announcedPrice.priceRange;
           console.log(`   💹 ดึงราคาช่างที่ประกาศ: ${announcedPrice.priceRange} สำหรับ ${announcedPrice.slipName}`);
+        } else {
+          // ตรวจสอบว่ามีบั้งไฟประกาศไว้ในกลุ่มนี้หรือไม่
+          const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
+          if (allPrices.length > 0) {
+            const availableNames = allPrices.map(p => p.slipName).join(', ');
+            console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในราคาช่างที่ประกาศ`);
+            return {
+              type: 'text',
+              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 บั้งไฟที่ประกาศราคาช่าง:\n${allPrices.map(p => `🎆 ${p.slipName} (${p.priceRange})`).join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง`,
+            };
+          }
+        }
+      }
+
+      // ✅ ถ้าเป็นวิธีที่ 2 (ราคาคะแนน) ตรวจสอบชื่อบั้งไฟจากชีท FireworkNames + AnnouncedPrices
+      if (parsedBet.method === 2) {
+        const groupId = source.groupId || '';
+        await announcedPriceService.ensureInitialized();
+        
+        // ตรวจจาก AnnouncedPrices
+        const announcedPrice = announcedPriceService.getAnnouncedPrice(groupId, parsedBet.slipName);
+        
+        // ตรวจจาก FireworkNames
+        let foundInFireworkNames = false;
+        try {
+          const sheets = announcedPriceService.sheets;
+          const spreadsheetId = announcedPriceService.spreadsheetId;
+          const fwRes = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'FireworkNames!A2:B',
+          });
+          const fwRows = fwRes.data.values || [];
+          for (const row of fwRows) {
+            if (row[0] === groupId) {
+              const fwName = (row[1] || '').trim();
+              if (fwName === parsedBet.slipName.trim() || 
+                  fwName.includes(parsedBet.slipName.trim()) || 
+                  parsedBet.slipName.trim().includes(fwName)) {
+                foundInFireworkNames = true;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`⚠️  Could not check FireworkNames: ${e.message}`);
+        }
+        
+        if (!announcedPrice && !foundInFireworkNames) {
+          // รวมรายชื่อบั้งไฟทั้งหมดในกลุ่ม
+          const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
+          let allNames = allPrices.map(p => `🎆 ${p.slipName} (${p.priceRange})`);
+          
+          try {
+            const sheets = announcedPriceService.sheets;
+            const spreadsheetId = announcedPriceService.spreadsheetId;
+            const fwRes = await sheets.spreadsheets.values.get({
+              spreadsheetId,
+              range: 'FireworkNames!A2:C',
+            });
+            const fwRows = fwRes.data.values || [];
+            for (const row of fwRows) {
+              if (row[0] === groupId) {
+                allNames.push(`🎆 ${row[1]} (ร้องราคาเอง)`);
+              }
+            }
+          } catch (e) { /* ignore */ }
+          
+          if (allNames.length > 0) {
+            console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในรายการที่ประกาศ`);
+            return {
+              type: 'text',
+              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 บั้งไฟที่ประกาศ:\n${allNames.join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง`,
+            };
+          }
         }
       }
 
@@ -589,6 +664,9 @@ class BettingRoundController {
       case 'ANNOUNCE_PRICE':
         return await this.handleAnnouncePriceCommand(command.priceRange, command.slipName, source);
 
+      case 'NO_CHANG_PRICE':
+        return await this.handleNoChangPriceCommand(command.slipName, source);
+
       default:
         return {
           type: 'text',
@@ -666,6 +744,50 @@ class BettingRoundController {
         `💹 ช่วงราคา: ${priceRange}\n\n` +
         `📋 รายการราคาที่ประกาศ:\n${priceList}`,
     };
+  }
+
+  /**
+   * จัดการคำสั่ง ช่างไม่ต่อย (เก็บชื่อบั้งไฟสำหรับร้องราคาเอง)
+   * @private
+   */
+  async handleNoChangPriceCommand(slipName, source) {
+    const groupId = source.groupId || '';
+    
+    try {
+      await announcedPriceService.ensureInitialized();
+      const sheets = announcedPriceService.sheets;
+      const spreadsheetId = announcedPriceService.spreadsheetId;
+      
+      const announcedAt = new Date().toLocaleString('th-TH', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
+
+      // บันทึกลงชีท FireworkNames
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: 'FireworkNames!A:D',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[groupId, slipName, 'ช่างไม่ต่อย', announcedAt]],
+        },
+      });
+
+      console.log(`📢 ช่างไม่ต่อย: ${slipName} (กลุ่ม: ${groupId})`);
+
+      return {
+        type: 'text',
+        text: `✅ บันทึกบั้งไฟ "${slipName}" สำเร็จ\n\n` +
+          `🎆 ช่างไม่ต่อย — ร้องราคาเอง\n` +
+          `💡 ใช้วิธีที่ 2: ไล่/350-390/100${slipName}`,
+      };
+    } catch (error) {
+      console.error('Error saving firework name:', error);
+      return {
+        type: 'text',
+        text: `❌ เกิดข้อผิดพลาด: ${error.message}`,
+      };
+    }
   }
 
   /**

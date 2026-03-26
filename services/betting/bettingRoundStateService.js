@@ -183,7 +183,7 @@ class BettingRoundStateService {
    * @returns {boolean}
    */
   canAcceptBets() {
-    return this.currentState === 'OPEN';
+    return true; // เปิดรับ bet ตลอด ไม่ต้องตรวจสถานะ
   }
 
   /**

@@ -372,6 +372,17 @@ class BettingMessageParserService {
   static parseAdminCommand(message) {
     const trimmedMessage = message.trim();
 
+    // คำสั่ง ช่างไม่ต่อย [ชื่อบั้งไฟ]
+    // ตัวอย่าง: "ช่างไม่ต่อย เพชรล้ำฟ้า"
+    const noChangMatch = trimmedMessage.match(/^ช่างไม่ต่อย\s+(.+)$/);
+    if (noChangMatch) {
+      return {
+        isCommand: true,
+        command: 'NO_CHANG_PRICE',
+        slipName: noChangMatch[1].trim(),
+      };
+    }
+
     // คำสั่ง ช่าง [ราคา] [ชื่อบั้งไฟ]
     // ตัวอย่าง: "ช่าง 330-375 เก่งเจริญ"
     const changMatch = trimmedMessage.match(/^ช่าง\s+(\d+-\d+)\s+(.+)$/);

@@ -2470,34 +2470,124 @@ app.post('/webhook', async (req, res) => {
         
         // Check if this is a command
         if (message.content.toLowerCase().includes('สรุปยอดแทง')) {
-          console.log(`📋 Summary command detected`);
-          const summary = await generateBettingSummary(message.groupId, message.sourceType, accountNumber);
+          console.log(`📋 Personal summary command detected for user: ${message.userId}`);
           
-          // LINE has a 5000 character limit per message, so split if needed
-          const maxLength = 4000;
-          if (summary.length > maxLength) {
-            const parts = [];
-            let currentPart = '';
-            const lines = summary.split('\n');
+          try {
+            // ดึงข้อมูลผู้เล่นจาก Players sheet
+            const playersRes = await sheets.spreadsheets.values.get({
+              auth: googleAuth,
+              spreadsheetId: GOOGLE_SHEET_ID,
+              range: `Players!A:K`,
+            });
+            const playerRows = playersRes.data.values || [];
+            let displayName = '';
+            let balance = 0;
+            let totalDeposits = 0;
             
-            for (const line of lines) {
-              if ((currentPart + line + '\n').length > maxLength) {
-                if (currentPart) parts.push(currentPart);
-                currentPart = line + '\n';
-              } else {
-                currentPart += line + '\n';
+            for (let i = 1; i < playerRows.length; i++) {
+              const row = playerRows[i];
+              if (row && row[0] === message.userId) {
+                displayName = row[1] || '';
+                balance = parseFloat(row[4]) || 0;
+                totalDeposits = parseFloat(row[5]) || 0;
+                break;
               }
             }
-            if (currentPart) parts.push(currentPart);
             
-            console.log(`   📤 Sending ${parts.length} message parts`);
-            for (const part of parts) {
-              await sendLineMessage(message.groupId, part, accessToken);
+            if (!displayName) {
+              const profile = await getLineUserProfile(message.userId, accessToken);
+              displayName = profile?.displayName || 'Unknown';
             }
-          } else {
-            await sendLineMessage(message.groupId, summary, accessToken);
+            
+            // ดึงข้อมูลจาก Bets sheet
+            const betsRes = await sheets.spreadsheets.values.get({
+              auth: googleAuth,
+              spreadsheetId: GOOGLE_SHEET_ID,
+              range: `${GOOGLE_WORKSHEET_NAME}!A:T`,
+            });
+            const betsRows = betsRes.data.values || [];
+            
+            // กรองเฉพาะรายการของคนนี้
+            const myBets = [];
+            for (let i = 1; i < betsRows.length; i++) {
+              const row = betsRows[i];
+              if (!row) continue;
+              const userAId = row[1] || '';
+              const userBId = row[17] || '';
+              
+              if (userAId === message.userId || userBId === message.userId) {
+                const isUserA = userAId === message.userId;
+                const slipName = row[4] || '-';
+                const side = isUserA ? (row[5] || '-') : (row[12] || '-');
+                const amount = isUserA ? (row[6] || '0') : (row[7] || '0');
+                const winLose = isUserA ? (row[9] || '') : (row[10] || '');
+                const netAmount = isUserA ? (row[18] || '') : (row[19] || '');
+                const opponent = isUserA ? (row[11] || '-') : (row[2] || '-');
+                
+                myBets.push({ slipName, side, amount, winLose, netAmount, opponent });
+              }
+            }
+            
+            // สร้างข้อความสรุป
+            let msg = `📊 สรุปยอดแทงของ ${displayName}\n`;
+            msg += `═══════════════════\n\n`;
+            
+            if (myBets.length === 0) {
+              msg += `ไม่พบรายการเล่น\n`;
+            } else {
+              let totalWin = 0;
+              let totalLose = 0;
+              let pending = 0;
+              
+              for (const bet of myBets) {
+                const net = parseFloat(bet.netAmount) || 0;
+                const status = bet.winLose || '⏳';
+                const amountNum = parseFloat(bet.amount) || 0;
+                
+                if (bet.winLose === '✅') totalWin += net;
+                else if (bet.winLose === '❌' || bet.winLose === '⛔️') totalLose += net;
+                if (!bet.winLose) pending++;
+                
+                const netStr = bet.netAmount ? ` → ${net >= 0 ? '+' : ''}${net.toFixed(0)}` : '';
+                msg += `${status} ${bet.slipName} | ${bet.side} | ${amountNum}฿${netStr}\n`;
+              }
+              
+              msg += `\n═══════════════════\n`;
+              msg += `📝 รวม ${myBets.length} รายการ`;
+              if (pending > 0) msg += ` (รอผล ${pending})`;
+              msg += `\n`;
+              msg += `✅ ได้: +${totalWin.toFixed(0)} บาท\n`;
+              msg += `❌ เสีย: ${totalLose.toFixed(0)} บาท\n`;
+            }
+            
+            msg += `\n💵 เติมเงินรวม: ${totalDeposits.toLocaleString()} บาท`;
+            msg += `\n💰 ยอดเงินคงเหลือ: ${balance.toLocaleString()} บาท`;
+            
+            // ส่งข้อความ (แบ่งถ้ายาวเกิน)
+            const maxLength = 4000;
+            if (msg.length > maxLength) {
+              const parts = [];
+              let currentPart = '';
+              const lines = msg.split('\n');
+              for (const line of lines) {
+                if ((currentPart + line + '\n').length > maxLength) {
+                  if (currentPart) parts.push(currentPart);
+                  currentPart = line + '\n';
+                } else {
+                  currentPart += line + '\n';
+                }
+              }
+              if (currentPart) parts.push(currentPart);
+              for (const part of parts) {
+                await sendLineMessage(message.groupId, part, accessToken);
+              }
+            } else {
+              await sendLineMessage(message.groupId, msg, accessToken);
+            }
+            console.log(`✅ Personal summary sent for ${displayName}`);
+          } catch (error) {
+            console.error(`❌ Error generating personal summary: ${error.message}`);
           }
-          console.log(`✅ Summary sent`);
         } else if (message.content.trim() === 'บช') {
           console.log(`💳 Bank account command detected`);
           const bankMessage = `💳✨ ช่องทางการเติมเงิน ✨💳\n\n🏦 ธนาคารกรุงไทย\n🔢 เลขที่บัญชี: 865-0-35901-9\n👤 ชื่อบัญชี: ชญาภา พรรณวงค์\n\n📎 กรุณาส่งสลิปการโอนเงินในห้องแชทนี้`;
@@ -2550,12 +2640,12 @@ app.post('/webhook', async (req, res) => {
             }
             
             // ส่งข้อความไปที่กลุ่ม
-            const groupWithdrawalMessage = `📱 ${userDisplayName} ต้องการถอนเงิน\n📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE`;
+            const groupWithdrawalMessage = `📱 ${userDisplayName} ต้องการถอนเงิน\n📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/9EDgGIV`;
             await sendLineMessage(message.groupId, groupWithdrawalMessage, userToken || accessToken);
             console.log(`✅ Withdrawal notification sent to group`);
             
             // ส่งข้อความไปที่ส่วนตัว
-            const personalWithdrawalMessage = `📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/JO6X7FE\n\n💰 ยอดเงินปัจจุบัน: ${userBalance} บาท`;
+            const personalWithdrawalMessage = `📱 ติดต่อแอดมิน หากต้องการถอนเงิน\nhttps://lin.ee/9EDgGIV\n\n💰 ยอดเงินปัจจุบัน: ${userBalance} บาท`;
             await sendLineMessageToUser(message.userId, personalWithdrawalMessage, userToken || accessToken);
             console.log(`✅ Withdrawal message sent to user`);
             
@@ -2564,6 +2654,11 @@ app.post('/webhook', async (req, res) => {
             const errorMessage = `❌ เกิดข้อผิดพลาด: ${error.message}`;
             await sendLineMessageToUser(message.userId, errorMessage, accessToken);
           }
+        } else if (message.content.trim() === 'สรุป') {
+          console.log(`📊 Summary command detected`);
+          const summaryMessage = `📊 สรุปรายการเล่น\nhttps://lin.ee/9EDgGIV`;
+          await sendLineMessage(message.groupId, summaryMessage, accessToken);
+          console.log(`✅ Summary link sent`);
         } else {
           // Check if this is a result announcement
           const resultData = parseResultMessage(message.content);
@@ -2721,12 +2816,24 @@ app.post('/webhook', async (req, res) => {
                 if (controllerResult && controllerResult.text) {
                   // ตรวจสอบว่าเป็นข้อความสำเร็จหรือข้อความแจ้งเตือนข้อผิดพลาด
                   const isSuccessMessage = controllerResult.text.includes('จับคู่เล่นสำเร็จ') || 
-                                          controllerResult.text.includes('บันทึกการเล่นสำเร็จ');
+                                          controllerResult.text.includes('บันทึกการเล่นสำเร็จ') ||
+                                          controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
+                                          controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
+                                          controllerResult.text.includes('ช่างไม่ต่อย');
                   
                   if (isSuccessMessage) {
-                    console.log(`   📤 Sending reply message to user`);
-                    await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
-                    console.log(`   ✅ Reply sent`);
+                    // ส่งข้อความแจ้งเตือนชื่อบั้งไฟผิดเข้ากลุ่ม
+                    if (controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
+                        controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
+                        controllerResult.text.includes('ช่างไม่ต่อย')) {
+                      console.log(`   📤 Sending message to group`);
+                      await sendLineMessage(message.groupId, controllerResult.text, accessToken);
+                      console.log(`   ✅ Group message sent`);
+                    } else {
+                      console.log(`   📤 Sending reply message to user`);
+                      await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
+                      console.log(`   ✅ Reply sent`);
+                    }
                   } else {
                     // ข้อความแจ้งเตือนข้อผิดพลาด - ไม่ส่ง
                     console.log(`   ⏭️  Skipping error message (not sending to user)`);
