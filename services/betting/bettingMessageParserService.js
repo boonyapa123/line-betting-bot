@@ -20,6 +20,8 @@ class BettingMessageParserService {
   static METHOD1_SLASH_PATTERN = /^(ชล|ชถ|ชย)\/(\d+)\/([ก-๙\s]+)$/;
   // รูปแบบติดกัน: ชถ10ฟ้า หรือ ชล100ฟ้า
   static METHOD1_COMPACT_PATTERN = /^(ชล|ชถ|ชย)(\d+)([ก-๙]+.*)$/;
+  // รูปแบบติดกัน+space: ชล200 เสี่ยปาน (ไม่มี space หลัง ชล แต่มี space ก่อนชื่อบั้งไฟ)
+  static METHOD1_COMPACT_SPACE_PATTERN = /^(ชล|ชถ|ชย)(\d+)\s+(.+)$/;
   // รูปแบบ space+ติดกัน: ชถ 100เก่ง (มี space หลัง ชถ แต่ไม่มี space ก่อนชื่อบั้งไฟ)
   static METHOD1_SPACE_COMPACT_PATTERN = /^(ชล|ชถ|ชย)\s+(\d+)([ก-๙]+.*)$/;
 
@@ -92,6 +94,12 @@ class BettingMessageParserService {
     const method1CompactMatch = trimmedMessage.match(this.METHOD1_COMPACT_PATTERN);
     if (method1CompactMatch) {
       return this.parseMethod1Alt(method1CompactMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบติดกัน+space: ชล200 เสี่ยปาน
+    const method1CompactSpaceMatch = trimmedMessage.match(this.METHOD1_COMPACT_SPACE_PATTERN);
+    if (method1CompactSpaceMatch) {
+      return this.parseMethod1Alt(method1CompactSpaceMatch);
     }
 
     // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบ space+ติดกัน: ชถ 100เก่ง
