@@ -472,27 +472,16 @@ class BettingRoundController {
         if (announcedPrice) {
           parsedBet.price = announcedPrice.priceRange;
           console.log(`   💹 ดึงราคาช่างที่ประกาศ: ${announcedPrice.priceRange} สำหรับ ${announcedPrice.slipName}`);
-        } else {
-          // ตรวจสอบว่ามีบั้งไฟประกาศไว้ในกลุ่มนี้หรือไม่
-          const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
-          if (allPrices.length > 0) {
-            const availableNames = allPrices.map(p => p.slipName).join(', ');
-            console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในราคาช่างที่ประกาศ`);
-            return {
-              type: 'text',
-              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 พิมพ์บั้งไฟให้ตรง:\n${allPrices.map(p => `🎆 ${p.slipName}`).join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง\nตัวอย่าง : 300-330ล100ฟ้า`,
-            };
-          }
         }
       }
 
-      // ✅ ถ้าเป็นวิธีที่ 2 (ราคาคะแนน) ตรวจสอบชื่อบั้งไฟจากชีท FireworkNames + AnnouncedPrices
-      if (parsedBet.method === 2) {
+      // ✅ ตรวจสอบชื่อบั้งไฟจากทั้ง AnnouncedPrices และ FireworkNames (ทั้งวิธี 1 และ 2)
+      {
         const groupId = source.groupId || '';
         await announcedPriceService.ensureInitialized();
         
         // ตรวจจาก AnnouncedPrices
-        const announcedPrice = announcedPriceService.getAnnouncedPrice(groupId, parsedBet.slipName);
+        const foundInAnnounced = !!announcedPriceService.getAnnouncedPrice(groupId, parsedBet.slipName);
         
         // ตรวจจาก FireworkNames
         let foundInFireworkNames = false;
@@ -505,19 +494,16 @@ class BettingRoundController {
           });
           const fwRows = fwRes.data.values || [];
           for (const row of fwRows) {
-            if (row[0] === groupId) {
-              const fwName = (row[1] || '').trim();
-              if (fwName === parsedBet.slipName.trim()) {
-                foundInFireworkNames = true;
-                break;
-              }
+            if (row[0] === groupId && (row[1] || '').trim() === parsedBet.slipName.trim()) {
+              foundInFireworkNames = true;
+              break;
             }
           }
         } catch (e) {
           console.warn(`⚠️  Could not check FireworkNames: ${e.message}`);
         }
         
-        if (!announcedPrice && !foundInFireworkNames) {
+        if (!foundInAnnounced && !foundInFireworkNames) {
           // รวมรายชื่อบั้งไฟทั้งหมดในกลุ่ม
           const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
           let allNames = allPrices.map(p => `🎆 ${p.slipName}`);
@@ -527,7 +513,7 @@ class BettingRoundController {
             const spreadsheetId = announcedPriceService.spreadsheetId;
             const fwRes = await sheets.spreadsheets.values.get({
               spreadsheetId,
-              range: 'FireworkNames!A2:C',
+              range: 'FireworkNames!A2:B',
             });
             const fwRows = fwRes.data.values || [];
             for (const row of fwRows) {

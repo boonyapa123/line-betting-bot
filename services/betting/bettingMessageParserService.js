@@ -44,7 +44,7 @@ class BettingMessageParserService {
   static METHOD2_SIMPLE_PATTERN = /^(\d+[\-\.\/\*]\d+)\s+([ลย])\s+(\d+)\s+(.+)$/;
   static METHOD2_SLASH_PATTERN = /^([ก-๙]+)\/(\d+[\-\.\/\*]\d+)\/(\d+)\/?([ก-๙\s]+)$/;
   // รูปแบบติดกัน: 350-400ย44ฟ้า (ราคา+ฝั่ง+ยอด+ชื่อบั้งไฟ)
-  static METHOD2_COMPACT_PATTERN = /^(\d+[\-\.\/\*]\d+)([ลยตส])(\d+)([ก-๙]+.*)$/;
+  static METHOD2_COMPACT_PATTERN = /^(\d+[\-\.\/\*]\d+)([ลยตสถ])(\d+)([ก-๙]+.*)$/;
   
   /**
    * รูปแบบ Space-Slash: [ฝั่ง] [ราคา]/[ยอดเงิน][ชื่อบั้งไฟ]
@@ -295,8 +295,17 @@ class BettingMessageParserService {
     const sideMap = {
       'ล': 'ไล่',
       'ย': 'ยั้ง',
-      'ต': 'ต่อ',
-      'ส': 'สู้',
+      'ต': 'ยั้ง',
+      'ถ': 'ยั้ง',
+      'ส': 'ไล่',
+    };
+
+    const sideCodeMap = {
+      'ล': 'ล',
+      'ย': 'ย',
+      'ต': 'ย',
+      'ถ': 'ย',
+      'ส': 'ล',
     };
 
     return {
@@ -304,7 +313,7 @@ class BettingMessageParserService {
       method: 2,
       price: price.trim(),
       side: sideMap[side] || side,
-      sideCode: side,
+      sideCode: sideCodeMap[side] || side,
       amount: parseInt(amount),
       slipName: slipName.trim(),
       timestamp: new Date().toISOString(),
