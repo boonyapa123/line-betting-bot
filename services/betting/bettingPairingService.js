@@ -71,9 +71,16 @@ class BettingPairingService {
       console.log(`📊 recordBet received betData:`, JSON.stringify(betData, null, 2));
 
       // ถ้ามีข้อความเดิม ให้ใช้ข้อความเดิม ไม่ใช่สร้างข้อความใหม่
-      const messageText = originalMessage || (betData.price 
-        ? `${betData.price} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`
-        : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`);
+      // ✅ ถ้ามี price (ราคาช่าง) แต่ originalMessage ไม่มีช่วงราคา ให้เพิ่มเข้าไป
+      let messageText = originalMessage || '';
+      if (!messageText) {
+        messageText = betData.price 
+          ? `${betData.price} ${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`
+          : `${betData.sideCode}${betData.amount ? ' ' + betData.amount : ''} ${betData.slipName}`;
+      } else if (betData.price && !messageText.match(/\d+-\d+/)) {
+        // originalMessage ไม่มีช่วงราคา แต่มี betData.price → เพิ่มช่วงราคาเข้าไป
+        messageText = `${messageText} [ราคาช่าง:${betData.price}]`;
+      }
       
       const timestamp = new Date().toLocaleString('th-TH', {
         year: 'numeric',

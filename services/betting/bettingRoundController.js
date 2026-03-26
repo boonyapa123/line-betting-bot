@@ -8,6 +8,7 @@ const bettingRoundStateService = require('./bettingRoundStateService');
 const bettingPairingService = require('./bettingPairingService');
 const balanceCheckService = require('./balanceCheckService');
 const pendingBalanceService = require('./pendingBalanceService');
+const announcedPriceService = require('./announcedPriceService');
 
 class BettingRoundController {
   /**
@@ -19,6 +20,7 @@ class BettingRoundController {
       await bettingPairingService.initialize();
       await balanceCheckService.initialize();
       await pendingBalanceService.initialize();
+      await announcedPriceService.initialize();
       console.log('BettingRoundController initialized successfully');
     } catch (error) {
       console.error('Error initializing BettingRoundController:', error);
@@ -458,6 +460,16 @@ class BettingRoundController {
 
       console.log(`📊 Parsed bet:`, JSON.stringify(parsedBet, null, 2));
 
+      // ✅ ถ้าเป็นวิธีที่ 1 (ราคาช่าง) ให้ดึงช่วงราคาที่ประกาศไว้
+      if (parsedBet.method === 1 && !parsedBet.price) {
+        const groupId = source.groupId || '';
+        const announcedPrice = announcedPriceService.getAnnouncedPrice(groupId, parsedBet.slipName);
+        if (announcedPrice) {
+          parsedBet.price = announcedPrice.priceRange;
+          console.log(`   💹 ดึงราคาช่างที่ประกาศ: ${announcedPrice.priceRange} สำหรับ ${announcedPrice.slipName}`);
+        }
+      }
+
       // ตรวจสอบความถูกต้อง
       const validation = BettingMessageParserService.validateBet(parsedBet);
       if (!validation.valid) {
@@ -549,7 +561,7 @@ class BettingRoundController {
         type: 'text',
         text: `✅ บันทึกการเดิมพันสำเร็จ\n\n` +
           `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-          `💹 ราคา: ${parsedBet.price}\n` +
+          `💹 ราคา: ${parsedBet.price || 'ราคาช่าง'}\n` +
           `💰 ยอดเงิน: ${parsedBet.amount} บาท\n\n` +
           `⏳ รอการจับคู่...`,
       };
@@ -569,6 +581,9 @@ class BettingRoundController {
 
       case 'CALCULATE':
         return await this.handleCalculateCommand(command.slipName, command.score, source);
+
+      case 'ANNOUNCE_PRICE':
+        return await this.handleAnnouncePriceCommand(command.priceRange, command.slipName, source);
 
       default:
         return {
@@ -615,6 +630,37 @@ class BettingRoundController {
     return {
       type: 'text',
       text: result.message,
+    };
+  }
+
+  /**
+   * จัดการคำสั่ง ช่าง (ประกาศช่วงราคา)
+   * @private
+   */
+  async handleAnnouncePriceCommand(priceRange, slipName, source) {
+    const groupId = source.groupId || '';
+    const result = await announcedPriceService.announcePrice(groupId, slipName, priceRange);
+
+    if (!result.success) {
+      return {
+        type: 'text',
+        text: `❌ ${result.error}`,
+      };
+    }
+
+    // แสดงรายการราคาที่ประกาศทั้งหมดในกลุ่ม
+    const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
+    let priceList = '';
+    for (const p of allPrices) {
+      priceList += `   🎆 ${p.slipName}: ${p.priceRange}\n`;
+    }
+
+    return {
+      type: 'text',
+      text: `✅ ประกาศราคาช่างสำเร็จ\n\n` +
+        `🎆 บั้งไฟ: ${slipName}\n` +
+        `💹 ช่วงราคา: ${priceRange}\n\n` +
+        `📋 รายการราคาที่ประกาศ:\n${priceList}`,
     };
   }
 
@@ -792,6 +838,11 @@ class BettingRoundController {
 
       // ล้างข้อมูลการเล่น
       await bettingPairingService.clearRoundTransactions();
+
+      // ลบช่วงราคาที่ประกาศสำหรับบั้งไฟนี้
+      if (source?.groupId) {
+        await announcedPriceService.removeAnnouncedPrice(source.groupId, slipName);
+      }
 
       // ปิดรอบ
       await bettingRoundStateService.closeRound();

@@ -106,11 +106,17 @@ class BetsSheetColumns {
     // ตัวอย่าง: "ชล 500 ฟ้าหลังฝน" → price = null (Method 1)
     const message = row[this.COLUMNS.MESSAGE_A] || '';
     
-    // ตรวจสอบรูปแบบ slash ก่อน: [ฝั่ง]/[ราคา]/[ยอดเงิน][ชื่อบั้งไฟ] หรือ [ฝั่ง]/[ราคา]/[ยอดเงิน]/[ชื่อบั้งไฟ]
-    let priceMatch = message.match(/\/(\d+[\-\.\/\*]\d+)\//);
+    // ตรวจสอบรูปแบบ tag ราคาช่าง: [ราคาช่าง:330-375]
+    let priceMatch = message.match(/\[ราคาช่าง:(\d+-\d+)\]/);
     let price = priceMatch ? priceMatch[1] : null;
+
+    // ตรวจสอบรูปแบบ slash: [ฝั่ง]/[ราคา]/[ยอดเงิน][ชื่อบั้งไฟ]
+    if (!price) {
+      priceMatch = message.match(/\/(\d+[\-\.\/\*]\d+)\//);
+      price = priceMatch ? priceMatch[1] : null;
+    }
     
-    // ถ้าไม่พบ ให้ตรวจสอบรูปแบบปกติ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
+    // ตรวจสอบรูปแบบปกติ: [ราคา] [ล/ย] [ยอดเงิน] [ชื่อบั้งไฟ]
     if (!price) {
       priceMatch = message.match(/^(\d+[\-\.\/\*]\d+)/);
       price = priceMatch ? priceMatch[1] : null;
@@ -263,7 +269,11 @@ class BetsSheetColumns {
     if (!priceA) return '';
     
     // ดึงช่วงราคาจาก Price A
-    const priceMatch = priceA.match(/^(\d+-\d+)/);
+    // รองรับทั้งรูปแบบปกติ (300-320 ล 20 ฟ้า) และ tag ราคาช่าง [ราคาช่าง:330-375]
+    let priceMatch = priceA.match(/\[ราคาช่าง:(\d+-\d+)\]/);
+    if (!priceMatch) {
+      priceMatch = priceA.match(/(\d+-\d+)/);
+    }
     if (!priceMatch) return '';
     
     const priceRange = priceMatch[1];

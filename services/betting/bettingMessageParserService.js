@@ -20,6 +20,8 @@ class BettingMessageParserService {
   static METHOD1_SLASH_PATTERN = /^(ชล|ชถ|ชย)\/(\d+)\/([ก-๙\s]+)$/;
   // รูปแบบติดกัน: ชถ10ฟ้า หรือ ชล100ฟ้า
   static METHOD1_COMPACT_PATTERN = /^(ชล|ชถ|ชย)(\d+)([ก-๙]+.*)$/;
+  // รูปแบบ space+ติดกัน: ชถ 100เก่ง (มี space หลัง ชถ แต่ไม่มี space ก่อนชื่อบั้งไฟ)
+  static METHOD1_SPACE_COMPACT_PATTERN = /^(ชล|ชถ|ชย)\s+(\d+)([ก-๙]+.*)$/;
 
   /**
    * Regex Pattern สำหรับวิธีที่ 2 (ราคาคะแนน)
@@ -90,6 +92,12 @@ class BettingMessageParserService {
     const method1CompactMatch = trimmedMessage.match(this.METHOD1_COMPACT_PATTERN);
     if (method1CompactMatch) {
       return this.parseMethod1Alt(method1CompactMatch);
+    }
+
+    // ตรวจสอบวิธีที่ 1 (ราคาช่าง) - รูปแบบ space+ติดกัน: ชถ 100เก่ง
+    const method1SpaceCompactMatch = trimmedMessage.match(this.METHOD1_SPACE_COMPACT_PATTERN);
+    if (method1SpaceCompactMatch) {
+      return this.parseMethod1Alt(method1SpaceCompactMatch);
     }
 
     // ตรวจสอบวิธีที่ 2 (ราคาคะแนน) - รูปแบบเดิม
@@ -355,6 +363,18 @@ class BettingMessageParserService {
    */
   static parseAdminCommand(message) {
     const trimmedMessage = message.trim();
+
+    // คำสั่ง ช่าง [ราคา] [ชื่อบั้งไฟ]
+    // ตัวอย่าง: "ช่าง 330-375 เก่งเจริญ"
+    const changMatch = trimmedMessage.match(/^ช่าง\s+(\d+-\d+)\s+(.+)$/);
+    if (changMatch) {
+      return {
+        isCommand: true,
+        command: 'ANNOUNCE_PRICE',
+        priceRange: changMatch[1],
+        slipName: changMatch[2].trim(),
+      };
+    }
 
     // คำสั่ง :เริ่ม
     if (trimmedMessage.startsWith(':เริ่ม')) {
