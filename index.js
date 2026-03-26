@@ -2819,13 +2819,17 @@ app.post('/webhook', async (req, res) => {
                                           controllerResult.text.includes('บันทึกการเล่นสำเร็จ') ||
                                           controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
                                           controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
-                                          controllerResult.text.includes('ช่างไม่ต่อย');
+                                          controllerResult.text.includes('ช่างไม่ต่อย') ||
+                                          controllerResult.text.includes('รูปแบบผิดครับ') ||
+                                          controllerResult.text.includes('ต้องใส่ยอดเงิน');
                   
                   if (isSuccessMessage) {
                     // ส่งข้อความแจ้งเตือนชื่อบั้งไฟผิดเข้ากลุ่ม
                     if (controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
                         controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
-                        controllerResult.text.includes('ช่างไม่ต่อย')) {
+                        controllerResult.text.includes('ช่างไม่ต่อย') ||
+                        controllerResult.text.includes('รูปแบบผิดครับ') ||
+                        controllerResult.text.includes('ต้องใส่ยอดเงิน')) {
                       console.log(`   📤 Sending message to group`);
                       await sendLineMessage(message.groupId, controllerResult.text, accessToken);
                       console.log(`   ✅ Group message sent`);
