@@ -149,17 +149,11 @@ class AnnouncedPriceService {
 
     const trimmedName = slipName.trim();
 
-    // exact match ก่อน
+    // exact match เท่านั้น
     if (groupPrices.has(trimmedName)) {
       return groupPrices.get(trimmedName);
     }
 
-    // partial match
-    for (const [name, data] of groupPrices) {
-      if (name.includes(trimmedName) || trimmedName.includes(name)) {
-        return data;
-      }
-    }
     return null;
   }
 

@@ -507,9 +507,7 @@ class BettingRoundController {
           for (const row of fwRows) {
             if (row[0] === groupId) {
               const fwName = (row[1] || '').trim();
-              if (fwName === parsedBet.slipName.trim() || 
-                  fwName.includes(parsedBet.slipName.trim()) || 
-                  parsedBet.slipName.trim().includes(fwName)) {
+              if (fwName === parsedBet.slipName.trim()) {
                 foundInFireworkNames = true;
                 break;
               }
