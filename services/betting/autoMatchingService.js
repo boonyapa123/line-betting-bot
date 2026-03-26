@@ -141,13 +141,24 @@ class AutoMatchingService {
    * @param {string} resultSymbol - ผลลัพธ์ (✅ = ชนะ, ❌ = แพ้, ⛔️ = เสมอ)
    * @returns {Object} ผลการคำนวน
    */
-  calculateWinLoss(pair, resultSymbol, resultNumber = null) {
+  calculateWinLoss(pair, resultSymbol, resultNumber = null, groupId = '') {
     const betAmount = pair.betAmount;
     let resultA, resultB, winningsA, winningsB;
 
     // ถ้ามี resultNumber และ messageA มีช่วงราคา → ใช้ checkPriceRangeResult
     const messageA = pair.playerA.messageA || '';
-    const priceMatch = messageA.match(/(\d+)-(\d+)/);
+    let priceMatch = messageA.match(/(\d+)-(\d+)/);
+    
+    // ✅ ถ้า messageA ไม่มีช่วงราคา ให้ดึงจากชีท AnnouncedPrices
+    if (!priceMatch && resultNumber && groupId) {
+      const announcedPriceService = require('./announcedPriceService');
+      const fireworkName = pair.playerA.fireworkName || pair.playerA.slipName || '';
+      const announced = announcedPriceService.getAnnouncedPrice(groupId, fireworkName);
+      if (announced) {
+        priceMatch = [null, String(announced.min), String(announced.max)];
+        console.log(`   💹 ดึงราคาช่างจาก AnnouncedPrices: ${announced.priceRange} สำหรับ ${fireworkName}`);
+      }
+    }
     
     if (resultNumber && priceMatch) {
       const bettingResultService = require('./bettingResultService');

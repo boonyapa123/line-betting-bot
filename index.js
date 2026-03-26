@@ -2594,7 +2594,7 @@ app.post('/webhook', async (req, res) => {
               for (const pair of matchedPairs) {
                 try {
                   // คำนวนแพ้ชนะ
-                  const winLoss = matchingService.calculateWinLoss(pair, resultData.result, resultData.resultNumber);
+                  const winLoss = matchingService.calculateWinLoss(pair, resultData.result, resultData.resultNumber, message.groupId);
                   
                   // อัปเดตผลลัพธ์
                   await matchingService.updateResultAndBalance(pair, winLoss, resultData.resultNumber);
