@@ -249,7 +249,7 @@ class BettingRoundController {
           type: 'text',
           text: `✅ จับคู่เล่นสำเร็จ\n\n` +
             `🎆 บั้งไฟ: ${pendingBet.slipName}\n` +
-            `💹 ราคา: ${parsedBet.price}\n\n` +
+            `💹 ราคา: ${pendingBet.price || parsedBet.price || 'ราคาช่าง'}\n\n` +
             `👤 ${pendingBet.displayName}\n` +
             `   ฝั่ง: ${pendingBet.sideCode}\n` +
             `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
@@ -440,7 +440,7 @@ class BettingRoundController {
           type: 'text',
           text: `✅ จับคู่เล่นสำเร็จ\n\n` +
             `🎆 บั้งไฟ: ${parsedBet.slipName}\n` +
-            `💹 ราคา: ${parsedBet.price}\n\n` +
+            `💹 ราคา: ${pendingBet.price || parsedBet.price || 'ราคาช่าง'}\n\n` +
             `👤 ${pendingBet.displayName}\n` +
             `   ฝั่ง: ${pendingBet.sideCode}\n` +
             `   ยอดเงิน: ${pendingBet.amount} บาท\n\n` +
