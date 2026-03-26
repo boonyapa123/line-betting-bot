@@ -355,13 +355,7 @@ class BettingMessageParserService {
    * @private
    */
   static getHint(message) {
-    if (message.includes('ชล') || message.includes('ชถ')) {
-      return '❌ ต้องใส่ยอดเงินและชื่อบั้งไฟ!\n\nตัวอย่าง: ชล100ฟ้า หรือ ชถ100ฟ้า';
-    }
-    if (message.includes('ล') || message.includes('ย') || message.includes('ต') || message.includes('ส')) {
-      return '❌ ต้องใส่ยอดเงินและชื่อบั้งไฟ!\n\nตัวอย่าง: 300-330ล100ฟ้า หรือ 300-330ย100ฟ้า';
-    }
-    return '❌ รูปแบบไม่ถูกต้อง\n\nวิธีที่ 1: ชล100ฟ้า\nวิธีที่ 2: 300-330ล100ฟ้า';
+    return '❌ ต้องใส่ยอดเงินและชื่อบั้งไฟ!\n\nตัวอย่าง:\n300-330ล100ฟ้า\n300-330ย100ฟ้า\nชถ300ฟ้า\nชล300ฟ้า';
   }
 
   /**
