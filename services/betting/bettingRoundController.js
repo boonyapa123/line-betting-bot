@@ -480,7 +480,7 @@ class BettingRoundController {
             console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในราคาช่างที่ประกาศ`);
             return {
               type: 'text',
-              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 บั้งไฟที่ประกาศราคาช่าง:\n${allPrices.map(p => `🎆 ${p.slipName} (${p.priceRange})`).join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง`,
+              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 พิมพ์บั้งไฟให้ตรง:\n${allPrices.map(p => `🎆 ${p.slipName}`).join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง\nตัวอย่าง : 300-330ล100ฟ้า`,
             };
           }
         }
@@ -520,7 +520,7 @@ class BettingRoundController {
         if (!announcedPrice && !foundInFireworkNames) {
           // รวมรายชื่อบั้งไฟทั้งหมดในกลุ่ม
           const allPrices = announcedPriceService.getAllAnnouncedPrices(groupId);
-          let allNames = allPrices.map(p => `🎆 ${p.slipName} (${p.priceRange})`);
+          let allNames = allPrices.map(p => `🎆 ${p.slipName}`);
           
           try {
             const sheets = announcedPriceService.sheets;
@@ -532,7 +532,7 @@ class BettingRoundController {
             const fwRows = fwRes.data.values || [];
             for (const row of fwRows) {
               if (row[0] === groupId) {
-                allNames.push(`🎆 ${row[1]} (ร้องราคาเอง)`);
+                allNames.push(`🎆 ${row[1]}`);
               }
             }
           } catch (e) { /* ignore */ }
@@ -541,7 +541,7 @@ class BettingRoundController {
             console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในรายการที่ประกาศ`);
             return {
               type: 'text',
-              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 บั้งไฟที่ประกาศ:\n${allNames.join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง`,
+              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 พิมพ์บั้งไฟให้ตรง:\n${allNames.join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง\nตัวอย่าง : 300-330ล100ฟ้า`,
             };
           }
         }
@@ -777,7 +777,7 @@ class BettingRoundController {
         type: 'text',
         text: `✅ บันทึกบั้งไฟ "${slipName}" สำเร็จ\n\n` +
           `🎆 ช่างไม่ต่อย — ร้องราคาเอง\n` +
-          `💡 ใช้วิธีที่ 2: ไล่/350-390/100${slipName}`,
+          `💡 ใช้วิธีที่ 2: 350-400ย44${slipName}`,
       };
     } catch (error) {
       console.error('Error saving firework name:', error);
