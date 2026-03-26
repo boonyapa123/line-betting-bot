@@ -141,7 +141,7 @@ class AutoMatchingService {
    * @param {string} resultSymbol - ผลลัพธ์ (✅ = ชนะ, ❌ = แพ้, ⛔️ = เสมอ)
    * @returns {Object} ผลการคำนวน
    */
-  calculateWinLoss(pair, resultSymbol, resultNumber = null, groupId = '') {
+  async calculateWinLoss(pair, resultSymbol, resultNumber = null, groupId = '') {
     const betAmount = pair.betAmount;
     let resultA, resultB, winningsA, winningsB;
 
@@ -152,6 +152,7 @@ class AutoMatchingService {
     // ✅ ถ้า messageA ไม่มีช่วงราคา ให้ดึงจากชีท AnnouncedPrices
     if (!priceMatch && resultNumber && groupId) {
       const announcedPriceService = require('./announcedPriceService');
+      await announcedPriceService.ensureInitialized();
       const fireworkName = pair.playerA.fireworkName || pair.playerA.slipName || '';
       const announced = announcedPriceService.getAnnouncedPrice(groupId, fireworkName);
       if (announced) {
