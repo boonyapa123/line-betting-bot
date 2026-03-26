@@ -739,8 +739,7 @@ class BettingRoundController {
       type: 'text',
       text: `✅ ประกาศราคาช่างสำเร็จ\n\n` +
         `🎆 บั้งไฟ: ${slipName}\n` +
-        `💹 ช่วงราคา: ${priceRange}\n\n` +
-        `📋 รายการราคาที่ประกาศ:\n${priceList}`,
+        `💹 ช่วงราคา: ${priceRange}`,
     };
   }
 
