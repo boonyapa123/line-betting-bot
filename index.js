@@ -2302,7 +2302,8 @@ app.post('/webhook', async (req, res) => {
           if (!verificationService.isReceiverMatched(verificationResult)) {
             // Fallback: เทียบชื่อผู้รับจาก response data (สำหรับ PromptPay ที่ checkReceiver เช็คไม่ได้)
             const receiverName = verificationResult?.data?.receiver?.account?.name || '';
-            const isNameMatched = SLIP_RECEIVER_NAMES.some(name => receiverName.includes(name));
+            const receiverNameLower = receiverName.toLowerCase();
+            const isNameMatched = SLIP_RECEIVER_NAMES.some(name => receiverNameLower.includes(name.toLowerCase()));
             
             if (isNameMatched) {
               console.log(`   ✅ Receiver name matched: "${receiverName}" (fallback check)`);
