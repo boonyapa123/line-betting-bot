@@ -528,7 +528,8 @@ class BettingRoundController {
             console.log(`   ❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}" ในรายการที่ประกาศ`);
             return {
               type: 'text',
-              text: `❌ ไม่พบชื่อบั้งไฟ "${parsedBet.slipName}"\n\n📋 พิมพ์บั้งไฟให้ตรง:\n${allNames.join('\n')}\n\n💡 กรุณาพิมพ์ชื่อบั้งไฟให้ตรง\nตัวอย่าง : 300-330ล100ฟ้า`,
+              text: `รูปแบบผิดครับ กรุณาตรวจสอบการเว้นวรรค\n\n❌ ต้องใส่ยอดเงินและชื่อบั้งไฟ!\n\nตัวอย่าง:\n300-330ล100ฟ้า\n300-330ย100ฟ้า\nชถ300ฟ้า\nชล300ฟ้า`,
+              isBetAttempt: true,
             };
           }
         }
