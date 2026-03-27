@@ -2832,9 +2832,15 @@ app.post('/webhook', async (req, res) => {
                         controllerResult.text.includes('บันทึกบั้งไฟ') ||
                         controllerResult.text.includes('ถูกจับคู่ไปแล้ว') ||
                         controllerResult.isBetAttempt === true) {
-                      console.log(`   📤 Sending message to group`);
-                      await sendLineMessage(message.groupId, controllerResult.text, accessToken);
-                      console.log(`   ✅ Group message sent`);
+                      // ถูกจับคู่ไปแล้ว → ส่ง DM คน reply ซ้ำอย่างเดียว ไม่ส่งเข้ากลุ่ม
+                      if (controllerResult.text.includes('ถูกจับคู่ไปแล้ว')) {
+                        await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
+                        console.log(`   ✅ DM sent to duplicate replier`);
+                      } else {
+                        console.log(`   📤 Sending message to group`);
+                        await sendLineMessage(message.groupId, controllerResult.text, accessToken);
+                        console.log(`   ✅ Group message sent`);
+                      }
                       // ส่ง DM ให้คน reply ซ้ำด้วย
                       if (controllerResult.text.includes('ถูกจับคู่ไปแล้ว')) {
                         await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
