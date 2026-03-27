@@ -691,18 +691,9 @@ class BettingPairingService {
    * @returns {object}
    */
   async clearRoundTransactions() {
-    try {
-      // ลบข้อมูลทั้งหมดใน Transactions Sheet
-      await this.sheets.spreadsheets.values.clear({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.transactionsSheetName}!A2:I`,
-      });
-
-      return { success: true, message: 'ล้างข้อมูลการเล่นสำเร็จ' };
-    } catch (error) {
-      console.error('Error clearing transactions:', error);
-      return { success: false, message: 'เกิดข้อผิดพลาดในการล้างข้อมูล' };
-    }
+    // ไม่ลบข้อมูล เก็บไว้ทั้งหมดเพื่อดูประวัติย้อนหลัง
+    console.log(`📋 Keeping all bets data in sheet`);
+    return { success: true, message: 'เก็บข้อมูลทั้งหมด' };
   }
 
   /**
