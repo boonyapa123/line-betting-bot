@@ -214,16 +214,12 @@ class BettingRoundController {
         // อัปเดตแถวของ User A ด้วยข้อมูล User B
         console.log(`📝 Updating row with User B data...`);
 
-        // สร้าง Price B จาก Price A
-        const priceB = BetsSheetColumns.createPriceB(pendingBet.message, pendingBet.sideCode);
-
         const userBData = {
           userId: userId,
           displayName: displayName,
           sideCode: parsedBet.sideCode,
           amount: parsedBet.amount,
           price: parsedBet.price,
-          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
           slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
           groupName: '', // ยังไม่มีข้อมูล
           tokenB: '', // ยังไม่มีข้อมูล
@@ -405,16 +401,12 @@ class BettingRoundController {
         // อัปเดตแถวของ User A ด้วยข้อมูล User B
         console.log(`📝 Updating row with User B data...`);
 
-        // สร้าง Price B จาก Price A
-        const priceB = BetsSheetColumns.createPriceB(pendingBet.message, pendingBet.sideCode);
-
         const userBData = {
           userId: userId,
           displayName: displayName,
           sideCode: parsedBet.sideCode,
           amount: parsedBet.amount,
           price: parsedBet.price,
-          priceB: priceB,  // ✅ เพิ่ม Price B ที่มีช่วงราคา
           slipName: pendingBet.slipName,  // ✅ ใช้ slip name เดียวกับของ User A
           groupName: '', // ยังไม่มีข้อมูล
           tokenB: '', // ยังไม่มีข้อมูล

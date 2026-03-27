@@ -296,14 +296,14 @@ class BetsSheetColumns {
     if (userBData.userId) row[this.COLUMNS.USER_B_ID] = userBData.userId;
     if (userBData.displayName) row[this.COLUMNS.USER_B_NAME] = userBData.displayName;
     
-    // ✅ บันทึก Price B ที่มีช่วงราคาเดียวกับ Price A แต่ฝั่งตรงข้าม
-    if (userBData.priceB) {
-      // ใช้ Price B ที่ส่งมา (มีช่วงราคา)
-      row[this.COLUMNS.SIDE_B] = userBData.priceB;
+    // ✅ บันทึก Side B = ฝั่งตรงข้ามของ Side A (คอลัมน์ F)
+    // ใช้รูปแบบเดียวกับคอลัมน์ F แต่เป็นฝั่งตรงข้าม
+    const sideA = row[this.COLUMNS.SIDE_A] || '';
+    if (sideA) {
+      row[this.COLUMNS.SIDE_B] = this.getOppositeSide(sideA);
     } else if (userBData.sideCode) {
-      // ถ้าไม่มี Price B ให้ใช้ opposite side code
-      const oppositeSide = this.getOppositeSide(userBData.sideCode);
-      row[this.COLUMNS.SIDE_B] = oppositeSide;
+      // fallback: ถ้าไม่มี Side A ให้ใช้ opposite ของ sideCode ที่ส่งมา
+      row[this.COLUMNS.SIDE_B] = this.getOppositeSide(userBData.sideCode);
     }
     
     // ✅ บันทึก amount B
