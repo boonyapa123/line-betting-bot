@@ -455,10 +455,11 @@ class BettingRoundController {
       const parsedBet = BettingMessageParserService.parseMessage(message.text);
 
       if (!parsedBet.success) {
-        // ไม่ส่งข้อความแจ้งเตือนในกลุ่ม
+        // ส่งเข้ากลุ่มเฉพาะเมื่อคล้ายการเดิมพัน
         return {
           type: 'text',
           text: `${parsedBet.error}\n\n${parsedBet.hint}`,
+          isBetAttempt: parsedBet.isBetAttempt || false,
         };
       }
 

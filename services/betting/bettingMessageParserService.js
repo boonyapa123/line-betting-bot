@@ -132,10 +132,16 @@ class BettingMessageParserService {
       return this.parseMethod2Compact(method2CompactMatch);
     }
 
-    // ไม่ตรงรูปแบบ
+    // ไม่ตรงรูปแบบ — ตรวจว่าคล้ายการเดิมพันหรือไม่
+    const isBetAttempt = /^(ชล|ชถ|ชย)/.test(trimmedMessage) ||
+                         /^\d+-\d+/.test(trimmedMessage) ||
+                         /^(ไล่|ยั้ง|ล|ย|ต|ส|ถ)\//.test(trimmedMessage) ||
+                         /\d+-\d+[ลยตสถ]/.test(trimmedMessage);
+
     return {
       success: false,
       method: null,
+      isBetAttempt,
       error: 'รูปแบบผิดครับ กรุณาตรวจสอบการเว้นวรรค',
       hint: this.getHint(trimmedMessage),
     };
