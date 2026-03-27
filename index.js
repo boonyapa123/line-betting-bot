@@ -2849,29 +2849,53 @@ app.post('/webhook', async (req, res) => {
                   isHandledByController = true;
                   console.log(`✅ Pair matched - sending notifications to both players and group`);
                   
-                  // ดึงข้อมูลผู้เล่น A จากแถวที่เพิ่งอัปเดต
+                  // ดึงข้อมูลจาก Bets sheet เป็นหลัก
                   try {
                     const bettingPairingService = require('./services/betting/bettingPairingService');
                     const groupBets = await bettingPairingService.getBetsByGroupId(message.groupId || '');
                     
-                    // ค้นหาแถวที่เพิ่งอัปเดต (มี User B แล้ว)
-                    const latestBet = groupBets.find(bet => bet.userBId && bet.userBId !== '');
+                    // ค้นหาแถวที่เพิ่งจับคู่ (มี User B + ยังไม่มีผล)
+                    const matchedBets = groupBets.filter(bet => 
+                      bet.userBId && bet.userBId !== '' && !bet.result
+                    );
+                    const latestBet = matchedBets[matchedBets.length - 1];
                     
-                    if (latestBet && latestBet.userId) {
-                      console.log(`   📤 Sending notification to Player A: ${latestBet.displayName}`);
-                      await sendLineMessageToUser(latestBet.userId, controllerResult.text, accessToken);
-                      console.log(`   ✅ Player A notification sent`);
+                    if (latestBet) {
+                      // สร้างข้อความจากข้อมูลใน sheet
+                      const matchMsg = `📢 ✅ จับคู่เล่นสำเร็จ\n\n` +
+                        `🎆 บั้งไฟ: ${latestBet.slipName}\n` +
+                        `💹 ราคา: ${latestBet.price || 'ราคาช่าง'}\n\n` +
+                        `👤 ${latestBet.displayName}\n` +
+                        `   ฝั่ง: ${latestBet.sideCode}\n` +
+                        `   ยอดเงิน: ${latestBet.amount} บาท\n\n` +
+                        `👤 ${latestBet.userBName}\n` +
+                        `   ฝั่ง: ${latestBet.sideBCode || '-'}\n` +
+                        `   ยอดเงิน: ${latestBet.amountB} บาท\n\n` +
+                        `⏳ รอการประกาศผล...`;
+                      
+                      // ส่งให้ Player A
+                      if (latestBet.userId) {
+                        console.log(`   📤 Sending notification to Player A: ${latestBet.displayName}`);
+                        await sendLineMessageToUser(latestBet.userId, matchMsg, accessToken);
+                        console.log(`   ✅ Player A notification sent`);
+                      }
+                      
+                      // ส่งให้ Player B
+                      if (latestBet.userBId) {
+                        console.log(`   📤 Sending notification to Player B: ${latestBet.userBName}`);
+                        await sendLineMessageToUser(latestBet.userBId, matchMsg, accessToken);
+                        console.log(`   ✅ Player B notification sent`);
+                      }
+                      
+                      // ส่งเข้ากลุ่ม
+                      if (message.sourceType === 'group') {
+                        console.log(`   📢 Sending group notification`);
+                        await sendLineMessage(message.groupId, matchMsg, accessToken);
+                        console.log(`   ✅ Group notification sent`);
+                      }
                     }
-                  } catch (playerAError) {
-                    console.error(`   ⚠️  Failed to send notification to Player A: ${playerAError.message}`);
-                  }
-                  
-                  // ส่งข้อความเข้ากลุ่มเพื่อแจ้งการจับคู่สำเร็จ (เฉพาะข้อความจับคู่สำเร็จเท่านั้น)
-                  if (message.sourceType === 'group') {
-                    const groupNotification = `📢 ${controllerResult.text}`;
-                    console.log(`   📢 Sending group notification`);
-                    await sendLineMessage(message.groupId, groupNotification, accessToken);
-                    console.log(`   ✅ Group notification sent`);
+                  } catch (notifyError) {
+                    console.error(`   ⚠️  Failed to send match notifications: ${notifyError.message}`);
                   }
                 }
                 
