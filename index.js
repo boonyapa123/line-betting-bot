@@ -2821,6 +2821,7 @@ app.post('/webhook', async (req, res) => {
                                           controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
                                           controllerResult.text.includes('ช่างไม่ต่อย') ||
                                           controllerResult.text.includes('บันทึกบั้งไฟ') ||
+                                          controllerResult.text.includes('ถูกจับคู่ไปแล้ว') ||
                                           controllerResult.isBetAttempt === true;
                   
                   if (isSuccessMessage) {
@@ -2829,10 +2830,16 @@ app.post('/webhook', async (req, res) => {
                         controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
                         controllerResult.text.includes('ช่างไม่ต่อย') ||
                         controllerResult.text.includes('บันทึกบั้งไฟ') ||
+                        controllerResult.text.includes('ถูกจับคู่ไปแล้ว') ||
                         controllerResult.isBetAttempt === true) {
                       console.log(`   📤 Sending message to group`);
                       await sendLineMessage(message.groupId, controllerResult.text, accessToken);
                       console.log(`   ✅ Group message sent`);
+                      // ส่ง DM ให้คน reply ซ้ำด้วย
+                      if (controllerResult.text.includes('ถูกจับคู่ไปแล้ว')) {
+                        await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
+                        console.log(`   ✅ DM sent to duplicate replier`);
+                      }
                     } else {
                       console.log(`   📤 Sending reply message to user`);
                       await sendLineMessageToUser(message.userId, controllerResult.text, accessToken);
