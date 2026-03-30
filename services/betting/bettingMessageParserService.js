@@ -391,9 +391,21 @@ class BettingMessageParserService {
       };
     }
 
+    // คำสั่ง A หรือ a ตามด้วยชื่อบั้งไฟ (ทำงานเหมือน ช่างยังไม่ต่อย)
+    // ตัวอย่าง: "Aฟ้า", "aฟ้า"
+    const aCommandMatch = trimmedMessage.match(/^[Aa]\s*([ก-๙].+)$/);
+    if (aCommandMatch) {
+      return {
+        isCommand: true,
+        command: 'NO_CHANG_PRICE',
+        slipName: aCommandMatch[1].trim(),
+        fromACommand: true,
+      };
+    }
+
     // คำสั่ง ช่าง [ราคา] [ชื่อบั้งไฟ]
-    // ตัวอย่าง: "ช่าง 330-375 เก่งเจริญ"
-    const changMatch = trimmedMessage.match(/^ช่าง\s+(\d+-\d+)\s+(.+)$/);
+    // ตัวอย่าง: "ช่าง 330-375 เก่งเจริญ", "ช่าง330-375เก่งเจริญ", "ช่าง330-375 เก่งเจริญ"
+    const changMatch = trimmedMessage.match(/^ช่าง\s*(\d+-\d+)\s*(.+)$/);
     if (changMatch) {
       return {
         isCommand: true,

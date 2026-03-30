@@ -643,7 +643,7 @@ class BettingRoundController {
         return await this.handleAnnouncePriceCommand(command.priceRange, command.slipName, source);
 
       case 'NO_CHANG_PRICE':
-        return await this.handleNoChangPriceCommand(command.slipName, source);
+        return await this.handleNoChangPriceCommand(command.slipName, source, command.fromACommand);
 
       default:
         return {
@@ -727,7 +727,7 @@ class BettingRoundController {
    * จัดการคำสั่ง ช่างไม่ต่อย (เก็บชื่อบั้งไฟสำหรับร้องราคาเอง)
    * @private
    */
-  async handleNoChangPriceCommand(slipName, source) {
+  async handleNoChangPriceCommand(slipName, source, fromACommand = false) {
     const groupId = source.groupId || '';
     
     try {
@@ -751,6 +751,15 @@ class BettingRoundController {
       });
 
       console.log(`📢 ช่างไม่ต่อย: ${slipName} (กลุ่ม: ${groupId})`);
+
+      if (fromACommand) {
+        return {
+          type: 'text',
+          text: `🎆 ช่างยังไม่ต่อย ${slipName}\n\n` +
+            `🔥 เล่นเลยๆ\n` +
+            `💡 ใช้วิธีที่ 2: 350-400ย44${slipName}`,
+        };
+      }
 
       return {
         type: 'text',

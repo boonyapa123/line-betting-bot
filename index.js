@@ -377,14 +377,21 @@ function parseResultMessage(message) {
   }
   
   // แยกชื่อบั้งไฟ เลขที่ออก และผลลัพธ์
-  const resultMatch = messageWithoutPrice.match(/(.+?)\s+(\d+)\s*(✅|❌|⛔️)/);
+  // รองรับ emoji ทั้งแบบมีและไม่มี variation selector (FE0F)
+  const resultMatch = messageWithoutPrice.match(/(.+?)\s+(\d+)\s*(✅️?|❌️?|⛔️?)/);
   if (!resultMatch) return null;
+  
+  // Normalize emoji ให้เป็นรูปแบบเดียวกันเสมอ (ไม่มี variation selector)
+  let resultEmoji = resultMatch[3].replace(/\uFE0F/g, '');
+  // แปลงกลับเป็น emoji มาตรฐานที่ใช้ในระบบ
+  const emojiMap = { '\u2705': '✅', '\u274C': '❌', '\u26D4': '⛔️' };
+  resultEmoji = emojiMap[resultEmoji] || resultEmoji;
   
   return {
     priceRange: priceRange,
     fireworkName: resultMatch[1].trim(),
     resultNumber: resultMatch[2],
-    result: resultMatch[3]
+    result: resultEmoji
   };
 }
 
