@@ -2828,6 +2828,7 @@ app.post('/webhook', async (req, res) => {
                                           controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
                                           controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
                                           controllerResult.text.includes('ช่างไม่ต่อย') ||
+                                          controllerResult.text.includes('ช่างยังไม่ต่อย') ||
                                           controllerResult.text.includes('บันทึกบั้งไฟ') ||
                                           controllerResult.text.includes('ถูกจับคู่ไปแล้ว') ||
                                           controllerResult.isBetAttempt === true;
@@ -2837,6 +2838,7 @@ app.post('/webhook', async (req, res) => {
                     if (controllerResult.text.includes('ไม่พบชื่อบั้งไฟ') ||
                         controllerResult.text.includes('ประกาศราคาช่างสำเร็จ') ||
                         controllerResult.text.includes('ช่างไม่ต่อย') ||
+                        controllerResult.text.includes('ช่างยังไม่ต่อย') ||
                         controllerResult.text.includes('บันทึกบั้งไฟ') ||
                         controllerResult.text.includes('ถูกจับคู่ไปแล้ว') ||
                         controllerResult.isBetAttempt === true) {
